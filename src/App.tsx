@@ -441,17 +441,6 @@ function App() {
       }
     }
 
-    // iOS only registers the page as a media session owner after metadata is
-    // set, so populate it before attaching action handlers.
-    try {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: 'Drone',
-        artist: 'Drone App',
-      })
-    } catch {
-      // Some browsers reject MediaMetadata before user gesture; ignore.
-    }
-
     setActionHandler('play', () => {
       droneEngine.ensureRunning(latestRuntimeConfigRef.current)
       useDroneStore.getState().setPlaying(true)
@@ -484,6 +473,24 @@ function App() {
       // Ignore browsers that reject the write.
     }
   }, [playing])
+
+  // Show the currently selected preset name on the iOS lock screen.
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) {
+      return
+    }
+    const activePresetName =
+      presets.find((preset) => preset.id === activePresetId)?.name ?? 'Drone'
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: activePresetName,
+        artist: songName || 'Drone',
+        album: 'Drone App',
+      })
+    } catch {
+      // Some browsers reject MediaMetadata before user gesture; ignore.
+    }
+  }, [activePresetId, presets, songName])
 
   // iOS PWA needs an actively playing media element for the OS to route
   // Bluetooth controls to our MediaSession handlers. We keep a silent
