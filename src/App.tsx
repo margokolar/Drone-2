@@ -425,6 +425,55 @@ function App() {
   })
 
   useEffect(() => {
+    if (!('mediaSession' in navigator)) {
+      return
+    }
+
+    const setActionHandler = (
+      action: MediaSessionAction,
+      handler: MediaSessionActionHandler | null,
+    ) => {
+      try {
+        navigator.mediaSession.setActionHandler(action, handler)
+      } catch {
+        // iOS Safari can reject unsupported handlers; keep play/pause working.
+      }
+    }
+
+    setActionHandler('play', () => {
+      droneEngine.ensureRunning(latestRuntimeConfigRef.current)
+      useDroneStore.getState().setPlaying(true)
+    })
+    setActionHandler('pause', () => {
+      useDroneStore.getState().setPlaying(false)
+    })
+    setActionHandler('nexttrack', () => {
+      useDroneStore.getState().selectNextPreset()
+    })
+    setActionHandler('previoustrack', () => {
+      useDroneStore.getState().selectPreviousPreset()
+    })
+
+    return () => {
+      setActionHandler('play', null)
+      setActionHandler('pause', null)
+      setActionHandler('nexttrack', null)
+      setActionHandler('previoustrack', null)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) {
+      return
+    }
+    try {
+      navigator.mediaSession.playbackState = playing ? 'playing' : 'paused'
+    } catch {
+      // Ignore browsers that reject the write.
+    }
+  }, [playing])
+
+  useEffect(() => {
     const navigatorWithAudioSession = navigator as Navigator & {
       audioSession?: { type: string }
     }
