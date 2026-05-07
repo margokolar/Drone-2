@@ -985,14 +985,16 @@ function App() {
     >
       <div className="mx-auto w-full max-w-md px-3 py-5 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl">
         <header className="sticky top-2 z-40 mb-3 flex items-center gap-3 rounded-xl border border-white/10 bg-[#111019]/90 px-3 py-2 backdrop-blur-sm landscape:hidden max-h-[500px]:hidden">
-          <button
-            type="button"
-            aria-label={menuLabel}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-white/80"
-            onClick={() => setMenuOpen(true)}
-          >
-            <Menu size={20} />
-          </button>
+          {activeTab !== 'blank' && (
+            <button
+              type="button"
+              aria-label={menuLabel}
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-white/80"
+              onClick={() => setMenuOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
+          )}
           <h1 className="text-xl font-semibold tracking-wide">Drone</h1>
           <div className="ml-auto text-4xl font-extrabold leading-none text-fuchsia-100">{currentTime}</div>
         </header>
