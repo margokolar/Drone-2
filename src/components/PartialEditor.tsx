@@ -3,6 +3,8 @@ import { useRef } from 'react'
 import type { PartialConfig } from '../audio/types'
 import { NumericValueField } from './NumericValueField'
 
+const SOLO_LONG_PRESS_MS = 800
+
 type PartialEditorProps = {
   partials: PartialConfig[]
   referenceFrequencyHz: number | null
@@ -31,6 +33,8 @@ export function PartialEditor({
   onSetTimbreValue,
 }: PartialEditorProps) {
   const soloRestoreRef = useRef<Map<string, boolean> | null>(null)
+  const soloPressTimerRef = useRef<number | null>(null)
+  const soloPressTriggeredRef = useRef(false)
 
   const morphFromBlend = (sine: number, saw: number, square: number): number => {
     const total = Math.max(0, sine) + Math.max(0, saw) + Math.max(0, square)
@@ -84,6 +88,13 @@ export function PartialEditor({
     return partials.every((partial) => (partial.id === partialId ? partial.enabled : !partial.enabled))
   }
 
+  const clearSoloPressTimer = () => {
+    if (soloPressTimerRef.current !== null) {
+      window.clearTimeout(soloPressTimerRef.current)
+      soloPressTimerRef.current = null
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-3">
@@ -108,16 +119,18 @@ export function PartialEditor({
         {partials.map((partial, index) => (
           <article key={partial.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-sm font-semibold text-white/85">Partial {index + 1}</div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className={`button-safe min-h-[44px] rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition ${
-                    isSoloFor(partial.id)
-                      ? 'border-fuchsia-300/70 bg-fuchsia-300/25 text-white'
-                      : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
-                  }`}
-                  onClick={() => {
+              <button
+                type="button"
+                className={`rounded-md px-2 py-1 text-sm font-semibold transition ${
+                  isSoloFor(partial.id)
+                    ? 'bg-amber-300/20 text-amber-100'
+                    : 'text-white/85 hover:bg-white/10'
+                }`}
+                onPointerDown={() => {
+                  soloPressTriggeredRef.current = false
+                  clearSoloPressTimer()
+                  soloPressTimerRef.current = window.setTimeout(() => {
+                    soloPressTriggeredRef.current = true
                     if (isSoloFor(partial.id) && soloRestoreRef.current) {
                       setEnabledForAll(soloRestoreRef.current)
                       soloRestoreRef.current = null
@@ -133,24 +146,37 @@ export function PartialEditor({
                       soloState.set(item.id, item.id === partial.id)
                     })
                     setEnabledForAll(soloState)
-                  }}
-                >
-                  Solo
-                </button>
-                <button
-                  type="button"
-                  className={`button-safe min-h-[44px] rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition ${
-                    !partial.enabled
-                      ? 'border-red-300/50 bg-red-300/20 text-red-100'
-                      : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
-                  }`}
-                  onClick={() => {
+                  }, SOLO_LONG_PRESS_MS)
+                }}
+                onPointerUp={clearSoloPressTimer}
+                onPointerLeave={clearSoloPressTimer}
+                onPointerCancel={clearSoloPressTimer}
+                onClick={() => {
+                  if (soloPressTriggeredRef.current) {
+                    soloPressTriggeredRef.current = false
+                    return
+                  }
+                  if (soloRestoreRef.current) {
+                    setEnabledForAll(soloRestoreRef.current)
                     soloRestoreRef.current = null
-                    onSetPartialEnabled(partial.id, !partial.enabled)
-                  }}
-                >
-                  Mute
-                </button>
+                  }
+                }}
+              >
+                Partial {index + 1}
+              </button>
+              <div className="flex items-center gap-2">
+                <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 text-xs text-white/70">
+                  <input
+                    type="checkbox"
+                    checked={partial.enabled}
+                    onChange={(event) => {
+                      soloRestoreRef.current = null
+                      onSetPartialEnabled(partial.id, event.target.checked)
+                    }}
+                    className="h-5 w-5 shrink-0 accent-fuchsia-300"
+                  />
+                  Active
+                </label>
                 <button
                   type="button"
                   className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 p-2 text-white/70 transition hover:bg-white/10"

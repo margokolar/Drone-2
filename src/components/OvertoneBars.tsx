@@ -11,6 +11,7 @@ type OvertoneBarsProps = {
 
 const MIN_DB = -48
 const MAX_DB = 0
+const SOLO_LONG_PRESS_MS = 800
 
 function toPercentFromDb(db: number): number {
   return ((clamp(db, MIN_DB, MAX_DB) - MIN_DB) / (MAX_DB - MIN_DB)) * 100
@@ -23,8 +24,12 @@ function toDbFromPercent(percent: number): number {
 export function OvertoneBars({ partials, onGainChange, onToggleEnabled, onGainDragStart }: OvertoneBarsProps) {
   const [activePartialId, setActivePartialId] = useState<string | null>(null)
   const [dragGainDb, setDragGainDb] = useState<number | null>(null)
+  const [soloPartialId, setSoloPartialId] = useState<string | null>(null)
   const rafIdRef = useRef<number | null>(null)
   const pendingRef = useRef<{ partialId: string; gainDb: number } | null>(null)
+  const soloRestoreRef = useRef<Map<string, boolean> | null>(null)
+  const soloPressTimerRef = useRef<number | null>(null)
+  const soloPressTriggeredRef = useRef(false)
 
   const flushPending = () => {
     if (rafIdRef.current !== null) {
@@ -57,6 +62,47 @@ export function OvertoneBars({ partials, onGainChange, onToggleEnabled, onGainDr
     }
   }
 
+  const applyEnabledMap = (enabledById: Map<string, boolean>) => {
+    partials.forEach((partial) => {
+      const nextEnabled = enabledById.get(partial.id)
+      if (typeof nextEnabled === 'boolean' && nextEnabled !== partial.enabled) {
+        onToggleEnabled(partial.id, nextEnabled)
+      }
+    })
+  }
+
+  const restoreSoloState = () => {
+    const restore = soloRestoreRef.current
+    if (!restore) {
+      return false
+    }
+    applyEnabledMap(restore)
+    soloRestoreRef.current = null
+    setSoloPartialId(null)
+    return true
+  }
+
+  const enterSoloState = (partialId: string) => {
+    const restoreState = new Map<string, boolean>()
+    partials.forEach((partial) => {
+      restoreState.set(partial.id, partial.enabled)
+    })
+    soloRestoreRef.current = restoreState
+    const soloState = new Map<string, boolean>()
+    partials.forEach((partial) => {
+      soloState.set(partial.id, partial.id === partialId)
+    })
+    applyEnabledMap(soloState)
+    setSoloPartialId(partialId)
+  }
+
+  const clearSoloPressTimer = () => {
+    if (soloPressTimerRef.current !== null) {
+      window.clearTimeout(soloPressTimerRef.current)
+      soloPressTimerRef.current = null
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="hide-scrollbar touch-pan-x overflow-x-auto">
@@ -65,15 +111,19 @@ export function OvertoneBars({ partials, onGainChange, onToggleEnabled, onGainDr
             const isDragging = activePartialId === partial.id && dragGainDb !== null
             const gainDbForHeight = isDragging ? dragGainDb : partial.gainDb
             const heightPercent = toPercentFromDb(gainDbForHeight)
+            const isSoloMode = soloPartialId !== null
+            const isSoloTarget = soloPartialId === partial.id
             const barClass = partial.enabled
               ? 'border-red-500/65 bg-black/40'
               : 'border-red-900/70 bg-black/25'
             const fillClass = partial.enabled
               ? 'from-fuchsia-900 via-fuchsia-700 to-fuchsia-400'
               : 'from-violet-950 via-violet-900 to-violet-700'
-            const chipClass = partial.enabled
-              ? 'border-white/10 bg-white/8 text-white/85'
-              : 'border-white/5 bg-white/3 text-white/45'
+            const chipClass = isSoloTarget
+              ? 'border-amber-300/70 bg-amber-300/25 text-amber-100'
+              : partial.enabled
+                ? 'border-white/10 bg-white/8 text-white/85'
+                : 'border-white/5 bg-white/3 text-white/45'
             return (
               <div key={partial.id} className="space-y-1">
                 <button
@@ -119,7 +169,30 @@ export function OvertoneBars({ partials, onGainChange, onToggleEnabled, onGainDr
                 <button
                   type="button"
                   className={`flex h-[35px] w-full min-w-0 items-center justify-center rounded border text-center text-xs tabular-nums landscape:h-7 max-h-[500px]:h-7 ${chipClass}`}
-                  onClick={() => onToggleEnabled(partial.id, !partial.enabled)}
+                  onPointerDown={() => {
+                    soloPressTriggeredRef.current = false
+                    clearSoloPressTimer()
+                    soloPressTimerRef.current = window.setTimeout(() => {
+                      soloPressTriggeredRef.current = true
+                      if (!restoreSoloState()) {
+                        enterSoloState(partial.id)
+                      }
+                    }, SOLO_LONG_PRESS_MS)
+                  }}
+                  onPointerUp={clearSoloPressTimer}
+                  onPointerLeave={clearSoloPressTimer}
+                  onPointerCancel={clearSoloPressTimer}
+                  onClick={() => {
+                    if (soloPressTriggeredRef.current) {
+                      soloPressTriggeredRef.current = false
+                      return
+                    }
+                    if (isSoloMode) {
+                      restoreSoloState()
+                      return
+                    }
+                    onToggleEnabled(partial.id, !partial.enabled)
+                  }}
                   aria-label={`Toggle overtone ${index + 1}`}
                 >
                   {index + 1}
