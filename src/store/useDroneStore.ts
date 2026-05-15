@@ -545,21 +545,33 @@ export const useDroneStore = create<DroneState>()(
       saveCurrentSongToLibrary: (songName) =>
         set((state) => {
           const resolvedName = songName?.trim() || state.songName || 'My Song'
-          const existingIndex = state.songLibrary.findIndex((entry) => entry.name === resolvedName)
-          const currentSongSnapshot: SongEntry = {
-            id:
-              existingIndex >= 0
-                ? state.songLibrary[existingIndex].id
-                : `song-${Date.now()}`,
-            name: resolvedName,
+          const currentIndex = state.songLibrary.findIndex((entry) => entry.name === state.songName)
+          const snapshot: Omit<SongEntry, 'id' | 'name'> = {
             presets: state.presets.map((preset) => duplicatePresetData(preset)),
             activePresetId: state.activePresetId,
           }
           let nextLibrary = [...state.songLibrary]
-          if (existingIndex >= 0) {
-            nextLibrary[existingIndex] = currentSongSnapshot
+          if (currentIndex >= 0) {
+            nextLibrary[currentIndex] = {
+              ...nextLibrary[currentIndex],
+              ...snapshot,
+              name: resolvedName,
+            }
           } else {
-            nextLibrary.push(currentSongSnapshot)
+            const byNameIndex = nextLibrary.findIndex((entry) => entry.name === resolvedName)
+            if (byNameIndex >= 0) {
+              nextLibrary[byNameIndex] = {
+                ...nextLibrary[byNameIndex],
+                ...snapshot,
+                name: resolvedName,
+              }
+            } else {
+              nextLibrary.push({
+                id: `song-${Date.now()}`,
+                name: resolvedName,
+                ...snapshot,
+              })
+            }
           }
           return {
             songName: resolvedName,

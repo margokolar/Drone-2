@@ -51,18 +51,20 @@ export function SongLibraryMenu({
   }, [menuOpen])
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative min-w-0" ref={menuRef}>
       <button
         type="button"
         className={
           triggerClassName ??
-          'flex min-h-[40px] w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 transition hover:bg-white/10'
+          'flex min-h-[40px] w-full min-w-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 transition hover:bg-white/10'
         }
         onClick={() => setMenuOpen((current) => !current)}
         aria-expanded={menuOpen}
         aria-label="Open song list"
       >
-        <span className="min-w-0 truncate">{songName}</span>
+        <span className="min-w-0 flex-1 truncate text-left" title={songName}>
+          {songName}
+        </span>
         <ChevronDown size={12} className="shrink-0" />
       </button>
       {menuOpen && (
@@ -76,16 +78,19 @@ export function SongLibraryMenu({
             type="button"
             className="mb-2 block min-h-[38px] w-full rounded-md border border-fuchsia-300/40 bg-fuchsia-300/10 px-3 py-2 text-left text-sm text-fuchsia-100 transition hover:bg-fuchsia-300/20"
             onClick={() => {
-              const suggestedName = songName || 'My Song'
-              const inputName = window.prompt('Save current song as', suggestedName)
+              const inputName = window.prompt('Song name', songName || 'My Song')
               if (inputName === null) {
                 return
               }
-              onSaveCurrentSong(inputName)
+              const trimmed = inputName.trim()
+              if (!trimmed) {
+                return
+              }
+              onSaveCurrentSong(trimmed)
               setMenuOpen(false)
             }}
           >
-            Save current song
+            Save / rename song
           </button>
           {songLibrary.map((song) => {
             const isActiveSong = song.name === songName

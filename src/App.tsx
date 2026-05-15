@@ -48,6 +48,10 @@ const TABS: { id: TabId; label: string }[] = [
 ]
 const APP_VERSION = '1.1'
 const MAX_OVERTONE_HISTORY = 60
+const SONG_MENU_TRIGGER_CLASS =
+  'flex min-h-[40px] w-full min-w-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 transition hover:bg-white/10'
+const SONG_MENU_DROPDOWN_CLASS =
+  'absolute left-0 right-0 z-40 mt-1 max-h-64 w-[calc(100vw-1.5rem)] max-w-[calc(100vw-3.5rem)] overflow-y-auto rounded-lg border border-white/10 bg-[#1a1825] p-2 shadow-xl md:max-w-96'
 
 function isIosStandalone(): boolean {
   const nav = navigator as Navigator & { standalone?: boolean }
@@ -791,7 +795,7 @@ function App() {
           }`}
         >
           <div className="space-y-4" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
-            <div className="sticky top-[68px] z-20 grid grid-cols-2 gap-2 landscape:top-2 max-h-[500px]:top-2">
+            <div className="sticky top-[68px] z-20 grid grid-cols-2 gap-2 overflow-visible landscape:top-2 max-h-[500px]:top-2">
               <article className="rounded-xl border border-fuchsia-300/45 bg-fuchsia-300/14 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -812,7 +816,7 @@ function App() {
                   </button>
                 </div>
               </article>
-              <article className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <article className="min-w-0 overflow-visible rounded-xl border border-white/10 bg-white/5 p-3">
                 <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
                   Song
                 </h2>
@@ -823,6 +827,8 @@ function App() {
                   onLoadSong={loadSongFromLibrary}
                   onMoveSong={moveSongInLibrary}
                   onDeleteSong={deleteSongFromLibrary}
+                  triggerClassName={SONG_MENU_TRIGGER_CLASS}
+                  dropdownClassName={SONG_MENU_DROPDOWN_CLASS}
                 />
               </article>
             </div>
@@ -974,8 +980,8 @@ function App() {
                   onLoadSong={loadSongFromLibrary}
                   onMoveSong={moveSongInLibrary}
                   onDeleteSong={deleteSongFromLibrary}
-                  triggerClassName="flex min-h-[40px] items-center gap-2 rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/90 transition hover:bg-white/10"
-                  dropdownClassName="absolute right-0 z-40 mt-1 max-h-64 w-72 max-w-[calc(100vw-3.5rem)] overflow-y-auto rounded-lg border border-white/10 bg-[#1a1825] p-2 shadow-xl md:w-96 md:max-w-96"
+                  triggerClassName={`${SONG_MENU_TRIGGER_CLASS} w-auto max-w-full px-4`}
+                  dropdownClassName={`${SONG_MENU_DROPDOWN_CLASS} left-auto right-0 w-72`}
                 />
               }
             >
