@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 
 const VIEWPORT_GUTTER_PX = 12
 const VIEWPORT_DROPDOWN_CLASS =
-  'fixed z-[60] max-h-64 overflow-y-auto rounded-lg border border-white/10 bg-[#1a1825] p-2 shadow-xl'
+  'fixed z-[60] overflow-y-auto rounded-lg border border-white/10 bg-[#1a1825] p-2 shadow-xl'
 const ANCHOR_DROPDOWN_CLASS =
   'fixed z-[60] max-h-64 overflow-y-auto rounded-lg border border-white/10 bg-[#1a1825] p-2 shadow-xl'
 
@@ -51,10 +51,13 @@ export function SongLibraryMenu({
     }
     const rect = trigger.getBoundingClientRect()
     if (dropdownPlacement === 'viewport') {
+      const top = rect.bottom + 4
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight
       setDropdownStyle({
-        top: rect.bottom + 4,
+        top,
         left: VIEWPORT_GUTTER_PX,
         right: VIEWPORT_GUTTER_PX,
+        maxHeight: Math.max(120, viewportHeight - top - VIEWPORT_GUTTER_PX),
       })
       return
     }
