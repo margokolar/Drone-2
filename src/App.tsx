@@ -1,9 +1,6 @@
 import {
-  ArrowDown,
-  ArrowUp,
   AudioWaveform,
   BatteryMedium,
-  ChevronDown,
   Download,
   Info,
   Menu,
@@ -14,7 +11,6 @@ import {
   Save,
   StepBack,
   StepForward,
-  Trash2,
   Undo2,
   Upload,
   X,
@@ -30,6 +26,7 @@ import { OvertoneMidiPanel } from './components/OvertoneMidiPanel'
 import { PartialEditor } from './components/PartialEditor'
 import { PresetList } from './components/PresetList'
 import { SectionCard } from './components/SectionCard'
+import { SongLibraryMenu } from './components/SongLibraryMenu'
 import { ToneMixer } from './components/ToneMixer'
 import { TopControls } from './components/TopControls'
 import { useAudioEngine } from './hooks/useAudioEngine'
@@ -108,14 +105,12 @@ function focusWithIosKeyboard(target: HTMLInputElement | HTMLTextAreaElement): v
 function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<TabId>('tone')
-  const [songMenuOpen, setSongMenuOpen] = useState(false)
   const [currentTime, setCurrentTime] = useState(() =>
     new Date().toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit' }),
   )
   const upPressTimeoutRef = useRef<number | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const overtoneAnalyzeInputRef = useRef<HTMLInputElement | null>(null)
-  const songMenuRef = useRef<HTMLDivElement | null>(null)
   const sideMenuRef = useRef<HTMLElement | null>(null)
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
   const overtoneUndoRef = useRef<PartialConfig[][]>([])
@@ -748,26 +743,6 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!songMenuOpen) {
-      return
-    }
-    const closeOnOutsidePointer = (event: PointerEvent) => {
-      const container = songMenuRef.current
-      if (!container) {
-        return
-      }
-      const target = event.target
-      if (target instanceof Node && !container.contains(target)) {
-        setSongMenuOpen(false)
-      }
-    }
-    window.addEventListener('pointerdown', closeOnOutsidePointer)
-    return () => {
-      window.removeEventListener('pointerdown', closeOnOutsidePointer)
-    }
-  }, [songMenuOpen])
-
-  useEffect(() => {
     if (!menuOpen) {
       return
     }
@@ -816,22 +791,41 @@ function App() {
           }`}
         >
           <div className="space-y-4" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
-            <SectionCard
-              title="Current preset"
-              className="relative sticky top-[68px] z-20 border-fuchsia-300/45 bg-fuchsia-300/14 p-1.5 pr-11 [&>header]:mb-0.5 [&>header>h2]:text-[11px] landscape:top-2 max-h-[500px]:top-2"
-            >
-              <div className="min-w-0 truncate text-sm font-semibold text-white/90">
-                {presets.find((preset) => preset.id === activePresetId)?.name ?? 'Preset'}
-              </div>
-              <button
-                type="button"
-                className="button-safe absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10"
-                onClick={saveActivePreset}
-                aria-label="Save active preset"
-              >
-                <Save size={15} />
-              </button>
-            </SectionCard>
+            <div className="sticky top-[68px] z-20 grid grid-cols-2 gap-2 landscape:top-2 max-h-[500px]:top-2">
+              <article className="rounded-xl border border-fuchsia-300/45 bg-fuchsia-300/14 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
+                      Preset
+                    </h2>
+                    <p className="mt-1 truncate text-sm font-semibold text-white/90">
+                      {presets.find((preset) => preset.id === activePresetId)?.name ?? 'Preset'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10"
+                    onClick={saveActivePreset}
+                    aria-label="Save current preset"
+                  >
+                    <Save size={15} />
+                  </button>
+                </div>
+              </article>
+              <article className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
+                  Song
+                </h2>
+                <SongLibraryMenu
+                  songName={songName}
+                  songLibrary={songLibrary}
+                  onSaveCurrentSong={saveCurrentSongToLibrary}
+                  onLoadSong={loadSongFromLibrary}
+                  onMoveSong={moveSongInLibrary}
+                  onDeleteSong={deleteSongFromLibrary}
+                />
+              </article>
+            </div>
             <SectionCard title="Global controls" className="[&>header]:mb-1">
               <div className="space-y-5">
                 <TopControls
@@ -973,101 +967,16 @@ function App() {
             <SectionCard
               title="Presets"
               rightSlot={
-                <div className="relative" ref={songMenuRef}>
-                  <button
-                    type="button"
-                    className="flex min-h-[40px] items-center gap-2 rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/90 transition hover:bg-white/10"
-                    onClick={() => setSongMenuOpen((current) => !current)}
-                    aria-expanded={songMenuOpen}
-                    aria-label="Open song list"
-                  >
-                    <span>{songName}</span>
-                    <ChevronDown size={12} />
-                  </button>
-                  {songMenuOpen && (
-                    <div className="absolute right-0 z-40 mt-1 max-h-64 w-72 max-w-[calc(100vw-3.5rem)] overflow-y-auto rounded-lg border border-white/10 bg-[#1a1825] p-2 shadow-xl md:w-96 md:max-w-96">
-                      <button
-                        type="button"
-                        className="mb-2 block min-h-[38px] w-full rounded-md border border-fuchsia-300/40 bg-fuchsia-300/10 px-3 py-2 text-left text-sm text-fuchsia-100 transition hover:bg-fuchsia-300/20"
-                        onClick={() => {
-                          const suggestedName = songName || 'My Song'
-                          const inputName = window.prompt('Save current song as', suggestedName)
-                          if (inputName === null) {
-                            return
-                          }
-                          saveCurrentSongToLibrary(inputName)
-                          setSongMenuOpen(false)
-                        }}
-                      >
-                        Save current song
-                      </button>
-                      {songLibrary.map((song) => {
-                        const isActiveSong = song.name === songName
-                        const songIndex = songLibrary.findIndex((entry) => entry.id === song.id)
-                        const canMoveUp = songIndex > 0
-                        const canMoveDown = songIndex < songLibrary.length - 1
-                        return (
-                          <div
-                            key={song.id}
-                            className={`flex items-center gap-2 rounded-md px-1 py-1.5 ${
-                              isActiveSong ? 'bg-fuchsia-300/20' : ''
-                            }`}
-                          >
-                            <button
-                              type="button"
-                              className={`min-w-0 flex-1 rounded px-2 py-1.5 text-left text-sm transition ${
-                                isActiveSong
-                                  ? 'text-fuchsia-100'
-                                  : 'text-white/80 hover:bg-white/10'
-                              }`}
-                              onClick={() => {
-                                loadSongFromLibrary(song.id)
-                                setSongMenuOpen(false)
-                              }}
-                            >
-                              <span className="block truncate">{song.name}</span>
-                            </button>
-                            <button
-                              type="button"
-                              className="flex h-8 w-8 items-center justify-center rounded border border-white/20 bg-white/10 text-white/80 transition hover:bg-white/15 disabled:opacity-40"
-                              aria-label={`Move ${song.name} up`}
-                              disabled={!canMoveUp}
-                              onClick={() => moveSongInLibrary(song.id, 'up')}
-                            >
-                              <ArrowUp size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              className="flex h-8 w-8 items-center justify-center rounded border border-white/20 bg-white/10 text-white/80 transition hover:bg-white/15 disabled:opacity-40"
-                              aria-label={`Move ${song.name} down`}
-                              disabled={!canMoveDown}
-                              onClick={() => moveSongInLibrary(song.id, 'down')}
-                            >
-                              <ArrowDown size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              className="flex h-8 w-8 items-center justify-center rounded border border-red-300/40 bg-red-300/10 text-red-100 transition hover:bg-red-300/20 disabled:opacity-40"
-                              aria-label={`Delete ${song.name}`}
-                              disabled={songLibrary.length <= 1}
-                              onClick={() => {
-                                const confirmed = window.confirm(
-                                  `Delete song \"${song.name}\" from library?`,
-                                )
-                                if (!confirmed) {
-                                  return
-                                }
-                                deleteSongFromLibrary(song.id)
-                              }}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
+                <SongLibraryMenu
+                  songName={songName}
+                  songLibrary={songLibrary}
+                  onSaveCurrentSong={saveCurrentSongToLibrary}
+                  onLoadSong={loadSongFromLibrary}
+                  onMoveSong={moveSongInLibrary}
+                  onDeleteSong={deleteSongFromLibrary}
+                  triggerClassName="flex min-h-[40px] items-center gap-2 rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/90 transition hover:bg-white/10"
+                  dropdownClassName="absolute right-0 z-40 mt-1 max-h-64 w-72 max-w-[calc(100vw-3.5rem)] overflow-y-auto rounded-lg border border-white/10 bg-[#1a1825] p-2 shadow-xl md:w-96 md:max-w-96"
+                />
               }
             >
               <PresetList
