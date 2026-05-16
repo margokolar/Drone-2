@@ -717,8 +717,8 @@ function App() {
             activeTab === 'blank' ? 'pb-20' : activeTab === 'metronome' ? 'pb-32' : 'pb-44'
           }`}
         >
-          <div className="space-y-4" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
-            <div className="sticky top-[68px] z-20 -mx-3 grid grid-cols-2 gap-2 overflow-visible bg-[#111019] px-3 pb-2 landscape:top-2 max-h-[500px]:top-2">
+          <div className="space-y-3" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
+            <div className="sticky top-[68px] z-20 -mx-3 grid grid-cols-2 gap-2 overflow-visible bg-[#111019] px-3 landscape:top-2 max-h-[500px]:top-2">
               <article className="relative rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
                 <button
                   type="button"
@@ -726,11 +726,11 @@ function App() {
                   onClick={() => setActiveTab('presets')}
                   aria-label="Open presets"
                 />
-                <div className="pointer-events-none relative min-w-0 pr-20">
+                <div className="pointer-events-none relative min-w-0">
                   <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
                     Preset
                   </h2>
-                  <p className="mt-1 truncate text-sm font-semibold text-white/90">
+                  <p className="mt-4 truncate text-sm font-semibold text-white/90">
                     {presets.find((preset) => preset.id === activePresetId)?.name ?? 'Preset'}
                   </p>
                 </div>
