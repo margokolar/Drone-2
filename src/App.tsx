@@ -719,23 +719,22 @@ function App() {
         >
           <div className="space-y-4" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
             <div className="sticky top-[68px] z-20 -mx-3 grid grid-cols-2 gap-2 overflow-visible bg-[#111019] px-3 pb-2 landscape:top-2 max-h-[500px]:top-2">
-              <article className="relative rounded-xl border border-fuchsia-300/45 bg-[#211a2d]">
+              <article className="relative rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
                 <button
                   type="button"
-                  className="block min-h-full w-full rounded-xl p-3 pr-20 text-left transition hover:bg-fuchsia-300/10"
+                  className="absolute inset-0 rounded-xl transition hover:bg-fuchsia-300/10"
                   onClick={() => setActiveTab('presets')}
                   aria-label="Open presets"
-                >
-                  <div className="min-w-0">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
-                      Preset
-                    </h2>
-                    <p className="mt-1 truncate text-sm font-semibold text-white/90">
-                      {presets.find((preset) => preset.id === activePresetId)?.name ?? 'Preset'}
-                    </p>
-                  </div>
-                </button>
-                <div className="absolute right-2 top-2 flex gap-1">
+                />
+                <div className="pointer-events-none relative min-w-0 pr-20">
+                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
+                    Preset
+                  </h2>
+                  <p className="mt-1 truncate text-sm font-semibold text-white/90">
+                    {presets.find((preset) => preset.id === activePresetId)?.name ?? 'Preset'}
+                  </p>
+                </div>
+                <div className="absolute right-2 top-2 z-10 flex gap-1">
                   <button
                     type="button"
                     className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] text-white/80 transition hover:bg-[#352a48]"

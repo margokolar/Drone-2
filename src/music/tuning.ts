@@ -116,6 +116,14 @@ function frequencyFromMidi(midi: number, a4Hz: number): number {
   return a4Hz * 2 ** ((midi - 69) / 12);
 }
 
+function normalizeFrequencyNearReference(frequency: number, referenceFrequency: number): number {
+  if (frequency <= 0 || referenceFrequency <= 0) {
+    return frequency;
+  }
+  const octaveShift = Math.round(Math.log2(referenceFrequency / frequency));
+  return frequency * 2 ** octaveShift;
+}
+
 function getJustRatio(noteClass: NoteClass, center: TonalCenter): number {
   const semitoneDistance = semitoneDistanceFromCenter(noteClass, center);
   return (
@@ -211,9 +219,12 @@ export function getNaturalFrequency(
   baseOctave: number
 ): number {
   const { noteClass, octaveOffset } = splitNoteId(noteId);
-  return (
+  const tunedFrequency =
     getNaturalFrequencyFromParts(noteClass, octaveOffset, center, a4Hz, baseOctave) *
-    getA4ScaleFactor("just", center, a4Hz, baseOctave)
+    getA4ScaleFactor("just", center, a4Hz, baseOctave);
+  return normalizeFrequencyNearReference(
+    tunedFrequency,
+    getEqualTemperamentFrequency(noteId, a4Hz, baseOctave)
   );
 }
 
@@ -224,9 +235,12 @@ export function getPythagoreanFrequency(
   baseOctave: number
 ): number {
   const { noteClass, octaveOffset } = splitNoteId(noteId);
-  return (
+  const tunedFrequency =
     getPythagoreanFrequencyFromParts(noteClass, octaveOffset, center, a4Hz, baseOctave) *
-    getA4ScaleFactor("pythagorean", center, a4Hz, baseOctave)
+    getA4ScaleFactor("pythagorean", center, a4Hz, baseOctave);
+  return normalizeFrequencyNearReference(
+    tunedFrequency,
+    getEqualTemperamentFrequency(noteId, a4Hz, baseOctave)
   );
 }
 
@@ -237,9 +251,12 @@ export function getBohlenPierceFrequency(
   baseOctave: number
 ): number {
   const { noteClass, octaveOffset } = splitNoteId(noteId);
-  return (
+  const tunedFrequency =
     getBohlenPierceFrequencyFromParts(noteClass, octaveOffset, center, a4Hz, baseOctave) *
-    getA4ScaleFactor("bohlen-pierce", center, a4Hz, baseOctave)
+    getA4ScaleFactor("bohlen-pierce", center, a4Hz, baseOctave);
+  return normalizeFrequencyNearReference(
+    tunedFrequency,
+    getEqualTemperamentFrequency(noteId, a4Hz, baseOctave)
   );
 }
 
