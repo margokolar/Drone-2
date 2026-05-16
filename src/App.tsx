@@ -779,7 +779,14 @@ function App() {
               <Menu size={20} />
             </button>
           )}
-          <h1 className="text-xl font-semibold tracking-wide">Drone 2</h1>
+          <button
+            type="button"
+            className="rounded-lg px-1 py-1 text-xl font-semibold tracking-wide text-white transition hover:bg-white/10"
+            onClick={() => setActiveTab('tone')}
+            aria-label="Open Tone home"
+          >
+            Drone 2
+          </button>
           <div className="ml-auto text-4xl font-extrabold leading-none text-fuchsia-100">{currentTime}</div>
         </header>
 
