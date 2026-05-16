@@ -70,6 +70,9 @@ type DroneState = {
   deletePreset: (presetId: string) => void
   movePreset: (presetId: string, direction: 'up' | 'down') => void
   importSong: (songPresets: Preset[], activePresetId?: string, songName?: string) => void
+  importSongLibrary: (
+    songs: Array<{ id?: string; name?: string; presets?: Preset[]; activePresetId?: string }>,
+  ) => void
   loadSongFromLibrary: (songId: string) => void
   deleteSongFromLibrary: (songId: string) => void
   moveSongInLibrary: (songId: string, direction: 'up' | 'down') => void
@@ -478,6 +481,75 @@ export const useDroneStore = create<DroneState>()(
             songLibrary: [...state.songLibrary, importedSong],
             presets: imported,
             ...applyPresetState(active),
+          }
+        }),
+      importSongLibrary: (songs) =>
+        set((state) => {
+          if (!Array.isArray(songs) || songs.length === 0) {
+            return state
+          }
+
+          const usedSongIds = new Set<string>()
+          const importedSongs: SongEntry[] = []
+
+          for (const song of songs) {
+            if (!Array.isArray(song.presets) || song.presets.length === 0) {
+              continue
+            }
+
+            const usedPresetIds = new Set<string>()
+            const importedPresets = song.presets.map((preset, index) => {
+              const trimmedName = preset.name?.trim()
+              const baseId = preset.id?.trim() || `preset-${Date.now()}-${index + 1}`
+              let nextId = baseId
+              let collisionIndex = 2
+              while (usedPresetIds.has(nextId)) {
+                nextId = `${baseId}-${collisionIndex}`
+                collisionIndex += 1
+              }
+              usedPresetIds.add(nextId)
+              return {
+                ...duplicatePresetData(preset),
+                id: nextId,
+                name: trimmedName || `Preset ${index + 1}`,
+                baseOctave: clamp(preset.baseOctave ?? 3, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
+                partials: normalizePartials(preset.partials.map((partial) => ({ ...partial }))),
+              }
+            })
+
+            const active =
+              importedPresets.find((preset) => preset.id === song.activePresetId) ?? importedPresets[0]
+            const baseSongId = song.id?.trim() || `song-${Date.now()}-${importedSongs.length + 1}`
+            let nextSongId = baseSongId
+            let songCollisionIndex = 2
+            while (usedSongIds.has(nextSongId)) {
+              nextSongId = `${baseSongId}-${songCollisionIndex}`
+              songCollisionIndex += 1
+            }
+            usedSongIds.add(nextSongId)
+
+            importedSongs.push({
+              id: nextSongId,
+              name: song.name?.trim() || `Imported Song ${importedSongs.length + 1}`,
+              presets: importedPresets.map((preset) => duplicatePresetData(preset)),
+              activePresetId: active.id,
+            })
+          }
+
+          if (importedSongs.length === 0) {
+            return state
+          }
+
+          const activeSong = importedSongs[0]
+          const copiedPresets = activeSong.presets.map((preset) => duplicatePresetData(preset))
+          const activePreset =
+            copiedPresets.find((preset) => preset.id === activeSong.activePresetId) ?? copiedPresets[0]
+
+          return {
+            songName: activeSong.name,
+            songLibrary: importedSongs,
+            presets: copiedPresets,
+            ...applyPresetState(activePreset),
           }
         }),
       loadSongFromLibrary: (songId) =>

@@ -16,9 +16,9 @@ export default defineConfig({
         navigateFallback: '/index.html',
       },
       manifest: {
-        name: 'Drone',
-        short_name: 'Drone',
-        description: 'Professional drone reference tool',
+        name: 'Drone 2',
+        short_name: 'Drone 2',
+        description: 'Experimental drone reference tool',
         theme_color: '#141319',
         background_color: '#141319',
         display: 'standalone',
