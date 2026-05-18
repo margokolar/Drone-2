@@ -1,6 +1,7 @@
 import {
   AudioWaveform,
   BatteryMedium,
+  ClipboardPaste,
   Copy,
   Download,
   Info,
@@ -16,10 +17,17 @@ import {
   Upload,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from 'react'
 import { droneEngine } from './audio/DroneEngine'
 import { analyzeWavOvertones } from './audio/overtoneAnalysis'
-import type { DroneRuntimeConfig, PartialConfig } from './audio/types'
+import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
 import { MetronomeControls } from './components/MetronomeControls'
 import { NoteSelector } from './components/NoteSelector'
 import { OvertoneBars } from './components/OvertoneBars'
@@ -33,7 +41,7 @@ import { TopControls } from './components/TopControls'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useMetronome } from './hooks/useMetronome'
 import { useOvertoneMidi } from './hooks/useOvertoneMidi'
-import type { NoteId } from './music/notes'
+import { NOTE_LABELS, type NoteId } from './music/notes'
 import { getFrequency } from './music/tuning'
 import { createDefaultPartials, type Preset } from './presets/defaultPresets'
 import { useDroneStore } from './store/useDroneStore'
@@ -48,22 +56,45 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'blank', label: 'Blank' },
 ]
 const APP_VERSION = '1.1'
+const DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS = 800
+/** ~Safari viewport, loogilised CSS px (mitte dünaamiline Dynamic Island / toolbar). */
+const IPHONE_16_PRO_MAX_CSS_W = 440
+const IPHONE_16_PRO_MAX_CSS_H = 956
 const MAX_OVERTONE_HISTORY = 60
 const SONG_MENU_TRIGGER_CLASS =
   'flex min-h-[40px] w-full min-w-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-[#252332] px-3 py-2 text-sm text-white/90 transition hover:bg-[#2f2d3c]'
+type OvertoneSnapshot = {
+  partials: PartialConfig[]
+  timbreBlend: TimbreBlend
+}
+
+function isToneStrictSolo(tones: ToneConfig[], noteId: NoteId): boolean {
+  const selected = tones.find((tone) => tone.noteId === noteId)
+  if (!selected?.enabled) {
+    return false
+  }
+  return tones.every((tone) => (tone.noteId === noteId ? tone.enabled : !tone.enabled))
+}
+
 function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<TabId>('tone')
+  const [selectedOvertoneNoteId, setSelectedOvertoneNoteId] = useState<NoteId>('d')
   const [currentTime, setCurrentTime] = useState(() =>
     new Date().toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit' }),
   )
   const upPressTimeoutRef = useRef<number | null>(null)
+  const droneTitleLongPressTimerRef = useRef<number | null>(null)
+  const droneTitleLongPressFiredRef = useRef(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const overtoneAnalyzeInputRef = useRef<HTMLInputElement | null>(null)
   const sideMenuRef = useRef<HTMLElement | null>(null)
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
-  const overtoneUndoRef = useRef<PartialConfig[][]>([])
-  const overtoneRedoRef = useRef<PartialConfig[][]>([])
+  const overtoneUndoRef = useRef<Map<NoteId, OvertoneSnapshot[]>>(new Map())
+  const overtoneRedoRef = useRef<Map<NoteId, OvertoneSnapshot[]>>(new Map())
+  const overtoneClipboardRef = useRef<PartialConfig[] | null>(null)
+  const timbreMorphHistoryActiveRef = useRef(false)
+  const toneSoloRestoreRef = useRef<Map<NoteId, boolean> | null>(null)
   const [, setOvertoneHistoryVersion] = useState(0)
   const playing = useDroneStore((state) => state.playing)
   const activePresetId = useDroneStore((state) => state.activePresetId)
@@ -92,12 +123,12 @@ function App() {
   const toggleToneEnabled = useDroneStore((state) => state.toggleToneEnabled)
   const setToneGain = useDroneStore((state) => state.setToneGain)
   const setTonePan = useDroneStore((state) => state.setTonePan)
-  const setPartialEnabled = useDroneStore((state) => state.setPartialEnabled)
-  const setPartials = useDroneStore((state) => state.setPartials)
-  const setPartialRatio = useDroneStore((state) => state.setPartialRatio)
-  const setPartialGain = useDroneStore((state) => state.setPartialGain)
-  const addPartial = useDroneStore((state) => state.addPartial)
-  const removePartial = useDroneStore((state) => state.removePartial)
+  const setTonePartials = useDroneStore((state) => state.setTonePartials)
+  const setTonePartialEnabled = useDroneStore((state) => state.setTonePartialEnabled)
+  const setTonePartialRatio = useDroneStore((state) => state.setTonePartialRatio)
+  const setTonePartialGain = useDroneStore((state) => state.setTonePartialGain)
+  const addTonePartial = useDroneStore((state) => state.addTonePartial)
+  const removeTonePartial = useDroneStore((state) => state.removeTonePartial)
   const setTimbreValue = useDroneStore((state) => state.setTimbreValue)
   const setMetronomeEnabled = useDroneStore((state) => state.setMetronomeEnabled)
   const setMetronomeBpm = useDroneStore((state) => state.setMetronomeBpm)
@@ -118,14 +149,58 @@ function App() {
   const selectNextPreset = useDroneStore((state) => state.selectNextPreset)
   const selectPreviousPreset = useDroneStore((state) => state.selectPreviousPreset)
 
+  const selectedOvertoneTone = useMemo(
+    () =>
+      tones.find((tone) => tone.noteId === selectedOvertoneNoteId) ??
+      tones.find((tone) => tone.enabled) ??
+      tones[0],
+    [selectedOvertoneNoteId, tones],
+  )
+  const selectedOvertonePartials = useMemo(
+    () => selectedOvertoneTone?.partials ?? partials,
+    [partials, selectedOvertoneTone],
+  )
+  const setSelectedOvertonePartials = useCallback(
+    (nextPartials: PartialConfig[]) => setTonePartials(selectedOvertoneNoteId, nextPartials),
+    [selectedOvertoneNoteId, setTonePartials],
+  )
+  const setSelectedOvertoneGain = useCallback(
+    (partialId: string, gainDb: number) =>
+      setTonePartialGain(selectedOvertoneNoteId, partialId, gainDb),
+    [selectedOvertoneNoteId, setTonePartialGain],
+  )
+  const setSelectedOvertoneRatio = useCallback(
+    (partialId: string, ratio: number) =>
+      setTonePartialRatio(selectedOvertoneNoteId, partialId, ratio),
+    [selectedOvertoneNoteId, setTonePartialRatio],
+  )
+  const setSelectedOvertoneEnabled = useCallback(
+    (partialId: string, enabled: boolean) =>
+      setTonePartialEnabled(selectedOvertoneNoteId, partialId, enabled),
+    [selectedOvertoneNoteId, setTonePartialEnabled],
+  )
+  const addSelectedOvertonePartial = useCallback(
+    () => addTonePartial(selectedOvertoneNoteId),
+    [addTonePartial, selectedOvertoneNoteId],
+  )
+  const removeSelectedOvertonePartial = useCallback(
+    (partialId: string) => removeTonePartial(selectedOvertoneNoteId, partialId),
+    [removeTonePartial, selectedOvertoneNoteId],
+  )
+
   const overtoneMidi = useOvertoneMidi({
-    partials,
-    setPartialGain,
-    setPartialEnabled,
+    partials: selectedOvertonePartials,
+    setPartialGain: setSelectedOvertoneGain,
+    setPartialEnabled: setSelectedOvertoneEnabled,
   })
 
   const clonePartials = useCallback(
     (source: PartialConfig[]) => source.map((partial) => ({ ...partial })),
+    [],
+  )
+
+  const cloneTimbreBlend = useCallback(
+    (source: TimbreBlend): TimbreBlend => ({ ...source }),
     [],
   )
 
@@ -148,42 +223,118 @@ function App() {
     return true
   }, [])
 
+  const sameTimbreBlend = useCallback((a: TimbreBlend, b: TimbreBlend) => {
+    return a.sine === b.sine && a.saw === b.saw && a.square === b.square
+  }, [])
+
+  const sameOvertoneSnapshot = useCallback(
+    (a: OvertoneSnapshot, b: OvertoneSnapshot) =>
+      samePartials(a.partials, b.partials) && sameTimbreBlend(a.timbreBlend, b.timbreBlend),
+    [samePartials, sameTimbreBlend],
+  )
+
+  const getCurrentOvertoneSnapshot = useCallback((): OvertoneSnapshot => {
+    const state = useDroneStore.getState()
+    const selectedTone = state.tones.find((tone) => tone.noteId === selectedOvertoneNoteId)
+    return {
+      partials: clonePartials(selectedTone?.partials ?? selectedOvertonePartials),
+      timbreBlend: cloneTimbreBlend(state.timbreBlend),
+    }
+  }, [clonePartials, cloneTimbreBlend, selectedOvertoneNoteId, selectedOvertonePartials])
+
+  const applyOvertoneSnapshot = useCallback(
+    (snapshot: OvertoneSnapshot) => {
+      setSelectedOvertonePartials(clonePartials(snapshot.partials))
+      setTimbreValue('sine', snapshot.timbreBlend.sine)
+      setTimbreValue('saw', snapshot.timbreBlend.saw)
+      setTimbreValue('square', snapshot.timbreBlend.square)
+    },
+    [clonePartials, setSelectedOvertonePartials, setTimbreValue],
+  )
+
+  const getOvertoneHistoryStack = useCallback(
+    (history: Map<NoteId, OvertoneSnapshot[]>, noteId: NoteId): OvertoneSnapshot[] => {
+      const existing = history.get(noteId)
+      if (existing) {
+        return existing
+      }
+      const next: OvertoneSnapshot[] = []
+      history.set(noteId, next)
+      return next
+    },
+    [],
+  )
+
   const rememberOvertoneState = useCallback(() => {
-    const snapshot = clonePartials(useDroneStore.getState().partials)
-    const currentTop = overtoneUndoRef.current[overtoneUndoRef.current.length - 1]
-    if (currentTop && samePartials(currentTop, snapshot)) {
+    const snapshot = getCurrentOvertoneSnapshot()
+    const undoStack = getOvertoneHistoryStack(overtoneUndoRef.current, selectedOvertoneNoteId)
+    const currentTop = undoStack[undoStack.length - 1]
+    if (currentTop && sameOvertoneSnapshot(currentTop, snapshot)) {
       return
     }
-    overtoneUndoRef.current.push(snapshot)
-    if (overtoneUndoRef.current.length > MAX_OVERTONE_HISTORY) {
-      overtoneUndoRef.current.shift()
+    undoStack.push(snapshot)
+    if (undoStack.length > MAX_OVERTONE_HISTORY) {
+      undoStack.shift()
     }
-    overtoneRedoRef.current = []
+    overtoneRedoRef.current.set(selectedOvertoneNoteId, [])
     setOvertoneHistoryVersion((value) => value + 1)
-  }, [clonePartials, samePartials])
+  }, [getCurrentOvertoneSnapshot, getOvertoneHistoryStack, sameOvertoneSnapshot, selectedOvertoneNoteId])
 
   const undoOvertoneChange = useCallback(() => {
-    const previous = overtoneUndoRef.current.pop()
+    const undoStack = getOvertoneHistoryStack(overtoneUndoRef.current, selectedOvertoneNoteId)
+    const previous = undoStack.pop()
     if (!previous) {
       return
     }
-    overtoneRedoRef.current.push(clonePartials(useDroneStore.getState().partials))
-    setPartials(previous)
+    const redoStack = getOvertoneHistoryStack(overtoneRedoRef.current, selectedOvertoneNoteId)
+    redoStack.push(getCurrentOvertoneSnapshot())
+    applyOvertoneSnapshot(previous)
     setOvertoneHistoryVersion((value) => value + 1)
-  }, [clonePartials, setPartials])
+  }, [applyOvertoneSnapshot, getCurrentOvertoneSnapshot, getOvertoneHistoryStack, selectedOvertoneNoteId])
 
   const redoOvertoneChange = useCallback(() => {
-    const next = overtoneRedoRef.current.pop()
+    const redoStack = getOvertoneHistoryStack(overtoneRedoRef.current, selectedOvertoneNoteId)
+    const next = redoStack.pop()
     if (!next) {
       return
     }
-    overtoneUndoRef.current.push(clonePartials(useDroneStore.getState().partials))
-    setPartials(next)
+    const undoStack = getOvertoneHistoryStack(overtoneUndoRef.current, selectedOvertoneNoteId)
+    undoStack.push(getCurrentOvertoneSnapshot())
+    applyOvertoneSnapshot(next)
     setOvertoneHistoryVersion((value) => value + 1)
-  }, [clonePartials, setPartials])
+  }, [applyOvertoneSnapshot, getCurrentOvertoneSnapshot, getOvertoneHistoryStack, selectedOvertoneNoteId])
 
-  const canUndoOvertones = overtoneUndoRef.current.length > 0
-  const canRedoOvertones = overtoneRedoRef.current.length > 0
+  const canUndoOvertones =
+    (overtoneUndoRef.current.get(selectedOvertoneNoteId)?.length ?? 0) > 0
+  const canRedoOvertones =
+    (overtoneRedoRef.current.get(selectedOvertoneNoteId)?.length ?? 0) > 0
+  const canPasteOvertones = overtoneClipboardRef.current !== null
+
+  const beginTimbreMorphChange = useCallback(() => {
+    if (timbreMorphHistoryActiveRef.current) {
+      return
+    }
+    rememberOvertoneState()
+    timbreMorphHistoryActiveRef.current = true
+  }, [rememberOvertoneState])
+
+  const endTimbreMorphChange = useCallback(() => {
+    timbreMorphHistoryActiveRef.current = false
+  }, [])
+
+  const copySelectedOvertones = useCallback(() => {
+    overtoneClipboardRef.current = clonePartials(selectedOvertonePartials)
+    setOvertoneHistoryVersion((value) => value + 1)
+  }, [clonePartials, selectedOvertonePartials])
+
+  const pasteSelectedOvertones = useCallback(() => {
+    const copied = overtoneClipboardRef.current
+    if (!copied) {
+      return
+    }
+    rememberOvertoneState()
+    setSelectedOvertonePartials(clonePartials(copied))
+  }, [clonePartials, rememberOvertoneState, setSelectedOvertonePartials])
 
   const downloadJson = useCallback((payload: unknown, fileName: string) => {
     const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], {
@@ -341,19 +492,19 @@ function App() {
   }, [])
 
   const resetOvertoneBalance = useCallback(() => {
-    const current = useDroneStore.getState().partials
+    const current = selectedOvertonePartials
     const resetTarget = buildResetOvertoneBalance(current)
     if (samePartials(current, resetTarget)) {
       return
     }
     rememberOvertoneState()
-    setPartials(resetTarget)
-  }, [buildResetOvertoneBalance, rememberOvertoneState, samePartials, setPartials])
+    setSelectedOvertonePartials(resetTarget)
+  }, [buildResetOvertoneBalance, rememberOvertoneState, samePartials, selectedOvertonePartials, setSelectedOvertonePartials])
 
   const canResetOvertones = useMemo(() => {
-    const resetTarget = buildResetOvertoneBalance(partials)
-    return !samePartials(partials, resetTarget)
-  }, [buildResetOvertoneBalance, partials, samePartials])
+    const resetTarget = buildResetOvertoneBalance(selectedOvertonePartials)
+    return !samePartials(selectedOvertonePartials, resetTarget)
+  }, [buildResetOvertoneBalance, selectedOvertonePartials, samePartials])
 
   const analyzeOvertoneBalanceFromFile = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
@@ -362,12 +513,12 @@ function App() {
         return
       }
       try {
-        const analysis = await analyzeWavOvertones(file, partials.length)
+        const analysis = await analyzeWavOvertones(file, selectedOvertonePartials.length)
         const includeRatios = window.confirm(
           'Include overtone ratio analysis too? Press Cancel to update only balance (gain/mute).',
         )
         const presetNameFromFile = file.name.replace(/\.[^/.]+$/, '').trim() || 'Analyzed WAV'
-        const current = useDroneStore.getState().partials
+        const current = selectedOvertonePartials
         const analyzed = current.map((partial, index) => {
           const gainDb = analysis.gainsDb[index] ?? -48
           return {
@@ -377,7 +528,7 @@ function App() {
             enabled: gainDb > -47.5,
           }
         })
-        setPartials(analyzed)
+        setSelectedOvertonePartials(analyzed)
         saveAsPreset()
         const nextActivePresetId = useDroneStore.getState().activePresetId
         renamePreset(nextActivePresetId, presetNameFromFile)
@@ -389,7 +540,7 @@ function App() {
         }
       }
     },
-    [partials.length, renamePreset, saveAsPreset, setPartials],
+    [renamePreset, saveAsPreset, selectedOvertonePartials, setSelectedOvertonePartials],
   )
 
   const openJblPortableApp = useCallback(() => {
@@ -408,25 +559,113 @@ function App() {
   }, [togglePlaying])
 
   const activeTones = useMemo(() => tones.filter((tone) => tone.enabled), [tones])
+  const overtoneToneOptions = activeTones.length > 0 ? activeTones : tones
+  const isSelectedOvertoneToneSolo = useMemo(
+    () => isToneStrictSolo(tones, selectedOvertoneNoteId),
+    [tones, selectedOvertoneNoteId],
+  )
+  const canNavigateOvertoneTone = useMemo(() => {
+    const restore = toneSoloRestoreRef.current
+    if (restore !== null) {
+      const preSoloActiveCount = tones.filter((tone) => restore.get(tone.noteId) === true).length
+      return preSoloActiveCount > 1
+    }
+    return overtoneToneOptions.length > 1
+  }, [tones, overtoneToneOptions, isSelectedOvertoneToneSolo])
+  const applyToneEnabledMap = useCallback((enabledByNoteId: Map<NoteId, boolean>) => {
+    useDroneStore.setState((state) => ({
+      tones: state.tones.map((tone) => {
+        const nextEnabled = enabledByNoteId.get(tone.noteId)
+        if (typeof nextEnabled !== 'boolean' || nextEnabled === tone.enabled) {
+          return tone
+        }
+        return { ...tone, enabled: nextEnabled }
+      }),
+    }))
+  }, [])
+  const restoreToneSoloState = useCallback(() => {
+    const restoreState = toneSoloRestoreRef.current
+    if (!restoreState) {
+      return false
+    }
+    applyToneEnabledMap(restoreState)
+    toneSoloRestoreRef.current = null
+    return true
+  }, [applyToneEnabledMap])
+  const enterToneSoloForNote = useCallback(
+    (noteId: NoteId) => {
+      const currentTones = useDroneStore.getState().tones
+      const targetTone = currentTones.find((tone) => tone.noteId === noteId)
+      if (!targetTone) {
+        return
+      }
+      const restoreState = new Map<NoteId, boolean>()
+      const soloState = new Map<NoteId, boolean>()
+      currentTones.forEach((tone) => {
+        restoreState.set(tone.noteId, tone.enabled)
+        soloState.set(tone.noteId, tone.noteId === noteId)
+      })
+      toneSoloRestoreRef.current = restoreState
+      applyToneEnabledMap(soloState)
+    },
+    [applyToneEnabledMap],
+  )
+  const toggleToneSoloForNote = useCallback(
+    (noteId: NoteId) => {
+      const currentTones = useDroneStore.getState().tones
+      const selectedTone = currentTones.find((tone) => tone.noteId === noteId)
+      const selectedIsSolo =
+        Boolean(selectedTone?.enabled) &&
+        currentTones.every((tone) => (tone.noteId === noteId ? tone.enabled : !tone.enabled))
+      if (selectedIsSolo && restoreToneSoloState()) {
+        return
+      }
+      enterToneSoloForNote(noteId)
+    },
+    [enterToneSoloForNote, restoreToneSoloState],
+  )
+  const toggleSelectedOvertoneToneSolo = useCallback(() => {
+    toggleToneSoloForNote(selectedOvertoneNoteId)
+  }, [toggleToneSoloForNote, selectedOvertoneNoteId])
+  const selectAdjacentOvertoneTone = useCallback(
+    (direction: 'previous' | 'next') => {
+      const restore = toneSoloRestoreRef.current
+      const navigationTones =
+        restore !== null
+          ? tones.filter((tone) => restore.get(tone.noteId) === true)
+          : overtoneToneOptions
+      if (navigationTones.length === 0) {
+        return
+      }
+      const currentIndex = navigationTones.findIndex((tone) => tone.noteId === selectedOvertoneNoteId)
+      const fallbackIndex = currentIndex >= 0 ? currentIndex : 0
+      const delta = direction === 'previous' ? -1 : 1
+      const nextIndex = (fallbackIndex + delta + navigationTones.length) % navigationTones.length
+      const nextNoteId = navigationTones[nextIndex].noteId
+      setSelectedOvertoneNoteId(nextNoteId)
+      if (restore !== null) {
+        const soloState = new Map<NoteId, boolean>()
+        useDroneStore.getState().tones.forEach((tone) => {
+          soloState.set(tone.noteId, tone.noteId === nextNoteId)
+        })
+        applyToneEnabledMap(soloState)
+      }
+    },
+    [applyToneEnabledMap, overtoneToneOptions, selectedOvertoneNoteId, tones],
+  )
   const partialReferenceFrequencyHz = useMemo(() => {
-    const sourceTones = activeTones.length > 0 ? activeTones : tones
-    if (sourceTones.length === 0) {
+    const sourceTone = selectedOvertoneTone ?? activeTones[0] ?? tones[0]
+    if (!sourceTone) {
       return null
     }
-    const sum = sourceTones.reduce((acc, tone) => {
-      return (
-        acc +
-        getFrequency(
-          tone.noteId,
-          tuningSystemId,
-          tonalCenter,
-          referenceA4Hz,
-          baseOctave,
-        )
-      )
-    }, 0)
-    return sum / sourceTones.length
-  }, [activeTones, baseOctave, referenceA4Hz, tonalCenter, tones, tuningSystemId])
+    return getFrequency(
+      sourceTone.noteId,
+      tuningSystemId,
+      tonalCenter,
+      referenceA4Hz,
+      baseOctave,
+    )
+  }, [activeTones, baseOctave, referenceA4Hz, selectedOvertoneTone, tonalCenter, tones, tuningSystemId])
   const runtimeConfig = useMemo<DroneRuntimeConfig>(
     () => ({
       referenceA4Hz,
@@ -447,8 +686,17 @@ function App() {
   }, [runtimeConfig])
 
   useEffect(() => {
-    overtoneUndoRef.current = []
-    overtoneRedoRef.current = []
+    if (!tones.some((tone) => tone.noteId === selectedOvertoneNoteId)) {
+      const fallback = tones.find((tone) => tone.enabled) ?? tones[0]
+      if (fallback) {
+        setSelectedOvertoneNoteId(fallback.noteId)
+      }
+    }
+  }, [selectedOvertoneNoteId, tones])
+
+  useEffect(() => {
+    overtoneUndoRef.current = new Map()
+    overtoneRedoRef.current = new Map()
     setOvertoneHistoryVersion((value) => value + 1)
   }, [activePresetId])
 
@@ -761,11 +1009,23 @@ function App() {
   }, [menuOpen])
 
   const menuLabel = menuOpen ? 'Close menu' : 'Open menu'
-  return (
+  const clearDroneTitleLongPressTimer = useCallback(() => {
+    if (droneTitleLongPressTimerRef.current !== null) {
+      window.clearTimeout(droneTitleLongPressTimerRef.current)
+      droneTitleLongPressTimerRef.current = null
+    }
+  }, [])
+  const iphone16ProMaxPreview = useMemo(
+    () =>
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('device') === 'iphone16pm',
+    [],
+  )
+  const appShell = (
     <div
-      className={`relative min-h-screen bg-[#111019] text-[#f2f2f7] ${
-        activeTab === 'metronome' ? 'h-screen overflow-hidden' : ''
-      }`}
+      className={`relative ${
+        iphone16ProMaxPreview ? 'min-h-full min-w-0' : 'min-h-screen'
+      } bg-[#111019] text-[#f2f2f7] ${activeTab === 'metronome' ? 'h-screen overflow-hidden' : ''}`}
     >
       <div className="mx-auto w-full max-w-md px-3 py-5 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl">
         <header className="sticky top-2 z-40 mb-3 flex items-center gap-3 rounded-xl border border-white/10 bg-[#111019]/90 px-3 py-2 backdrop-blur-sm landscape:hidden max-h-[500px]:hidden">
@@ -781,9 +1041,27 @@ function App() {
           )}
           <button
             type="button"
-            className="rounded-lg px-1 py-1 text-xl font-semibold tracking-wide text-white transition hover:bg-white/10"
-            onClick={() => setActiveTab('tone')}
-            aria-label="Open Tone home"
+            className="select-none rounded-lg px-1 py-1 text-xl font-semibold tracking-wide text-white transition hover:bg-white/10"
+            onPointerDown={() => {
+              droneTitleLongPressFiredRef.current = false
+              clearDroneTitleLongPressTimer()
+              droneTitleLongPressTimerRef.current = window.setTimeout(() => {
+                droneTitleLongPressTimerRef.current = null
+                droneTitleLongPressFiredRef.current = true
+                setActiveTab('overtones')
+              }, DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS)
+            }}
+            onPointerUp={clearDroneTitleLongPressTimer}
+            onPointerLeave={clearDroneTitleLongPressTimer}
+            onPointerCancel={clearDroneTitleLongPressTimer}
+            onClick={() => {
+              if (droneTitleLongPressFiredRef.current) {
+                droneTitleLongPressFiredRef.current = false
+                return
+              }
+              setActiveTab('tone')
+            }}
+            aria-label="Open Tone home. Long-press to open Overtone balance."
           >
             Drone 2
           </button>
@@ -879,8 +1157,14 @@ function App() {
             <SectionCard title="Tone mixer">
               <ToneMixer
                 tones={activeTones}
+                allTones={tones}
                 onToneGain={setToneGain}
                 onTonePan={setTonePan}
+                onToggleToneSolo={toggleToneSoloForNote}
+                onEditOvertones={(noteId) => {
+                  setSelectedOvertoneNoteId(noteId)
+                  setActiveTab('overtones')
+                }}
               />
             </SectionCard>
           </div>
@@ -893,49 +1177,93 @@ function App() {
           >
             <SectionCard
               title="Overtone balance"
-              className="landscape:p-2 landscape:[&>header]:hidden max-h-[500px]:p-2 max-h-[500px]:[&>header]:hidden"
+              className="landscape:p-2 landscape:[&>header]:hidden max-h-[500px]:p-2 max-h-[500px]:[&>header]:hidden [&>header]:mb-2"
               rightSlot={
-                <div className="flex items-center gap-2 landscape:hidden max-h-[500px]:hidden">
-                  <button
-                    type="button"
-                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10"
-                    onClick={saveActivePreset}
-                    aria-label="Save current preset"
-                  >
-                    <Save size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
-                    onClick={resetOvertoneBalance}
-                    aria-label="Reset overtone balance"
-                    disabled={!canResetOvertones}
-                  >
-                    <RotateCcw size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
-                    onClick={undoOvertoneChange}
-                    aria-label="Undo overtone change"
-                    disabled={!canUndoOvertones}
-                  >
-                    <Undo2 size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
-                    onClick={redoOvertoneChange}
-                    aria-label="Redo overtone change"
-                    disabled={!canRedoOvertones}
-                  >
-                    <Redo2 size={16} />
-                  </button>
+                <div className="flex w-full min-w-0 flex-col items-end gap-1.5 landscape:hidden max-h-[500px]:hidden">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
+                      Tone
+                    </span>
+                    <button
+                      type="button"
+                      className={`button-safe rounded-lg border px-2.5 py-1 text-base font-extrabold uppercase tracking-[0.12em] transition ${
+                        isSelectedOvertoneToneSolo
+                          ? 'border-amber-300/70 bg-amber-300/30 text-amber-50 shadow-[0_0_18px_rgba(251,191,36,0.28)] hover:bg-amber-300/40'
+                          : 'border-fuchsia-300/50 bg-fuchsia-300/20 text-fuchsia-50 shadow-[0_0_18px_rgba(240,171,252,0.16)] hover:bg-fuchsia-300/30'
+                      }`}
+                      onClick={toggleSelectedOvertoneToneSolo}
+                      aria-label={`Lülita tooni solo: ${selectedOvertoneTone ? NOTE_LABELS[selectedOvertoneTone.noteId] : 'tone'}`}
+                    >
+                      {selectedOvertoneTone ? NOTE_LABELS[selectedOvertoneTone.noteId] : 'Tone'}
+                    </button>
+                  </div>
+                  <div className="hide-scrollbar -mx-0.5 flex overflow-x-auto">
+                    <div className="flex min-w-full items-center justify-between gap-9 px-0.5">
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          className="button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10"
+                          onClick={saveActivePreset}
+                          aria-label="Save current preset"
+                        >
+                          <Save size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                          onClick={resetOvertoneBalance}
+                          aria-label="Reset overtone balance"
+                          disabled={!canResetOvertones}
+                        >
+                          <RotateCcw size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                          onClick={undoOvertoneChange}
+                          aria-label="Undo overtone change"
+                          disabled={!canUndoOvertones}
+                        >
+                          <Undo2 size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                          onClick={redoOvertoneChange}
+                          aria-label="Redo overtone change"
+                          disabled={!canRedoOvertones}
+                        >
+                          <Redo2 size={16} />
+                        </button>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          className="button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                          onClick={() => selectAdjacentOvertoneTone('previous')}
+                          aria-label="Previous tone"
+                          disabled={!canNavigateOvertoneTone}
+                        >
+                          <StepBack size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                          onClick={() => selectAdjacentOvertoneTone('next')}
+                          aria-label="Next tone"
+                          disabled={!canNavigateOvertoneTone}
+                        >
+                          <StepForward size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               }
             >
               <OvertoneBars
-                partials={partials}
+                partials={selectedOvertonePartials}
+                timbreBlend={timbreBlend}
                 onGainChange={overtoneMidi.onPartialGainFromUi}
                 onGainDragStart={rememberOvertoneState}
                 onToggleEnabled={(partialId, enabled) => {
@@ -943,31 +1271,50 @@ function App() {
                   overtoneMidi.onPartialEnabledFromUi(partialId, enabled)
                 }}
               />
-              <div className="mt-2 flex justify-end">
-                <div className="flex items-center">
+              <div className="mt-2 flex items-center justify-between gap-2 landscape:hidden max-h-[500px]:hidden">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    className="button-safe flex min-h-[40px] items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white/85 transition hover:bg-white/10"
-                    onClick={() => overtoneAnalyzeInputRef.current?.click()}
-                    aria-label="Choose audio file for overtone analysis"
+                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10"
+                    onClick={copySelectedOvertones}
+                    aria-label="Copy tone overtones"
                   >
-                    <AudioWaveform size={16} />
-                    Analyse audio
+                    <Copy size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                    onClick={pasteSelectedOvertones}
+                    aria-label="Paste tone overtones"
+                    disabled={!canPasteOvertones}
+                  >
+                    <ClipboardPaste size={16} />
                   </button>
                 </div>
+                <button
+                  type="button"
+                  className="button-safe flex h-9 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2 text-xs font-semibold text-white/85 transition hover:bg-white/10"
+                  onClick={() => overtoneAnalyzeInputRef.current?.click()}
+                  aria-label="Choose audio file for overtone analysis"
+                >
+                  <AudioWaveform size={16} />
+                  Analyse audio
+                </button>
               </div>
             </SectionCard>
             <SectionCard title="Partials & timbre">
               <PartialEditor
-                partials={partials}
+                partials={selectedOvertonePartials}
                 referenceFrequencyHz={partialReferenceFrequencyHz}
                 timbreBlend={timbreBlend}
                 onSetPartialEnabled={overtoneMidi.onPartialEnabledFromUi}
-                onSetPartialRatio={setPartialRatio}
+                onSetPartialRatio={setSelectedOvertoneRatio}
                 onSetPartialGain={overtoneMidi.onPartialGainFromUi}
-                onAddPartial={addPartial}
-                onRemovePartial={removePartial}
+                onAddPartial={addSelectedOvertonePartial}
+                onRemovePartial={removeSelectedOvertonePartial}
                 onSetTimbreValue={setTimbreValue}
+                onTimbreChangeStart={beginTimbreMorphChange}
+                onTimbreChangeEnd={endTimbreMorphChange}
               />
             </SectionCard>
           </div>
@@ -1053,6 +1400,45 @@ function App() {
               ))}
               {activeTab === 'overtones' && (
                 <div className="ml-2 hidden items-center gap-1.5 landscape:flex max-h-[500px]:flex">
+                  <button
+                    type="button"
+                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                    onClick={() => selectAdjacentOvertoneTone('previous')}
+                    aria-label="Previous tone"
+                    disabled={!canNavigateOvertoneTone}
+                  >
+                    <StepBack size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                    onClick={() => selectAdjacentOvertoneTone('next')}
+                    aria-label="Next tone"
+                    disabled={!canNavigateOvertoneTone}
+                  >
+                    <StepForward size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className={`button-safe flex h-9 items-center gap-1 rounded-lg border px-2 transition ${
+                      isSelectedOvertoneToneSolo
+                        ? 'border-amber-300/65 bg-amber-300/25 text-amber-50 shadow-[0_0_18px_rgba(251,191,36,0.22)] hover:bg-amber-300/35'
+                        : 'border-fuchsia-300/45 bg-fuchsia-300/15 text-fuchsia-50 shadow-[0_0_18px_rgba(240,171,252,0.12)] hover:bg-fuchsia-300/25'
+                    }`}
+                    onClick={toggleSelectedOvertoneToneSolo}
+                    aria-label={`Lülita tooni solo: ${selectedOvertoneTone ? NOTE_LABELS[selectedOvertoneTone.noteId] : 'tone'}`}
+                  >
+                    <span
+                      className={`text-[9px] font-semibold uppercase tracking-[0.14em] ${
+                        isSelectedOvertoneToneSolo ? 'text-amber-100/65' : 'text-white/45'
+                      }`}
+                    >
+                      Tone
+                    </span>
+                    <span className="text-sm font-extrabold uppercase tracking-[0.12em]">
+                      {selectedOvertoneTone ? NOTE_LABELS[selectedOvertoneTone.noteId] : 'Tone'}
+                    </span>
+                  </button>
                   <button
                     type="button"
                     className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10"
@@ -1254,6 +1640,33 @@ function App() {
           void analyzeOvertoneBalanceFromFile(event)
         }}
       />
+    </div>
+  )
+
+  if (!iphone16ProMaxPreview) {
+    return appShell
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0c0c0f] px-3 py-5 text-[#f2f2f7]">
+      <p className="mb-3 max-w-md text-center text-[10px] leading-relaxed text-white/50">
+        iPhone 16 Pro Max · {IPHONE_16_PRO_MAX_CSS_W}×{IPHONE_16_PRO_MAX_CSS_H} CSS px. Normaalse täisekraani jaoks
+        eemalda{' '}
+        <code className="rounded bg-white/10 px-1 font-mono text-[10px] text-fuchsia-300/90">device=iphone16pm</code>{' '}
+        URL-ist.
+      </p>
+      <div
+        className="relative overflow-hidden rounded-[2.8rem] border-[11px] border-[#3a3839] bg-black shadow-[0_28px_90px_rgba(0,0,0,0.55)]"
+        style={{
+          width: IPHONE_16_PRO_MAX_CSS_W,
+          height: `min(${IPHONE_16_PRO_MAX_CSS_H}px, calc(100vh - 7rem))`,
+          maxWidth: '100vw',
+        }}
+      >
+        <div className="relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain">
+          {appShell}
+        </div>
+      </div>
     </div>
   )
 }

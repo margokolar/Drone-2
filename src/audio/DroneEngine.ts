@@ -222,7 +222,8 @@ export class DroneEngine {
     forceRebuild: boolean,
   ): void {
     const existing = this.voiceMap.get(toneConfig.noteId)
-    const needsRebuild = forceRebuild || this.voiceNeedsRebuild(existing, config.partials)
+    const tonePartials = toneConfig.partials ?? config.partials
+    const needsRebuild = forceRebuild || this.voiceNeedsRebuild(existing, tonePartials)
 
     if (needsRebuild && existing) {
       // Keep rebuild crossfades short so rapid undo/reset cycles do not stack
@@ -274,7 +275,7 @@ export class DroneEngine {
       config.baseOctave,
     )
     const oscillators: OscBundle[] = []
-    for (const partial of config.partials) {
+    for (const partial of toneConfig.partials ?? config.partials) {
       if (!partial.enabled) {
         continue
       }
@@ -349,7 +350,7 @@ export class DroneEngine {
     voice.panner.pan.linearRampToValueAtTime(toneConfig.pan, now + PARAM_SMOOTH_SECONDS)
 
     const blend = normalizedBlend(config.timbreBlend)
-    const activePartials = config.partials.filter((partial) => partial.enabled)
+    const activePartials = (toneConfig.partials ?? config.partials).filter((partial) => partial.enabled)
     const waveTarget = [blend.sine, blend.saw, blend.square]
     let index = 0
     for (const partial of activePartials) {

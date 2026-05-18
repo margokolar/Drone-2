@@ -52,6 +52,7 @@ function withEnabledTones(noteIds: string[]): ToneConfig[] {
   return TONES_TEMPLATE.map((tone) => ({
     ...tone,
     enabled: noteIds.includes(tone.noteId),
+    partials: clonePartials(),
   }))
 }
 

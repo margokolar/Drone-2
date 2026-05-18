@@ -19,6 +19,7 @@ export type ToneConfig = {
   enabled: boolean
   gainDb: number
   pan: number
+  partials?: PartialConfig[]
 }
 
 export type DroneRuntimeConfig = {

@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { useRef } from 'react'
+import { useRef, type KeyboardEvent } from 'react'
 import type { PartialConfig } from '../audio/types'
 import { NumericValueField } from './NumericValueField'
 
@@ -19,6 +19,8 @@ type PartialEditorProps = {
   onAddPartial: () => void
   onRemovePartial: (partialId: string) => void
   onSetTimbreValue: (key: 'sine' | 'saw' | 'square', value: number) => void
+  onTimbreChangeStart?: () => void
+  onTimbreChangeEnd?: () => void
 }
 
 export function PartialEditor({
@@ -31,6 +33,8 @@ export function PartialEditor({
   onAddPartial,
   onRemovePartial,
   onSetTimbreValue,
+  onTimbreChangeStart,
+  onTimbreChangeEnd,
 }: PartialEditorProps) {
   const soloRestoreRef = useRef<Map<string, boolean> | null>(null)
   const soloPressTimerRef = useRef<number | null>(null)
@@ -65,10 +69,17 @@ export function PartialEditor({
   const timbreMorph = morphFromBlend(timbreBlend.sine, timbreBlend.saw, timbreBlend.square)
 
   const applyMorph = (nextMorph: number) => {
+    onTimbreChangeStart?.()
     const nextBlend = blendFromMorph(nextMorph)
     onSetTimbreValue('sine', nextBlend.sine)
     onSetTimbreValue('saw', nextBlend.saw)
     onSetTimbreValue('square', nextBlend.square)
+  }
+
+  const handleTimbreKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+      onTimbreChangeStart?.()
+    }
   }
 
   const setEnabledForAll = (enabledById: Map<string, boolean>) => {
@@ -109,6 +120,12 @@ export function PartialEditor({
           max={1}
           step={0.01}
           value={timbreMorph}
+          onPointerDown={onTimbreChangeStart}
+          onPointerUp={onTimbreChangeEnd}
+          onPointerCancel={onTimbreChangeEnd}
+          onKeyDown={handleTimbreKeyDown}
+          onKeyUp={onTimbreChangeEnd}
+          onBlur={onTimbreChangeEnd}
           onChange={(event) => applyMorph(Number(event.target.value))}
           className="h-2 w-full accent-fuchsia-300"
           aria-label="Timbre morph from sine to saw to square"

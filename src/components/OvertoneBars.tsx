@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
-import type { PartialConfig } from '../audio/types'
-import { clamp } from '../audio/audioMath'
+import type { PartialConfig, TimbreBlend } from '../audio/types'
+import { clamp, dbToGain, normalizedBlend } from '../audio/audioMath'
 
 type OvertoneBarsProps = {
   partials: PartialConfig[]
+  timbreBlend: TimbreBlend
   onGainChange: (partialId: string, gainDb: number) => void
   onToggleEnabled: (partialId: string, enabled: boolean) => void
   onGainDragStart?: () => void
@@ -21,7 +22,94 @@ function toDbFromPercent(percent: number): number {
   return MIN_DB + (clamp(percent, 0, 100) / 100) * (MAX_DB - MIN_DB)
 }
 
-export function OvertoneBars({ partials, onGainChange, onToggleEnabled, onGainDragStart }: OvertoneBarsProps) {
+function gainToDb(gain: number): number {
+  if (gain <= 0) {
+    return MIN_DB
+  }
+  return 20 * Math.log10(gain)
+}
+
+function isNearlyInteger(value: number): boolean {
+  return Math.abs(value - Math.round(value)) < 0.001
+}
+
+type ComponentGains = {
+  sine: number
+  saw: number
+  square: number
+  total: number
+}
+
+function harmonicComponentContribution(
+  targetRatio: number,
+  sourceRatio: number,
+  blend: TimbreBlend,
+): Omit<ComponentGains, 'total'> {
+  if (sourceRatio <= 0 || targetRatio <= 0) {
+    return { sine: 0, saw: 0, square: 0 }
+  }
+
+  const harmonic = targetRatio / sourceRatio
+  if (harmonic < 1 || !isNearlyInteger(harmonic)) {
+    return { sine: 0, saw: 0, square: 0 }
+  }
+
+  const harmonicIndex = Math.round(harmonic)
+  return {
+    sine: harmonicIndex === 1 ? blend.sine : 0,
+    saw: blend.saw / harmonicIndex,
+    square: harmonicIndex % 2 === 1 ? blend.square / harmonicIndex : 0,
+  }
+}
+
+function effectiveHarmonicComponents(
+  targetRatio: number,
+  sourcePartials: PartialConfig[],
+  activePartialId: string | null,
+  dragGainDb: number | null,
+  blend: TimbreBlend,
+): ComponentGains {
+  const gains = sourcePartials.reduce<ComponentGains>((sum, source) => {
+    if (!source.enabled) {
+      return sum
+    }
+    const sourceGainDb = activePartialId === source.id && dragGainDb !== null ? dragGainDb : source.gainDb
+    const sourceGain = dbToGain(sourceGainDb)
+    const contribution = harmonicComponentContribution(targetRatio, source.ratio, blend)
+    sum.sine += sourceGain * contribution.sine
+    sum.saw += sourceGain * contribution.saw
+    sum.square += sourceGain * contribution.square
+    sum.total = sum.sine + sum.saw + sum.square
+    return sum
+  }, { sine: 0, saw: 0, square: 0, total: 0 })
+
+  return gains
+}
+
+function logLayerPercents(components: ComponentGains): Omit<ComponentGains, 'total'> {
+  const sine = toPercentFromDb(gainToDb(components.sine))
+  const saw = toPercentFromDb(gainToDb(components.saw))
+  const square = toPercentFromDb(gainToDb(components.square))
+  const total = sine + saw + square
+
+  if (total <= 0) {
+    return { sine: 0, saw: 0, square: 0 }
+  }
+
+  return {
+    sine: (sine / total) * 100,
+    saw: (saw / total) * 100,
+    square: (square / total) * 100,
+  }
+}
+
+export function OvertoneBars({
+  partials,
+  timbreBlend,
+  onGainChange,
+  onToggleEnabled,
+  onGainDragStart,
+}: OvertoneBarsProps) {
   const [activePartialId, setActivePartialId] = useState<string | null>(null)
   const [dragGainDb, setDragGainDb] = useState<number | null>(null)
   const [soloPartialId, setSoloPartialId] = useState<string | null>(null)
@@ -30,6 +118,7 @@ export function OvertoneBars({ partials, onGainChange, onToggleEnabled, onGainDr
   const soloRestoreRef = useRef<Map<string, boolean> | null>(null)
   const soloPressTimerRef = useRef<number | null>(null)
   const soloPressTriggeredRef = useRef(false)
+  const blend = normalizedBlend(timbreBlend)
 
   const flushPending = () => {
     if (rafIdRef.current !== null) {
@@ -108,17 +197,22 @@ export function OvertoneBars({ partials, onGainChange, onToggleEnabled, onGainDr
       <div className="hide-scrollbar touch-pan-x overflow-x-auto">
         <div className="grid min-w-[620px] grid-cols-16 gap-1 landscape:min-w-0 landscape:w-full landscape:gap-0.5 max-h-[500px]:min-w-0 max-h-[500px]:w-full max-h-[500px]:gap-0.5">
           {partials.map((partial, index) => {
-            const isDragging = activePartialId === partial.id && dragGainDb !== null
-            const gainDbForHeight = isDragging ? dragGainDb : partial.gainDb
+            const gainDbForHeight = activePartialId === partial.id && dragGainDb !== null ? dragGainDb : partial.gainDb
+            const componentGains = effectiveHarmonicComponents(
+              partial.ratio,
+              partials,
+              activePartialId,
+              dragGainDb,
+              blend,
+            )
             const heightPercent = toPercentFromDb(gainDbForHeight)
+            const totalEffectPercent = toPercentFromDb(gainToDb(componentGains.total))
+            const layerPercents = logLayerPercents(componentGains)
             const isSoloMode = soloPartialId !== null
             const isSoloTarget = soloPartialId === partial.id
             const barClass = partial.enabled
               ? 'border-red-500/65 bg-black/40'
               : 'border-red-900/70 bg-black/25'
-            const fillClass = partial.enabled
-              ? 'from-fuchsia-900 via-fuchsia-700 to-fuchsia-400'
-              : 'from-violet-950 via-violet-900 to-violet-700'
             const chipClass = isSoloTarget
               ? 'border-amber-300/70 bg-amber-300/25 text-amber-100'
               : partial.enabled
@@ -162,8 +256,29 @@ export function OvertoneBars({ partials, onGainChange, onToggleEnabled, onGainDr
                   aria-label={`Overtone ${index + 1} gain`}
                 >
                   <div
-                    className={`absolute inset-x-0 bottom-0 rounded-b-md bg-linear-to-t transition-[height] duration-75 ${fillClass}`}
+                    className="pointer-events-none absolute inset-x-1 bottom-0 rounded-t-sm border border-white/18 bg-white/7"
+                    style={{ height: `${totalEffectPercent}%` }}
+                  />
+                  <div
+                    className="absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-b-md shadow-[0_0_18px_rgba(244,114,182,0.18)] transition-[height] duration-75"
                     style={{ height: `${heightPercent}%` }}
+                  >
+                    <div
+                      className={partial.enabled ? 'bg-cyan-300/85' : 'bg-cyan-900/70'}
+                      style={{ height: `${layerPercents.square}%` }}
+                    />
+                    <div
+                      className={partial.enabled ? 'bg-fuchsia-400/90' : 'bg-fuchsia-950/75'}
+                      style={{ height: `${layerPercents.saw}%` }}
+                    />
+                    <div
+                      className={partial.enabled ? 'bg-amber-200/90' : 'bg-amber-950/75'}
+                      style={{ height: `${layerPercents.sine}%` }}
+                    />
+                  </div>
+                  <div
+                    className="pointer-events-none absolute left-0 right-0 h-0.5 bg-white/85 shadow-[0_0_10px_rgba(255,255,255,0.65)]"
+                    style={{ bottom: `${totalEffectPercent}%` }}
                   />
                 </button>
                 <button

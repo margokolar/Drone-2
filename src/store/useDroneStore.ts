@@ -58,6 +58,12 @@ type DroneState = {
   setPartials: (partials: PartialConfig[]) => void
   addPartial: () => void
   removePartial: (partialId: string) => void
+  setTonePartials: (noteId: NoteId, partials: PartialConfig[]) => void
+  setTonePartialGain: (noteId: NoteId, partialId: string, gainDb: number) => void
+  setTonePartialRatio: (noteId: NoteId, partialId: string, ratio: number) => void
+  setTonePartialEnabled: (noteId: NoteId, partialId: string, enabled: boolean) => void
+  addTonePartial: (noteId: NoteId) => void
+  removeTonePartial: (noteId: NoteId, partialId: string) => void
   setMetronomeEnabled: (enabled: boolean) => void
   setMetronomeBpm: (bpm: number) => void
   setMetronomeVolumeDb: (db: number) => void
@@ -94,8 +100,8 @@ function clamp(value: number, min: number, max: number): number {
 function duplicatePresetData(preset: Preset): Preset {
   return {
     ...preset,
-    tones: preset.tones.map((tone) => ({ ...tone })),
-    partials: preset.partials.map((partial) => ({ ...partial })),
+    tones: preset.tones.map((tone) => normalizeTonePartials(tone, preset.partials)),
+    partials: normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial }))),
     timbreBlend: { ...preset.timbreBlend },
   }
 }
@@ -120,13 +126,13 @@ function applyPresetState(preset: Preset): Pick<
     baseOctave: clamp(preset.baseOctave, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
     masterGainDb: preset.masterGainDb,
     timbreBlend: { ...preset.timbreBlend },
-    tones: preset.tones.map((tone) => ({ ...tone })),
-    partials: normalizePartials(preset.partials.map((partial) => ({ ...partial }))),
+    tones: preset.tones.map((tone) => normalizeTonePartials(tone, preset.partials)),
+    partials: normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial }))),
   }
 }
 
-const INITIAL_PRESET = duplicatePresetData(DEFAULT_PRESETS[0])
 const DEFAULT_PARTIALS = createDefaultPartials()
+const INITIAL_PRESET = duplicatePresetData(DEFAULT_PRESETS[0])
 const INITIAL_SONG_ID = 'song-default'
 
 function normalizePartials(partials: PartialConfig[]): PartialConfig[] {
@@ -137,6 +143,13 @@ function normalizePartials(partials: PartialConfig[]): PartialConfig[] {
     ratio: clamp(partial.ratio, 0.0625, 32),
     gainDb: clamp(partial.gainDb, -48, 0),
   }))
+}
+
+function normalizeTonePartials(tone: ToneConfig, fallbackPartials: PartialConfig[]): ToneConfig {
+  return {
+    ...tone,
+    partials: normalizePartials((tone.partials ?? fallbackPartials).map((partial) => ({ ...partial }))),
+  }
 }
 
 export const useDroneStore = create<DroneState>()(
@@ -312,6 +325,121 @@ export const useDroneStore = create<DroneState>()(
             partials: state.partials.filter((partial) => partial.id !== partialId),
           }
         }),
+      setTonePartials: (noteId, partials) =>
+        set((state) => ({
+          tones: state.tones.map((tone) =>
+            tone.noteId === noteId
+              ? {
+                  ...tone,
+                  partials: normalizePartials(partials.map((partial) => ({ ...partial }))),
+                }
+              : tone,
+          ),
+        })),
+      setTonePartialGain: (noteId, partialId, gainDb) =>
+        set((state) => ({
+          tones: state.tones.map((tone) => {
+            if (tone.noteId !== noteId) {
+              return tone
+            }
+            const source = tone.partials ?? state.partials
+            return {
+              ...tone,
+              partials: normalizePartials(
+                source.map((partial) =>
+                  partial.id === partialId
+                    ? {
+                        ...partial,
+                        gainDb: clamp(gainDb, -48, 0),
+                      }
+                    : partial,
+                ),
+              ),
+            }
+          }),
+        })),
+      setTonePartialRatio: (noteId, partialId, ratio) =>
+        set((state) => ({
+          tones: state.tones.map((tone) => {
+            if (tone.noteId !== noteId) {
+              return tone
+            }
+            const source = tone.partials ?? state.partials
+            return {
+              ...tone,
+              partials: normalizePartials(
+                source.map((partial) =>
+                  partial.id === partialId
+                    ? {
+                        ...partial,
+                        ratio: clamp(ratio, 0.0625, 32),
+                      }
+                    : partial,
+                ),
+              ),
+            }
+          }),
+        })),
+      setTonePartialEnabled: (noteId, partialId, enabled) =>
+        set((state) => ({
+          tones: state.tones.map((tone) => {
+            if (tone.noteId !== noteId) {
+              return tone
+            }
+            const source = tone.partials ?? state.partials
+            return {
+              ...tone,
+              partials: normalizePartials(
+                source.map((partial) =>
+                  partial.id === partialId
+                    ? {
+                        ...partial,
+                        enabled,
+                      }
+                    : partial,
+                ),
+              ),
+            }
+          }),
+        })),
+      addTonePartial: (noteId) =>
+        set((state) => ({
+          tones: state.tones.map((tone) => {
+            if (tone.noteId !== noteId) {
+              return tone
+            }
+            const source = normalizePartials(tone.partials ?? state.partials)
+            const nextIndex = source.length + 1
+            return {
+              ...tone,
+              partials: [
+                ...source,
+                {
+                  id: `p-${Date.now()}-${nextIndex}`,
+                  ratio: nextIndex,
+                  gainDb: -24,
+                  enabled: true,
+                },
+              ],
+            }
+          }),
+        })),
+      removeTonePartial: (noteId, partialId) =>
+        set((state) => ({
+          tones: state.tones.map((tone) => {
+            if (tone.noteId !== noteId) {
+              return tone
+            }
+            const source = normalizePartials(tone.partials ?? state.partials)
+            if (source.length <= 1) {
+              return tone
+            }
+            return {
+              ...tone,
+              partials: source.filter((partial) => partial.id !== partialId),
+            }
+          }),
+        })),
       setMetronomeEnabled: (enabled) => set({ metronomeEnabled: enabled }),
       setMetronomeBpm: (bpm) => set({ metronomeBpm: clamp(bpm, 30, 220) }),
       setMetronomeVolumeDb: (db) => set({ metronomeVolumeDb: clamp(db, -40, 0) }),
@@ -330,7 +458,7 @@ export const useDroneStore = create<DroneState>()(
             baseOctave: state.baseOctave,
             masterGainDb: state.masterGainDb,
             timbreBlend: { ...state.timbreBlend },
-            tones: state.tones.map((tone) => ({ ...tone })),
+            tones: state.tones.map((tone) => normalizeTonePartials(tone, state.partials)),
             partials: normalizePartials(state.partials.map((partial) => ({ ...partial }))),
           }
           const presets = state.presets.map((preset) => {
@@ -353,7 +481,7 @@ export const useDroneStore = create<DroneState>()(
             baseOctave: state.baseOctave,
             masterGainDb: state.masterGainDb,
             timbreBlend: { ...state.timbreBlend },
-            tones: state.tones.map((tone) => ({ ...tone })),
+            tones: state.tones.map((tone) => normalizeTonePartials(tone, state.partials)),
             partials: normalizePartials(state.partials.map((partial) => ({ ...partial }))),
           }
           return {
@@ -464,7 +592,7 @@ export const useDroneStore = create<DroneState>()(
               id: nextId,
               name: trimmedName || `Preset ${index + 1}`,
               baseOctave: clamp(preset.baseOctave ?? 3, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
-              partials: normalizePartials(preset.partials.map((partial) => ({ ...partial }))),
+              partials: normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial }))),
             }
           })
           const active =
@@ -513,7 +641,7 @@ export const useDroneStore = create<DroneState>()(
                 id: nextId,
                 name: trimmedName || `Preset ${index + 1}`,
                 baseOctave: clamp(preset.baseOctave ?? 3, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
-                partials: normalizePartials(preset.partials.map((partial) => ({ ...partial }))),
+                partials: normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial }))),
               }
             })
 
@@ -677,37 +805,48 @@ export const useDroneStore = create<DroneState>()(
     }),
     {
       name: 'bourdon-store-v1',
-      version: 3,
+      version: 4,
       migrate: (persistedState) => {
         const typed = persistedState as Partial<DroneState> | undefined
         if (!typed) {
           return persistedState
         }
-        const incomingPartials = typed.partials ?? []
-        const migratedPresets = (typed.presets ?? []).map((preset) => ({
-          ...preset,
-          baseOctave: clamp(
-            preset.baseOctave ?? 3,
-            MIN_BASE_OCTAVE,
-            MAX_BASE_OCTAVE,
-          ),
-        }))
+        const incomingPartials = normalizePartials(typed.partials ?? [])
+        const migratedPresets = (typed.presets ?? []).map((preset) =>
+          duplicatePresetData({
+            ...preset,
+            baseOctave: clamp(
+              preset.baseOctave ?? 3,
+              MIN_BASE_OCTAVE,
+              MAX_BASE_OCTAVE,
+            ),
+            partials: normalizePartials(preset.partials ?? incomingPartials),
+          }),
+        )
+        const migratedTones = (typed.tones ?? INITIAL_PRESET.tones).map((tone) =>
+          normalizeTonePartials(tone, incomingPartials),
+        )
         return {
           ...typed,
           presets: migratedPresets,
-          partials: normalizePartials(incomingPartials),
+          partials: incomingPartials,
+          tones: migratedTones,
           baseOctave: clamp(typed.baseOctave ?? 3, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
           songName: typed.songName ?? 'My Song',
-          songLibrary: typed.songLibrary ?? [
-            {
-              id: INITIAL_SONG_ID,
-              name: typed.songName ?? 'My Song',
-              presets: migratedPresets.length
-                ? migratedPresets.map((preset) => duplicatePresetData(preset))
-                : DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset)),
-              activePresetId: typed.activePresetId ?? INITIAL_PRESET.id,
-            },
-          ],
+          songLibrary:
+            typed.songLibrary?.map((song) => ({
+              ...song,
+              presets: song.presets.map((preset) => duplicatePresetData(preset)),
+            })) ?? [
+              {
+                id: INITIAL_SONG_ID,
+                name: typed.songName ?? 'My Song',
+                presets: migratedPresets.length
+                  ? migratedPresets.map((preset) => duplicatePresetData(preset))
+                  : DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset)),
+                activePresetId: typed.activePresetId ?? INITIAL_PRESET.id,
+              },
+            ],
           metronomeEnabled: typed.metronomeEnabled ?? false,
           metronomeBpm: typed.metronomeBpm ?? 72,
           metronomeVolumeDb: typed.metronomeVolumeDb ?? -15,
