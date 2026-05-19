@@ -41,7 +41,7 @@ import { TopControls } from './components/TopControls'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useMetronome } from './hooks/useMetronome'
 import { useOvertoneMidi } from './hooks/useOvertoneMidi'
-import { NOTE_LABELS, type NoteId } from './music/notes'
+import { NOTE_IDS, NOTE_LABELS, type NoteId } from './music/notes'
 import { getFrequency } from './music/tuning'
 import { createDefaultPartials, type Preset } from './presets/defaultPresets'
 import { useDroneStore } from './store/useDroneStore'
@@ -76,6 +76,24 @@ function isToneStrictSolo(tones: ToneConfig[], noteId: NoteId): boolean {
   return tones.every((tone) => (tone.noteId === noteId ? tone.enabled : !tone.enabled))
 }
 
+function sortTonesByNoteId(source: ToneConfig[]): ToneConfig[] {
+  return [...source].sort(
+    (left, right) => NOTE_IDS.indexOf(left.noteId) - NOTE_IDS.indexOf(right.noteId),
+  )
+}
+
+function getOvertoneNavigationTones(
+  tones: ToneConfig[],
+  overtoneToneOptions: ToneConfig[],
+  toneSoloRestore: Map<NoteId, boolean> | null,
+): ToneConfig[] {
+  if (toneSoloRestore !== null) {
+    const preSoloActive = tones.filter((tone) => toneSoloRestore.get(tone.noteId) === true)
+    return sortTonesByNoteId(preSoloActive)
+  }
+  return sortTonesByNoteId(overtoneToneOptions)
+}
+
 function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<TabId>('tone')
@@ -94,7 +112,7 @@ function App() {
   const overtoneRedoRef = useRef<Map<NoteId, OvertoneSnapshot[]>>(new Map())
   const overtoneClipboardRef = useRef<PartialConfig[] | null>(null)
   const timbreMorphHistoryActiveRef = useRef(false)
-  const toneSoloRestoreRef = useRef<Map<NoteId, boolean> | null>(null)
+  const [toneSoloRestore, setToneSoloRestore] = useState<Map<NoteId, boolean> | null>(null)
   const [, setOvertoneHistoryVersion] = useState(0)
   const playing = useDroneStore((state) => state.playing)
   const activePresetId = useDroneStore((state) => state.activePresetId)
@@ -564,14 +582,12 @@ function App() {
     () => isToneStrictSolo(tones, selectedOvertoneNoteId),
     [tones, selectedOvertoneNoteId],
   )
-  const canNavigateOvertoneTone = useMemo(() => {
-    const restore = toneSoloRestoreRef.current
-    if (restore !== null) {
-      const preSoloActiveCount = tones.filter((tone) => restore.get(tone.noteId) === true).length
-      return preSoloActiveCount > 1
-    }
-    return overtoneToneOptions.length > 1
-  }, [tones, overtoneToneOptions, isSelectedOvertoneToneSolo])
+  const overtoneNavigationTones = useMemo(
+    () =>
+      getOvertoneNavigationTones(tones, overtoneToneOptions, toneSoloRestore),
+    [tones, overtoneToneOptions, toneSoloRestore],
+  )
+  const canNavigateOvertoneTone = overtoneNavigationTones.length > 1
   const applyToneEnabledMap = useCallback((enabledByNoteId: Map<NoteId, boolean>) => {
     useDroneStore.setState((state) => ({
       tones: state.tones.map((tone) => {
@@ -584,14 +600,13 @@ function App() {
     }))
   }, [])
   const restoreToneSoloState = useCallback(() => {
-    const restoreState = toneSoloRestoreRef.current
-    if (!restoreState) {
+    if (!toneSoloRestore) {
       return false
     }
-    applyToneEnabledMap(restoreState)
-    toneSoloRestoreRef.current = null
+    applyToneEnabledMap(toneSoloRestore)
+    setToneSoloRestore(null)
     return true
-  }, [applyToneEnabledMap])
+  }, [applyToneEnabledMap, toneSoloRestore])
   const enterToneSoloForNote = useCallback(
     (noteId: NoteId) => {
       const currentTones = useDroneStore.getState().tones
@@ -605,7 +620,7 @@ function App() {
         restoreState.set(tone.noteId, tone.enabled)
         soloState.set(tone.noteId, tone.noteId === noteId)
       })
-      toneSoloRestoreRef.current = restoreState
+      setToneSoloRestore(restoreState)
       applyToneEnabledMap(soloState)
     },
     [applyToneEnabledMap],
@@ -629,11 +644,14 @@ function App() {
   }, [toggleToneSoloForNote, selectedOvertoneNoteId])
   const selectAdjacentOvertoneTone = useCallback(
     (direction: 'previous' | 'next') => {
-      const restore = toneSoloRestoreRef.current
-      const navigationTones =
-        restore !== null
-          ? tones.filter((tone) => restore.get(tone.noteId) === true)
-          : overtoneToneOptions
+      const currentTones = useDroneStore.getState().tones
+      const activeTonesNow = currentTones.filter((tone) => tone.enabled)
+      const toneOptionsNow = activeTonesNow.length > 0 ? activeTonesNow : currentTones
+      const navigationTones = getOvertoneNavigationTones(
+        currentTones,
+        toneOptionsNow,
+        toneSoloRestore,
+      )
       if (navigationTones.length === 0) {
         return
       }
@@ -643,15 +661,15 @@ function App() {
       const nextIndex = (fallbackIndex + delta + navigationTones.length) % navigationTones.length
       const nextNoteId = navigationTones[nextIndex].noteId
       setSelectedOvertoneNoteId(nextNoteId)
-      if (restore !== null) {
+      if (toneSoloRestore !== null || isToneStrictSolo(currentTones, selectedOvertoneNoteId)) {
         const soloState = new Map<NoteId, boolean>()
-        useDroneStore.getState().tones.forEach((tone) => {
+        currentTones.forEach((tone) => {
           soloState.set(tone.noteId, tone.noteId === nextNoteId)
         })
         applyToneEnabledMap(soloState)
       }
     },
-    [applyToneEnabledMap, overtoneToneOptions, selectedOvertoneNoteId, tones],
+    [applyToneEnabledMap, selectedOvertoneNoteId, toneSoloRestore],
   )
   const partialReferenceFrequencyHz = useMemo(() => {
     const sourceTone = selectedOvertoneTone ?? activeTones[0] ?? tones[0]
