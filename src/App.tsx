@@ -55,7 +55,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'metronome', label: 'Click' },
   { id: 'blank', label: 'Blank' },
 ]
-const APP_VERSION = '1.1'
+const APP_VERSION = '2.1'
 const DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS = 800
 /** ~Safari viewport, loogilised CSS px (mitte dünaamiline Dynamic Island / toolbar). */
 const IPHONE_16_PRO_MAX_CSS_W = 440
