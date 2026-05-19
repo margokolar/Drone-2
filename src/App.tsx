@@ -1063,7 +1063,7 @@ function App() {
             }}
             aria-label="Open Tone home. Long-press to open Overtone balance."
           >
-            drone2.1
+            Drone 2
           </button>
           <div className="ml-auto text-4xl font-extrabold leading-none text-fuchsia-100">{currentTime}</div>
         </header>
