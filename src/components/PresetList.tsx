@@ -69,30 +69,67 @@ export function PresetList({
               <div className="mb-1.5 flex min-h-8 items-center">
                 <div className="flex min-w-0 flex-1 items-center">
                   {(isEditing) ? (
-                    <input
-                      type="text"
-                      name="drone-preset-name"
-                      value={editingName}
-                      onChange={(e) => setEditingName(e.target.value)}
-                      onBlur={() => commitRename(preset.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => {
-                        e.stopPropagation()
-                        if (e.key === 'Enter') {
-                          ;(e.target as HTMLInputElement).blur()
-                        }
-                      }}
-                      className="min-h-8 w-full rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-sm font-semibold leading-tight text-white outline-none focus:border-fuchsia-300/50 [user-select:text]"
-                      aria-label="Preset name"
+                    <form
+                      className="relative w-full min-w-0"
                       autoComplete="off"
-                      autoCorrect="off"
-                      autoCapitalize="off"
-                      spellCheck={false}
-                      enterKeyHint="done"
-                      data-lpignore="true"
-                      data-1p-ignore
-                      autoFocus
-                    />
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        commitRename(preset.id)
+                      }}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <input
+                        type="text"
+                        tabIndex={-1}
+                        aria-hidden
+                        autoComplete="off"
+                        className="pointer-events-none absolute h-0 w-0 opacity-0"
+                        readOnly
+                      />
+                      <input
+                        type="password"
+                        tabIndex={-1}
+                        aria-hidden
+                        autoComplete="new-password"
+                        className="pointer-events-none absolute h-0 w-0 opacity-0"
+                        readOnly
+                      />
+                      <input
+                        id={`preset-rename-${preset.id}`}
+                        type="text"
+                        inputMode="text"
+                        value={editingName}
+                        readOnly
+                        onChange={(event) => setEditingName(event.target.value)}
+                        onFocus={(event) => {
+                          const input = event.currentTarget
+                          if (input.readOnly) {
+                            input.readOnly = false
+                          }
+                          input.select()
+                        }}
+                        onBlur={() => commitRename(preset.id)}
+                        onKeyDown={(event) => {
+                          event.stopPropagation()
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            event.currentTarget.form?.requestSubmit()
+                          }
+                        }}
+                        className="min-h-8 w-full rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-sm font-semibold leading-tight text-white outline-none focus:border-fuchsia-300/50 [user-select:text]"
+                        aria-label="Rename preset"
+                        autoComplete="one-time-code"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck={false}
+                        enterKeyHint="done"
+                        data-form-type="other"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        autoFocus
+                      />
+                    </form>
                   ) : (
                     <div className="flex min-h-8 w-full min-w-0 items-center justify-between gap-3">
                       <div className="text-safe min-w-0 flex-1 truncate text-sm font-semibold text-white">
