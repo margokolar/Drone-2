@@ -68,7 +68,7 @@ select {
 .music-accidental {
   display: inline-block;
   font-family: 'Noto Music', serif;
-  font-size: 1.15em;
+  font-size: 0.95em;
   font-style: normal;
   font-synthesis: none;
   font-weight: 400;
