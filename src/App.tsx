@@ -20,6 +20,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -123,6 +124,7 @@ function App() {
   const sideMenuRef = useRef<HTMLElement | null>(null)
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
+  const overtonesPanelRef = useRef<HTMLDivElement | null>(null)
   const overtoneSelectionPinnedRef = useRef(false)
   const previousTabRef = useRef<TabId>('tone')
   const overtoneUndoRef = useRef<Map<NoteId, OvertoneSnapshot[]>>(new Map())
@@ -1089,17 +1091,44 @@ function App() {
     return () => window.clearInterval(timerId)
   }, [])
 
-  useEffect(() => {
+  const resetTabScroll = useCallback(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+    if (previewScrollRef.current) {
+      previewScrollRef.current.scrollTop = 0
+    }
+  }, [])
+
+  useLayoutEffect(() => {
     if (activeTab !== 'overtones' && activeTab !== 'presets' && activeTab !== 'metronome') {
       return
     }
-    window.requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, behavior: 'auto' })
-      document.documentElement.scrollTop = 0
-      document.body.scrollTop = 0
-      previewScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' })
+    resetTabScroll()
+    if (activeTab === 'overtones') {
+      overtonesPanelRef.current?.scrollIntoView({ block: 'start', inline: 'nearest' })
+    }
+    requestAnimationFrame(() => {
+      resetTabScroll()
+      if (activeTab === 'overtones') {
+        overtonesPanelRef.current?.scrollIntoView({ block: 'start', inline: 'nearest' })
+      }
     })
-  }, [activeTab])
+  }, [activeTab, resetTabScroll])
+
+  useEffect(() => {
+    if (activeTab !== 'overtones') {
+      return
+    }
+    const onOrientationChange = () => {
+      requestAnimationFrame(() => {
+        resetTabScroll()
+        overtonesPanelRef.current?.scrollIntoView({ block: 'start', inline: 'nearest' })
+      })
+    }
+    window.addEventListener('orientationchange', onOrientationChange)
+    return () => window.removeEventListener('orientationchange', onOrientationChange)
+  }, [activeTab, resetTabScroll])
 
   useEffect(() => {
     if (!menuOpen) {
@@ -1140,7 +1169,11 @@ function App() {
         iphone16ProMaxPreview ? 'min-h-full min-w-0' : 'min-h-screen'
       } bg-[#111019] text-[#f2f2f7] ${activeTab === 'metronome' ? 'h-screen overflow-hidden' : ''}`}
     >
-      <div className="mx-auto w-full max-w-md px-3 py-5 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl">
+      <div
+        className={`mx-auto w-full max-w-md px-3 py-5 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
+          activeTab === 'overtones' ? 'landscape:pt-0 max-h-[500px]:pt-0' : ''
+        }`}
+      >
         <header className="fixed left-3 right-3 top-2 z-40 mx-auto flex max-w-md items-center gap-3 rounded-xl border border-white/10 bg-[#111019]/90 px-3 py-2 backdrop-blur-sm landscape:hidden max-h-[500px]:hidden md:max-w-5xl">
           {activeTab !== 'blank' && (
             <button
@@ -1301,7 +1334,8 @@ function App() {
             </SectionCard>
           </div>
           <div
-            className="space-y-4 pt-16 landscape:space-y-2 landscape:pt-0 max-h-[500px]:space-y-2 max-h-[500px]:pt-0"
+            ref={overtonesPanelRef}
+            className="space-y-4 portrait:pt-16 landscape:space-y-2 landscape:pt-0 max-h-[500px]:space-y-2 max-h-[500px]:pt-0"
             role="tabpanel"
             id="panel-overtones"
             aria-labelledby="tab-overtones"
