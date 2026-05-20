@@ -1645,6 +1645,32 @@ function App() {
                   >
                     <Redo2 size={16} />
                   </button>
+                  <button
+                    type="button"
+                    className={overtoneIconButtonClass('landscape-inline')}
+                    onClick={copySelectedOvertones}
+                    aria-label="Copy tone overtones"
+                  >
+                    <Copy size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className={overtoneIconButtonClass('landscape-inline')}
+                    onClick={pasteSelectedOvertones}
+                    aria-label="Paste tone overtones"
+                    disabled={!canPasteOvertones}
+                  >
+                    <ClipboardPaste size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className={overtoneIconButtonClass('landscape-inline')}
+                    onClick={deactivateAllPartials}
+                    aria-label="Deactivate all partials"
+                    disabled={!canDeactivateAllPartials}
+                  >
+                    <PowerOff size={16} />
+                  </button>
                 </div>
               )}
             </div>
