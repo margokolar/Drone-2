@@ -71,6 +71,7 @@ export function PresetList({
                   {(isEditing) ? (
                     <input
                       type="text"
+                      name="drone-preset-name"
                       value={editingName}
                       onChange={(e) => setEditingName(e.target.value)}
                       onBlur={() => commitRename(preset.id)}
@@ -83,6 +84,13 @@ export function PresetList({
                       }}
                       className="min-h-8 w-full rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-sm font-semibold leading-tight text-white outline-none focus:border-fuchsia-300/50 [user-select:text]"
                       aria-label="Preset name"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      enterKeyHint="done"
+                      data-lpignore="true"
+                      data-1p-ignore
                       autoFocus
                     />
                   ) : (
