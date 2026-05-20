@@ -14,6 +14,18 @@ type PresetListProps = {
   onMovePreset: (presetId: string, direction: 'up' | 'down') => void
 }
 
+function selectAllEditableText(element: HTMLElement) {
+  element.focus({ preventScroll: true })
+  const range = document.createRange()
+  range.selectNodeContents(element)
+  const selection = window.getSelection()
+  if (!selection) {
+    return
+  }
+  selection.removeAllRanges()
+  selection.addRange(range)
+}
+
 export function PresetList({
   presets,
   activePresetId,
@@ -25,24 +37,24 @@ export function PresetList({
 }: PresetListProps) {
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
-  const renameInputRef = useRef<HTMLInputElement | null>(null)
+  const renameEditorRef = useRef<HTMLDivElement | null>(null)
 
   const startEditing = (preset: Preset) => {
     flushSync(() => {
       setEditingPresetId(preset.id)
       setEditingName(preset.name)
     })
-    const input = renameInputRef.current
-    if (!input) {
+    const editor = renameEditorRef.current
+    if (!editor) {
       return
     }
-    input.focus({ preventScroll: true })
-    input.readOnly = false
-    input.setSelectionRange(0, input.value.length)
+    editor.textContent = preset.name
+    selectAllEditableText(editor)
   }
 
   const commitRename = (presetId: string) => {
-    const trimmed = editingName.trim()
+    const raw = renameEditorRef.current?.textContent ?? editingName
+    const trimmed = raw.replace(/\s+/g, ' ').trim()
     if (trimmed) {
       onRenamePreset(presetId, trimmed)
     }
@@ -80,55 +92,34 @@ export function PresetList({
               <div className="mb-1.5 flex min-h-8 items-center">
                 <div className="flex min-w-0 flex-1 items-center">
                   {(isEditing) ? (
-                    <form
-                      className="relative w-full min-w-0"
-                      autoComplete="off"
-                      onSubmit={(event) => {
-                        event.preventDefault()
-                        event.stopPropagation()
-                        commitRename(preset.id)
-                      }}
+                    <div
+                      className="w-full min-w-0"
                       onClick={(event) => event.stopPropagation()}
+                      onPointerDown={(event) => event.stopPropagation()}
                     >
-                      <input
-                        type="text"
-                        name="contact-autofill-trap"
-                        tabIndex={-1}
-                        aria-hidden
-                        autoComplete="name"
-                        className="pointer-events-none absolute -left-[9999px] h-px w-px opacity-0"
-                        defaultValue=""
-                        readOnly
-                      />
-                      <input
-                        ref={renameInputRef}
-                        id={`preset-label-${preset.id}`}
-                        name={`preset-label-${preset.id}`}
-                        type="text"
-                        inputMode="text"
-                        value={editingName}
-                        readOnly
-                        onChange={(event) => setEditingName(event.target.value)}
+                      <div
+                        ref={renameEditorRef}
+                        contentEditable
+                        suppressContentEditableWarning
+                        role="textbox"
+                        aria-label="Preset label"
+                        onInput={(event) => setEditingName(event.currentTarget.textContent ?? '')}
                         onBlur={() => commitRename(preset.id)}
                         onKeyDown={(event) => {
                           event.stopPropagation()
                           if (event.key === 'Enter') {
                             event.preventDefault()
-                            event.currentTarget.form?.requestSubmit()
+                            commitRename(preset.id)
                           }
                         }}
+                        onPaste={(event) => {
+                          event.preventDefault()
+                          const text = event.clipboardData.getData('text/plain').replace(/[\r\n]+/g, ' ')
+                          document.execCommand('insertText', false, text)
+                        }}
                         className="min-h-8 w-full rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-sm font-semibold leading-tight text-white outline-none focus:border-fuchsia-300/50 [user-select:text]"
-                        aria-label="Preset label"
-                        autoComplete="off"
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        spellCheck={false}
-                        enterKeyHint="done"
-                        data-form-type="other"
-                        data-lpignore="true"
-                        data-1p-ignore="true"
                       />
-                    </form>
+                    </div>
                   ) : (
                     <div className="flex min-h-8 w-full min-w-0 items-center justify-between gap-3">
                       <div className="text-safe min-w-0 flex-1 truncate text-sm font-semibold text-white">
