@@ -1073,7 +1073,7 @@ function App() {
       } bg-[#111019] text-[#f2f2f7] ${activeTab === 'metronome' ? 'h-screen overflow-hidden' : ''}`}
     >
       <div className="mx-auto w-full max-w-md px-3 py-5 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl">
-        <header className="sticky top-2 z-40 mb-3 flex items-center gap-3 rounded-xl border border-white/10 bg-[#111019]/90 px-3 py-2 backdrop-blur-sm landscape:hidden max-h-[500px]:hidden">
+        <header className="fixed left-3 right-3 top-2 z-40 mx-auto flex max-w-md items-center gap-3 rounded-xl border border-white/10 bg-[#111019]/90 px-3 py-2 backdrop-blur-sm landscape:hidden max-h-[500px]:hidden md:max-w-5xl">
           {activeTab !== 'blank' && (
             <button
               type="button"
@@ -1118,8 +1118,8 @@ function App() {
             activeTab === 'blank' ? 'pb-20' : activeTab === 'metronome' ? 'pb-32' : 'pb-44'
           }`}
         >
-          <div className="space-y-3" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
-            <div className="sticky top-[76px] z-20 -mx-3 grid grid-cols-2 gap-2 overflow-visible bg-[#111019] px-3 landscape:top-3 max-h-[500px]:top-3">
+          <div className="space-y-3 pt-44 landscape:pt-28 max-h-[500px]:pt-28" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
+            <div className="fixed left-3 right-3 top-[76px] z-20 mx-auto grid max-w-md grid-cols-2 gap-2 overflow-visible bg-[#111019] px-3 landscape:top-3 max-h-[500px]:top-3 md:max-w-5xl">
               <article className="relative rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
                 <button
                   type="button"
