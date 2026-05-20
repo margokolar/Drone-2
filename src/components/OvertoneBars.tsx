@@ -222,7 +222,7 @@ export function OvertoneBars({
               <div key={partial.id} className="space-y-1">
                 <button
                   type="button"
-                  className={`relative h-44 w-full touch-none rounded-md border landscape:h-28 max-h-[500px]:h-28 ${barClass}`}
+                  className={`relative h-44 w-full touch-none rounded-md border ${barClass}`}
                   onPointerDown={(event) => {
                     event.preventDefault()
                     event.currentTarget.setPointerCapture(event.pointerId)
