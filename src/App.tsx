@@ -1423,7 +1423,7 @@ function App() {
           <div className="space-y-4" role="tabpanel" id="panel-blank" aria-labelledby="tab-blank" hidden={activeTab !== 'blank'} />
         </main>
       </div>
-      <div className="fixed bottom-2 left-0 right-0 z-30 px-3">
+      <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#111019] px-3 pb-2">
         <div className="mx-auto w-full max-w-md space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl">
           <nav
             className="overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm"
