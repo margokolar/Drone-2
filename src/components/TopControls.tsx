@@ -29,7 +29,7 @@ export function TopControls({
   return (
     <div className="grid grid-cols-2 gap-3">
       <label className="block">
-        <span className="mb-3 block text-xs uppercase tracking-[0.16em] text-white/60">Tuning system</span>
+        <span className="mb-2 block text-xs uppercase tracking-[0.16em] text-white/60">Tuning system</span>
         <div className="relative">
           <select
             value={tuningSystemId}
@@ -49,7 +49,7 @@ export function TopControls({
         </div>
       </label>
       <label className="block">
-        <span className="mb-3 block text-xs uppercase tracking-[0.16em] text-white/60">Tonal center</span>
+        <span className="mb-2 block text-xs uppercase tracking-[0.16em] text-white/60">Tonal center</span>
         <div className="relative">
           <select
             value={tonalCenter}
