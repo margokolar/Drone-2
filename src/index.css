@@ -66,10 +66,13 @@ select {
 }
 
 .music-accidental {
-  font-family: 'Noto Music', 'Bravura Text', 'Noto Sans Symbols2', serif;
+  display: inline-block;
+  font-family: 'Noto Music', serif;
   font-size: 1.15em;
+  font-style: normal;
+  font-synthesis: none;
   font-weight: 400;
-  line-height: 0;
+  line-height: 1;
   position: relative;
   top: -0.18em;
   vertical-align: baseline;

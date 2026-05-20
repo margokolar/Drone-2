@@ -15,10 +15,17 @@ export function ToneLabel({ noteId, className }: ToneLabelProps) {
   if (noteId === 'fis' || noteId === 'fis1') {
     return (
       <span
-        className={clsx('tone-label-with-accidental', toneLabelBaseClass, className, uppercase && 'uppercase')}
+        className={clsx(
+          'tone-label-with-accidental text-base leading-none tracking-[0.03em]',
+          className,
+          uppercase && 'uppercase',
+        )}
       >
-        f<span className="music-accidental">♯</span>
-        {noteId === 'fis1' ? <span className={toneLabelOctaveClass}>1</span> : null}
+        <span className="font-bold">f</span>
+        <span className="music-accidental" aria-hidden="true">
+          ♯
+        </span>
+        {noteId === 'fis1' ? <span className={clsx(toneLabelOctaveClass, 'font-bold')}>1</span> : null}
       </span>
     )
   }
