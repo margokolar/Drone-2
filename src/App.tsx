@@ -1119,7 +1119,7 @@ function App() {
           }`}
         >
           <div className="space-y-3 pt-40 landscape:pt-24 max-h-[500px]:pt-24" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
-            <div className="fixed left-3 right-3 top-[76px] z-20 mx-auto grid max-w-md grid-cols-2 gap-2 bg-[#111019] landscape:top-3 max-h-[500px]:top-3 md:max-w-5xl">
+            <div className="fixed left-3 right-3 top-[76px] z-20 mx-auto grid max-w-md grid-cols-2 gap-3 bg-[#111019] landscape:top-3 max-h-[500px]:top-3 md:max-w-5xl">
               <article className="relative min-w-0 overflow-hidden rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
                 <button
                   type="button"
