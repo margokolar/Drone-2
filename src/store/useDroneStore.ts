@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { PartialConfig, ToneConfig } from '../audio/types'
-import { TONAL_CENTERS, type NoteId, type TonalCenter } from '../music/notes'
+import { TONAL_CENTERS, migrateLegacyNoteId, NOTE_IDS, type NoteId, type TonalCenter } from '../music/notes'
 import {
   MAX_BASE_OCTAVE,
   MIN_BASE_OCTAVE,
@@ -98,10 +98,11 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function duplicatePresetData(preset: Preset): Preset {
+  const partials = normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial })))
   return {
     ...preset,
-    tones: preset.tones.map((tone) => normalizeTonePartials(tone, preset.partials)),
-    partials: normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial }))),
+    tones: migrateTones(preset.tones, partials),
+    partials,
     timbreBlend: { ...preset.timbreBlend },
   }
 }
@@ -124,7 +125,7 @@ function applyPresetState(preset: Preset): Pick<
     baseOctave: clamp(preset.baseOctave, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
     masterGainDb: preset.masterGainDb,
     timbreBlend: { ...preset.timbreBlend },
-    tones: preset.tones.map((tone) => normalizeTonePartials(tone, preset.partials)),
+    tones: migrateTones(preset.tones, preset.partials ?? DEFAULT_PARTIALS),
     partials: normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial }))),
   }
 }
@@ -148,6 +149,41 @@ function normalizeTonePartials(tone: ToneConfig, fallbackPartials: PartialConfig
     ...tone,
     partials: normalizePartials((tone.partials ?? fallbackPartials).map((partial) => ({ ...partial }))),
   }
+}
+
+function migrateTones(tones: ToneConfig[], fallbackPartials: PartialConfig[]): ToneConfig[] {
+  const migratedById = new Map<NoteId, ToneConfig>()
+
+  for (const tone of tones) {
+    const noteId = migrateLegacyNoteId(tone.noteId)
+    if (!noteId) {
+      continue
+    }
+    const existing = migratedById.get(noteId)
+    migratedById.set(noteId, {
+      ...tone,
+      noteId,
+      enabled: existing?.enabled === true || tone.enabled,
+      gainDb: existing?.gainDb ?? tone.gainDb,
+      pan: existing?.pan ?? tone.pan,
+    })
+  }
+
+  return NOTE_IDS.map((noteId) => {
+    const tone = migratedById.get(noteId)
+    if (tone) {
+      return normalizeTonePartials(tone, fallbackPartials)
+    }
+    return normalizeTonePartials(
+      {
+        noteId,
+        enabled: false,
+        gainDb: noteId.endsWith('1') || noteId === 'g0' || noteId === 'a0' ? -18 : -12,
+        pan: 0,
+      },
+      fallbackPartials,
+    )
+  })
 }
 
 export const useDroneStore = create<DroneState>()(
@@ -801,7 +837,7 @@ export const useDroneStore = create<DroneState>()(
     }),
     {
       name: 'bourdon-store-v1',
-      version: 4,
+      version: 6,
       migrate: (persistedState) => {
         const typed = persistedState as Partial<DroneState> | undefined
         if (!typed) {
@@ -817,11 +853,10 @@ export const useDroneStore = create<DroneState>()(
               MAX_BASE_OCTAVE,
             ),
             partials: normalizePartials(preset.partials ?? incomingPartials),
+            tones: migrateTones(preset.tones ?? [], preset.partials ?? incomingPartials),
           }),
         )
-        const migratedTones = (typed.tones ?? INITIAL_PRESET.tones).map((tone) =>
-          normalizeTonePartials(tone, incomingPartials),
-        )
+        const migratedTones = migrateTones(typed.tones ?? INITIAL_PRESET.tones, incomingPartials)
         return {
           ...typed,
           presets: migratedPresets,

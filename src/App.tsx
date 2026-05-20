@@ -1190,7 +1190,7 @@ function App() {
               </article>
             </div>
             <SectionCard title="Global controls" className="[&>header]:mb-1">
-              <div className="space-y-5">
+              <div className="space-y-3">
                 <TopControls
                   referenceA4Hz={referenceA4Hz}
                   baseOctave={baseOctave}

@@ -19,9 +19,17 @@ export const NOTE_IDS = [
   'g1',
   'a1',
   'h1',
+  'g0',
+  'a0',
 ] as const
 
 export type NoteId = (typeof NOTE_IDS)[number]
+
+export const TONE_SELECTION_SUB_OCTAVE_IDS = ['g0', 'a0'] as const satisfies readonly NoteId[]
+
+export const TONE_SELECTION_GRID_IDS = NOTE_IDS.filter(
+  (noteId) => !TONE_SELECTION_SUB_OCTAVE_IDS.includes(noteId as (typeof TONE_SELECTION_SUB_OCTAVE_IDS)[number]),
+)
 
 export const TONAL_CENTERS = ['g', 'd', 'a', 'c', 'e'] as const
 
@@ -55,18 +63,32 @@ export const NOTE_LABELS: Record<NoteId, string> = {
   g1: 'g1',
   a1: 'a1',
   h1: 'h1',
+  g0: 'g0',
+  a0: 'a0',
 }
 
 export function splitNoteId(noteId: NoteId): {
   noteClass: NoteClass
   octaveOffset: number
 } {
-  const hasHighOctave = noteId.endsWith('1')
-  const rawClass = hasHighOctave
-    ? noteId.slice(0, noteId.length - 1)
-    : noteId
-  return {
-    noteClass: rawClass as NoteClass,
-    octaveOffset: hasHighOctave ? 1 : 0,
+  if (noteId.endsWith('0')) {
+    return {
+      noteClass: noteId.slice(0, -1) as NoteClass,
+      octaveOffset: -1,
+    }
   }
+  if (noteId.endsWith('1')) {
+    return {
+      noteClass: noteId.slice(0, -1) as NoteClass,
+      octaveOffset: 1,
+    }
+  }
+  return {
+    noteClass: noteId as NoteClass,
+    octaveOffset: 0,
+  }
+}
+
+export function migrateLegacyNoteId(noteId: string): NoteId | null {
+  return NOTE_IDS.includes(noteId as NoteId) ? (noteId as NoteId) : null
 }

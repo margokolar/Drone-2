@@ -45,6 +45,8 @@ const TONES_TEMPLATE: ToneConfig[] = [
   { noteId: 'g1', enabled: false, gainDb: -18, pan: 0 },
   { noteId: 'a1', enabled: false, gainDb: -18, pan: 0 },
   { noteId: 'h1', enabled: false, gainDb: -18, pan: 0 },
+  { noteId: 'g0', enabled: false, gainDb: -18, pan: 0 },
+  { noteId: 'a0', enabled: false, gainDb: -18, pan: 0 },
 ]
 
 function withEnabledTones(noteIds: string[]): ToneConfig[] {
