@@ -107,32 +107,63 @@ export function PresetList({
               <div className="mb-1.5 flex min-h-8 items-center">
                 <div className="flex min-w-0 flex-1 items-center">
                   {(isEditing) ? (
-                    <input
-                      ref={renameInputRef}
-                      type="text"
-                      inputMode="text"
-                      value={editingName}
-                      onChange={(event) => setEditingName(event.target.value)}
-                      onBlur={() => scheduleRenameBlur(preset.id)}
-                      onClick={(event) => event.stopPropagation()}
-                      onKeyDown={(event) => {
-                        event.stopPropagation()
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          commitRename(preset.id)
-                        }
-                      }}
-                      className="min-h-8 w-full rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-sm font-semibold leading-tight text-white outline-none focus:border-fuchsia-300/50 [user-select:text]"
-                      aria-label="Preset label"
+                    <form
+                      className="relative w-full min-w-0"
                       autoComplete="off"
-                      autoCorrect="off"
-                      autoCapitalize="off"
-                      spellCheck={false}
-                      enterKeyHint="done"
-                      data-form-type="other"
-                      data-lpignore="true"
-                      data-1p-ignore="true"
-                    />
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        commitRename(preset.id)
+                      }}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <input
+                        type="text"
+                        name="ios-autofill-name-trap"
+                        tabIndex={-1}
+                        aria-hidden
+                        autoComplete="name"
+                        defaultValue=""
+                        className="pointer-events-none absolute -left-[9999px] h-px w-px opacity-0"
+                        readOnly
+                      />
+                      <input
+                        type="email"
+                        name="ios-autofill-email-trap"
+                        tabIndex={-1}
+                        aria-hidden
+                        autoComplete="email"
+                        defaultValue=""
+                        className="pointer-events-none absolute -left-[9999px] h-px w-px opacity-0"
+                        readOnly
+                      />
+                      <input
+                        ref={renameInputRef}
+                        id={`preset-title-${preset.id}`}
+                        type="search"
+                        inputMode="text"
+                        value={editingName}
+                        onChange={(event) => setEditingName(event.target.value)}
+                        onBlur={() => scheduleRenameBlur(preset.id)}
+                        onKeyDown={(event) => {
+                          event.stopPropagation()
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            commitRename(preset.id)
+                          }
+                        }}
+                        className="min-h-8 w-full appearance-none rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-sm font-semibold leading-tight text-white outline-none focus:border-fuchsia-300/50 [user-select:text] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
+                        aria-label="Preset title"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck={false}
+                        enterKeyHint="done"
+                        data-form-type="other"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                      />
+                    </form>
                   ) : (
                     <div className="flex min-h-8 w-full min-w-0 items-center justify-between gap-3">
                       <div className="text-safe min-w-0 flex-1 truncate text-sm font-semibold text-white">
@@ -160,7 +191,7 @@ export function PresetList({
                       commitRename(preset.id)
                     }}
                     className="flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-fuchsia-300/50 bg-fuchsia-300/20 p-1.5 text-fuchsia-100 transition hover:bg-fuchsia-300/30"
-                    aria-label="Save name"
+                    aria-label="Save preset title"
                   >
                     <Check size={16} />
                   </button>
@@ -173,7 +204,7 @@ export function PresetList({
                         startEditing(preset)
                       }}
                       className={toolButtonClass}
-                      aria-label="Rename preset"
+                      aria-label="Edit preset title"
                     >
                       <Pencil size={16} />
                     </button>
