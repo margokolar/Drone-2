@@ -1,6 +1,8 @@
+import clsx from 'clsx'
 import { AudioWaveform } from 'lucide-react'
 import type { ToneConfig } from '../audio/types'
-import { NOTE_LABELS, type NoteId } from '../music/notes'
+import { getTonePageLabel, type NoteId } from '../music/notes'
+import { ToneLabel } from './ToneLabel'
 
 function isToneStrictSolo(tones: ToneConfig[], noteId: NoteId): boolean {
   const selected = tones.find((tone) => tone.noteId === noteId)
@@ -47,22 +49,23 @@ export function ToneMixer({
                 </span>
                 <button
                   type="button"
-                  className={`button-safe min-w-0 shrink rounded-lg border px-2.5 py-1 text-base font-extrabold uppercase tracking-[0.12em] transition ${
+                  className={clsx(
+                    'button-safe min-w-0 shrink rounded-lg border px-2.5 py-1 tracking-[0.12em] transition',
                     strictSolo
                       ? 'border-amber-300/70 bg-amber-300/30 text-amber-50 shadow-[0_0_18px_rgba(251,191,36,0.28)] hover:bg-amber-300/40'
-                      : 'border-fuchsia-300/50 bg-fuchsia-300/20 text-fuchsia-50 shadow-[0_0_18px_rgba(240,171,252,0.16)] hover:bg-fuchsia-300/30'
-                  }`}
+                      : 'border-fuchsia-300/50 bg-fuchsia-300/20 text-fuchsia-50 shadow-[0_0_18px_rgba(240,171,252,0.16)] hover:bg-fuchsia-300/30',
+                  )}
                   onClick={() => onToggleToneSolo(tone.noteId)}
-                  aria-label={`Lülita tooni solo: ${NOTE_LABELS[tone.noteId]}`}
+                  aria-label={`Lülita tooni solo: ${getTonePageLabel(tone.noteId)}`}
                 >
-                  {NOTE_LABELS[tone.noteId]}
+                  <ToneLabel noteId={tone.noteId} />
                 </button>
               </div>
               <button
                 type="button"
                 className="button-safe flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs font-semibold text-white/80 transition hover:bg-white/10"
                 onClick={() => onEditOvertones(tone.noteId)}
-                aria-label={`Edit ${NOTE_LABELS[tone.noteId]} overtones`}
+                aria-label={`Edit ${getTonePageLabel(tone.noteId)} overtones`}
               >
                 <AudioWaveform size={14} />
                 OT

@@ -1,8 +1,9 @@
 import clsx from 'clsx'
+import { ToneLabel } from './ToneLabel'
 import {
-  NOTE_LABELS,
   TONE_SELECTION_GRID_IDS,
   TONE_SELECTION_SUB_OCTAVE_IDS,
+  getTonePageLabel,
   type NoteId,
 } from '../music/notes'
 import type { ToneConfig } from '../audio/types'
@@ -13,35 +14,29 @@ type NoteSelectorProps = {
 }
 
 const TONE_BUTTON_CLASS =
-  'flex min-h-[36px] min-w-0 items-center justify-center rounded-md border px-1 py-1.5 text-xs font-semibold transition'
+  'flex min-h-[36px] min-w-0 items-center justify-center rounded-md border px-1 py-1.5 transition'
 
 function ToneButton({
   noteId,
-  label,
-  uppercase,
   enabled,
   onToggleTone,
 }: {
   noteId: NoteId
-  label?: string
-  uppercase?: boolean
   enabled: boolean
   onToggleTone: (noteId: NoteId) => void
 }) {
-  const displayLabel = label ?? NOTE_LABELS[noteId]
   return (
     <button
       type="button"
       onClick={() => onToggleTone(noteId)}
       className={clsx(
         TONE_BUTTON_CLASS,
-        uppercase && 'uppercase',
         enabled && 'border-fuchsia-300/70 bg-fuchsia-300/20 text-fuchsia-100',
         !enabled && 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10',
       )}
-      aria-label={`Toggle ${displayLabel}`}
+      aria-label={`Toggle ${getTonePageLabel(noteId)}`}
     >
-      {displayLabel}
+      <ToneLabel noteId={noteId} />
     </button>
   )
 }
@@ -60,8 +55,6 @@ export function NoteSelector({ tones, onToggleTone }: NoteSelectorProps) {
         <ToneButton
           key={noteId}
           noteId={noteId}
-          label={NOTE_LABELS[noteId].slice(0, -1)}
-          uppercase
           enabled={Boolean(toneState.get(noteId))}
           onToggleTone={onToggleTone}
         />

@@ -92,3 +92,20 @@ export function splitNoteId(noteId: NoteId): {
 export function migrateLegacyNoteId(noteId: string): NoteId | null {
   return NOTE_IDS.includes(noteId as NoteId) ? (noteId as NoteId) : null
 }
+
+export function getTonePageLabel(noteId: NoteId): string {
+  if (noteId === 'g0' || noteId === 'a0') {
+    return NOTE_LABELS[noteId].slice(0, -1)
+  }
+  if (noteId === 'fis') {
+    return 'f♯'
+  }
+  if (noteId === 'fis1') {
+    return 'f♯1'
+  }
+  return NOTE_LABELS[noteId]
+}
+
+export function tonePageLabelUsesUppercase(noteId: NoteId): boolean {
+  return noteId === 'g0' || noteId === 'a0'
+}

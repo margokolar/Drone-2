@@ -59,3 +59,24 @@ select {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+.tone-label-with-accidental {
+  display: inline;
+  white-space: nowrap;
+}
+
+.music-accidental {
+  font-family: 'Noto Music', 'Bravura Text', 'Noto Sans Symbols2', serif;
+  font-size: 1.15em;
+  font-weight: 400;
+  line-height: 0;
+  position: relative;
+  top: -0.18em;
+  vertical-align: baseline;
+}
+
+.tone-label-octave {
+  font-size: 0.55em;
+  font-weight: 700;
+  vertical-align: baseline;
+}

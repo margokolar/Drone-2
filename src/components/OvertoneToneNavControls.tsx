@@ -1,7 +1,10 @@
+import clsx from 'clsx'
 import { StepBack, StepForward } from 'lucide-react'
+import { tonePageLabelUsesUppercase, type NoteId } from '../music/notes'
+import { ToneLabel } from './ToneLabel'
 
 type OvertoneToneNavControlsProps = {
-  toneLabel: string
+  toneNoteId: NoteId
   isSolo: boolean
   canNavigate: boolean
   soloAriaLabel: string
@@ -23,7 +26,7 @@ function soloButtonClass(isSolo: boolean, variant: OvertoneToneNavControlsProps[
 }
 
 export function OvertoneToneNavControls({
-  toneLabel,
+  toneNoteId,
   isSolo,
   canNavigate,
   soloAriaLabel,
@@ -32,6 +35,7 @@ export function OvertoneToneNavControls({
   onNext,
   variant,
 }: OvertoneToneNavControlsProps) {
+  const toneLabelUppercase = tonePageLabelUsesUppercase(toneNoteId)
   const stepButtonClass =
     'button-safe flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40'
 
@@ -77,16 +81,22 @@ export function OvertoneToneNavControls({
         >
           Tone
         </span>
-        <span className="text-sm font-extrabold uppercase tracking-[0.12em]">{toneLabel}</span>
+        <ToneLabel
+          noteId={toneNoteId}
+          className={clsx('tracking-[0.12em]', toneLabelUppercase && 'uppercase')}
+        />
       </button>
     ) : (
       <button
         type="button"
-        className={`button-safe min-w-0 shrink touch-manipulation rounded-lg border px-2.5 py-1 text-base font-extrabold uppercase tracking-[0.12em] transition ${soloButtonClass(isSolo, variant)}`}
+        className={clsx(
+          'button-safe min-w-0 shrink touch-manipulation rounded-lg border px-2.5 py-1 tracking-[0.12em] transition',
+          soloButtonClass(isSolo, variant),
+        )}
         onClick={onToggleSolo}
         aria-label={soloAriaLabel}
       >
-        {toneLabel}
+        <ToneLabel noteId={toneNoteId} className={toneLabelUppercase ? 'uppercase' : undefined} />
       </button>
     )
 

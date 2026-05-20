@@ -42,7 +42,7 @@ import { TopControls } from './components/TopControls'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useMetronome } from './hooks/useMetronome'
 import { useOvertoneMidi } from './hooks/useOvertoneMidi'
-import { NOTE_IDS, NOTE_LABELS, type NoteId } from './music/notes'
+import { getTonePageLabel, NOTE_IDS, type NoteId } from './music/notes'
 import { getFrequency } from './music/tuning'
 import { createDefaultPartials, type Preset } from './presets/defaultPresets'
 import { useDroneStore } from './store/useDroneStore'
@@ -83,6 +83,15 @@ function sortTonesByNoteId(source: ToneConfig[]): ToneConfig[] {
   )
 }
 
+function getLastActiveToneNoteId(source: ToneConfig[]): NoteId | undefined {
+  const sortedActive = sortTonesByNoteId(source.filter((tone) => tone.enabled))
+  if (sortedActive.length > 0) {
+    return sortedActive[sortedActive.length - 1]?.noteId
+  }
+  const sortedAll = sortTonesByNoteId(source)
+  return sortedAll[sortedAll.length - 1]?.noteId
+}
+
 function getOvertoneNavigationTones(
   tones: ToneConfig[],
   overtoneToneOptions: ToneConfig[],
@@ -110,6 +119,8 @@ function App() {
   const sideMenuRef = useRef<HTMLElement | null>(null)
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
+  const overtoneSelectionPinnedRef = useRef(false)
+  const previousTabRef = useRef<TabId>('tone')
   const overtoneUndoRef = useRef<Map<NoteId, OvertoneSnapshot[]>>(new Map())
   const overtoneRedoRef = useRef<Map<NoteId, OvertoneSnapshot[]>>(new Map())
   const overtoneClipboardRef = useRef<PartialConfig[] | null>(null)
@@ -602,7 +613,7 @@ function App() {
   )
   const canNavigateOvertoneTone = overtoneNavigationTones.length > 1
   const selectedOvertoneToneLabel = selectedOvertoneTone
-    ? NOTE_LABELS[selectedOvertoneTone.noteId]
+    ? getTonePageLabel(selectedOvertoneTone.noteId)
     : 'Tone'
   const selectedOvertoneToneSoloAriaLabel = `Lülita tooni solo: ${selectedOvertoneToneLabel}`
   const applyToneEnabledMap = useCallback((enabledByNoteId: Map<NoteId, boolean>) => {
@@ -722,12 +733,28 @@ function App() {
 
   useEffect(() => {
     if (!tones.some((tone) => tone.noteId === selectedOvertoneNoteId)) {
-      const fallback = tones.find((tone) => tone.enabled) ?? tones[0]
-      if (fallback) {
-        setSelectedOvertoneNoteId(fallback.noteId)
+      const fallbackNoteId = getLastActiveToneNoteId(tones)
+      if (fallbackNoteId) {
+        setSelectedOvertoneNoteId(fallbackNoteId)
       }
     }
   }, [selectedOvertoneNoteId, tones])
+
+  useEffect(() => {
+    const previousTab = previousTabRef.current
+    previousTabRef.current = activeTab
+    if (activeTab !== 'overtones' || previousTab === 'overtones') {
+      return
+    }
+    if (overtoneSelectionPinnedRef.current) {
+      overtoneSelectionPinnedRef.current = false
+      return
+    }
+    const lastActiveToneNoteId = getLastActiveToneNoteId(tones)
+    if (lastActiveToneNoteId) {
+      setSelectedOvertoneNoteId(lastActiveToneNoteId)
+    }
+  }, [activeTab, tones])
 
   useEffect(() => {
     overtoneUndoRef.current = new Map()
@@ -1227,6 +1254,7 @@ function App() {
                 onTonePan={setTonePan}
                 onToggleToneSolo={toggleToneSoloForNote}
                 onEditOvertones={(noteId) => {
+                  overtoneSelectionPinnedRef.current = true
                   setSelectedOvertoneNoteId(noteId)
                   setActiveTab('overtones')
                 }}
@@ -1247,7 +1275,7 @@ function App() {
                 <div className="flex w-full min-w-0 flex-col items-end gap-1.5 landscape:hidden max-h-[500px]:hidden">
                   <OvertoneToneNavControls
                     variant="portrait-solo"
-                    toneLabel={selectedOvertoneToneLabel}
+                    toneNoteId={selectedOvertoneNoteId}
                     isSolo={isSelectedOvertoneToneSolo}
                     canNavigate={canNavigateOvertoneTone}
                     soloAriaLabel={selectedOvertoneToneSoloAriaLabel}
@@ -1296,7 +1324,7 @@ function App() {
                       </div>
                       <OvertoneToneNavControls
                         variant="portrait-steps"
-                        toneLabel={selectedOvertoneToneLabel}
+                        toneNoteId={selectedOvertoneNoteId}
                         isSolo={isSelectedOvertoneToneSolo}
                         canNavigate={canNavigateOvertoneTone}
                         soloAriaLabel={selectedOvertoneToneSoloAriaLabel}
@@ -1462,7 +1490,7 @@ function App() {
                 <div className="ml-2 hidden shrink-0 items-center gap-1.5 landscape:flex max-h-[500px]:flex">
                   <OvertoneToneNavControls
                     variant="landscape-inline"
-                    toneLabel={selectedOvertoneToneLabel}
+                    toneNoteId={selectedOvertoneNoteId}
                     isSolo={isSelectedOvertoneToneSolo}
                     canNavigate={canNavigateOvertoneTone}
                     soloAriaLabel={selectedOvertoneToneSoloAriaLabel}
