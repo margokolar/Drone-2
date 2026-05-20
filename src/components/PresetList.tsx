@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { ArrowDown, ArrowUp, Check, Copy, Pencil, Trash2 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import type { Preset } from '../presets/defaultPresets'
 
 type PresetListProps = {
@@ -26,24 +27,17 @@ export function PresetList({
   const [editingName, setEditingName] = useState('')
   const renameInputRef = useRef<HTMLInputElement | null>(null)
 
-  useEffect(() => {
-    if (!editingPresetId) {
+  const startEditing = (preset: Preset) => {
+    flushSync(() => {
+      setEditingPresetId(preset.id)
+      setEditingName(preset.name)
+    })
+    const input = renameInputRef.current
+    if (!input) {
       return
     }
-    const frame = window.requestAnimationFrame(() => {
-      const input = renameInputRef.current
-      if (!input) {
-        return
-      }
-      input.focus()
-      input.setSelectionRange(0, input.value.length)
-    })
-    return () => window.cancelAnimationFrame(frame)
-  }, [editingPresetId])
-
-  const startEditing = (preset: Preset) => {
-    setEditingPresetId(preset.id)
-    setEditingName(preset.name)
+    input.focus({ preventScroll: true })
+    input.setSelectionRange(0, input.value.length)
   }
 
   const commitRename = (presetId: string) => {
@@ -165,8 +159,9 @@ export function PresetList({
                   <>
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
+                      onPointerDown={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
                         startEditing(preset)
                       }}
                       className={toolButtonClass}
