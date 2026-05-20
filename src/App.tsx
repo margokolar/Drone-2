@@ -8,6 +8,7 @@ import {
   Menu,
   Pause,
   Play,
+  PowerOff,
   Redo2,
   RotateCcw,
   Save,
@@ -373,6 +374,23 @@ function App() {
     rememberOvertoneState()
     setSelectedOvertonePartials(clonePartials(copied))
   }, [clonePartials, rememberOvertoneState, setSelectedOvertonePartials])
+
+  const canDeactivateAllPartials = useMemo(
+    () => selectedOvertonePartials.some((partial) => partial.enabled),
+    [selectedOvertonePartials],
+  )
+
+  const deactivateAllPartials = useCallback(() => {
+    if (!canDeactivateAllPartials) {
+      return
+    }
+    rememberOvertoneState()
+    selectedOvertonePartials.forEach((partial) => {
+      if (partial.enabled) {
+        overtoneMidi.onPartialEnabledFromUi(partial.id, false)
+      }
+    })
+  }, [canDeactivateAllPartials, overtoneMidi, rememberOvertoneState, selectedOvertonePartials])
 
   const downloadJson = useCallback((payload: unknown, fileName: string) => {
     const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], {
@@ -1445,6 +1463,15 @@ function App() {
                     disabled={!canPasteOvertones}
                   >
                     <ClipboardPaste size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className={overtoneIconButtonClass('portrait-solo')}
+                    onClick={deactivateAllPartials}
+                    aria-label="Deactivate all partials"
+                    disabled={!canDeactivateAllPartials}
+                  >
+                    <PowerOff size={16} />
                   </button>
                 </div>
                 <button
