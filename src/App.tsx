@@ -1119,8 +1119,8 @@ function App() {
           }`}
         >
           <div className="space-y-3 pt-40 landscape:pt-24 max-h-[500px]:pt-24" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
-            <div className="fixed left-3 right-3 top-[76px] z-20 mx-auto grid w-full max-w-md grid-cols-2 gap-2 overflow-visible bg-[#111019] landscape:top-3 max-h-[500px]:top-3 md:max-w-5xl">
-              <article className="relative rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
+            <div className="fixed left-3 right-3 top-[76px] z-20 mx-auto grid max-w-md grid-cols-2 gap-2 bg-[#111019] landscape:top-3 max-h-[500px]:top-3 md:max-w-5xl">
+              <article className="relative min-w-0 overflow-hidden rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
                 <button
                   type="button"
                   className="absolute inset-0 rounded-xl transition hover:bg-fuchsia-300/10"
@@ -1154,8 +1154,8 @@ function App() {
                   </button>
                 </div>
               </article>
-              <article className="relative min-w-0 overflow-visible rounded-xl border border-white/10 bg-[#1a1825] p-3">
-                <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
+              <article className="relative min-w-0 overflow-hidden rounded-xl border border-white/10 bg-[#1a1825] p-3">
+                <h2 className="mb-2 pr-[4.25rem] text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
                   Song
                 </h2>
                 <div className="absolute right-2 top-2 z-10 flex gap-1">
@@ -1183,7 +1183,7 @@ function App() {
                   onLoadSong={loadSongFromLibrary}
                   onMoveSong={moveSongInLibrary}
                   onDeleteSong={deleteSongFromLibrary}
-                  triggerClassName="mt-5 flex min-h-0 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-white/10 px-2 py-1 text-sm font-semibold text-white/95 transition hover:bg-white/15"
+                  triggerClassName="mt-5 flex min-h-0 w-full max-w-full min-w-0 items-center justify-between gap-2 overflow-hidden rounded-md border border-white/10 bg-white/10 px-2 py-1 text-sm font-semibold text-white/95 transition hover:bg-white/15"
                 />
               </article>
             </div>
