@@ -1118,7 +1118,7 @@ function App() {
             activeTab === 'blank' ? 'pb-20' : activeTab === 'metronome' ? 'pb-32' : 'pb-44'
           }`}
         >
-          <div className="space-y-3 pt-44 landscape:pt-28 max-h-[500px]:pt-28" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
+          <div className="space-y-3 pt-40 landscape:pt-24 max-h-[500px]:pt-24" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
             <div className="fixed left-3 right-3 top-[76px] z-20 mx-auto grid max-w-md grid-cols-2 gap-2 overflow-visible bg-[#111019] px-3 landscape:top-3 max-h-[500px]:top-3 md:max-w-5xl">
               <article className="relative rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
                 <button
@@ -1232,7 +1232,7 @@ function App() {
             </SectionCard>
           </div>
           <div
-            className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
+            className="space-y-4 pt-16 landscape:space-y-2 landscape:pt-16 max-h-[500px]:space-y-2 max-h-[500px]:pt-16"
             role="tabpanel"
             id="panel-overtones"
             aria-labelledby="tab-overtones"
@@ -1364,7 +1364,13 @@ function App() {
               />
             </SectionCard>
           </div>
-          <div className="space-y-4" role="tabpanel" id="panel-metronome" aria-labelledby="tab-metronome" hidden={activeTab !== 'metronome'}>
+          <div
+            className="space-y-4 pt-16 landscape:space-y-2 max-h-[500px]:space-y-2 max-h-[500px]:pt-16"
+            role="tabpanel"
+            id="panel-metronome"
+            aria-labelledby="tab-metronome"
+            hidden={activeTab !== 'metronome'}
+          >
             <SectionCard title="Click" className="px-3 pb-3 pt-1.5 [&>header]:mb-0">
               <MetronomeControls
                 enabled={metronomeEnabled}
@@ -1376,7 +1382,13 @@ function App() {
               />
             </SectionCard>
           </div>
-          <div className="space-y-4" role="tabpanel" id="panel-presets" aria-labelledby="tab-presets" hidden={activeTab !== 'presets'}>
+          <div
+            className="space-y-4 pt-16 landscape:space-y-2 max-h-[500px]:space-y-2 max-h-[500px]:pt-16"
+            role="tabpanel"
+            id="panel-presets"
+            aria-labelledby="tab-presets"
+            hidden={activeTab !== 'presets'}
+          >
             <SectionCard
               title="Presets"
               rightSlot={
