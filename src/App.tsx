@@ -31,6 +31,7 @@ import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from 
 import { MetronomeControls } from './components/MetronomeControls'
 import { NoteSelector } from './components/NoteSelector'
 import { OvertoneBars } from './components/OvertoneBars'
+import { OvertoneToneNavControls } from './components/OvertoneToneNavControls'
 import { OvertoneMidiPanel } from './components/OvertoneMidiPanel'
 import { PartialEditor } from './components/PartialEditor'
 import { PresetList } from './components/PresetList'
@@ -588,6 +589,10 @@ function App() {
     [tones, overtoneToneOptions, toneSoloRestore],
   )
   const canNavigateOvertoneTone = overtoneNavigationTones.length > 1
+  const selectedOvertoneToneLabel = selectedOvertoneTone
+    ? NOTE_LABELS[selectedOvertoneTone.noteId]
+    : 'Tone'
+  const selectedOvertoneToneSoloAriaLabel = `Lülita tooni solo: ${selectedOvertoneToneLabel}`
   const applyToneEnabledMap = useCallback((enabledByNoteId: Map<NoteId, boolean>) => {
     useDroneStore.setState((state) => ({
       tones: state.tones.map((tone) => {
@@ -1194,27 +1199,20 @@ function App() {
             hidden={activeTab !== 'overtones'}
           >
             <SectionCard
-              title="Overtone balance"
+              title="Overtones"
               className="landscape:p-2 landscape:[&>header]:hidden max-h-[500px]:p-2 max-h-[500px]:[&>header]:hidden [&>header]:mb-2"
               rightSlot={
                 <div className="flex w-full min-w-0 flex-col items-end gap-1.5 landscape:hidden max-h-[500px]:hidden">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
-                      Tone
-                    </span>
-                    <button
-                      type="button"
-                      className={`button-safe rounded-lg border px-2.5 py-1 text-base font-extrabold uppercase tracking-[0.12em] transition ${
-                        isSelectedOvertoneToneSolo
-                          ? 'border-amber-300/70 bg-amber-300/30 text-amber-50 shadow-[0_0_18px_rgba(251,191,36,0.28)] hover:bg-amber-300/40'
-                          : 'border-fuchsia-300/50 bg-fuchsia-300/20 text-fuchsia-50 shadow-[0_0_18px_rgba(240,171,252,0.16)] hover:bg-fuchsia-300/30'
-                      }`}
-                      onClick={toggleSelectedOvertoneToneSolo}
-                      aria-label={`Lülita tooni solo: ${selectedOvertoneTone ? NOTE_LABELS[selectedOvertoneTone.noteId] : 'tone'}`}
-                    >
-                      {selectedOvertoneTone ? NOTE_LABELS[selectedOvertoneTone.noteId] : 'Tone'}
-                    </button>
-                  </div>
+                  <OvertoneToneNavControls
+                    variant="portrait-solo"
+                    toneLabel={selectedOvertoneToneLabel}
+                    isSolo={isSelectedOvertoneToneSolo}
+                    canNavigate={canNavigateOvertoneTone}
+                    soloAriaLabel={selectedOvertoneToneSoloAriaLabel}
+                    onToggleSolo={toggleSelectedOvertoneToneSolo}
+                    onPrevious={() => selectAdjacentOvertoneTone('previous')}
+                    onNext={() => selectAdjacentOvertoneTone('next')}
+                  />
                   <div className="hide-scrollbar -mx-0.5 flex overflow-x-auto">
                     <div className="flex min-w-full items-center justify-between gap-9 px-0.5">
                       <div className="flex shrink-0 items-center gap-1">
@@ -1254,26 +1252,16 @@ function App() {
                           <Redo2 size={16} />
                         </button>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          type="button"
-                          className="button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
-                          onClick={() => selectAdjacentOvertoneTone('previous')}
-                          aria-label="Previous tone"
-                          disabled={!canNavigateOvertoneTone}
-                        >
-                          <StepBack size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          className="button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
-                          onClick={() => selectAdjacentOvertoneTone('next')}
-                          aria-label="Next tone"
-                          disabled={!canNavigateOvertoneTone}
-                        >
-                          <StepForward size={16} />
-                        </button>
-                      </div>
+                      <OvertoneToneNavControls
+                        variant="portrait-steps"
+                        toneLabel={selectedOvertoneToneLabel}
+                        isSolo={isSelectedOvertoneToneSolo}
+                        canNavigate={canNavigateOvertoneTone}
+                        soloAriaLabel={selectedOvertoneToneSoloAriaLabel}
+                        onToggleSolo={toggleSelectedOvertoneToneSolo}
+                        onPrevious={() => selectAdjacentOvertoneTone('previous')}
+                        onNext={() => selectAdjacentOvertoneTone('next')}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1417,46 +1405,17 @@ function App() {
                 </button>
               ))}
               {activeTab === 'overtones' && (
-                <div className="ml-2 hidden items-center gap-1.5 landscape:flex max-h-[500px]:flex">
-                  <button
-                    type="button"
-                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
-                    onClick={() => selectAdjacentOvertoneTone('previous')}
-                    aria-label="Previous tone"
-                    disabled={!canNavigateOvertoneTone}
-                  >
-                    <StepBack size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
-                    onClick={() => selectAdjacentOvertoneTone('next')}
-                    aria-label="Next tone"
-                    disabled={!canNavigateOvertoneTone}
-                  >
-                    <StepForward size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className={`button-safe flex h-9 items-center gap-1 rounded-lg border px-2 transition ${
-                      isSelectedOvertoneToneSolo
-                        ? 'border-amber-300/65 bg-amber-300/25 text-amber-50 shadow-[0_0_18px_rgba(251,191,36,0.22)] hover:bg-amber-300/35'
-                        : 'border-fuchsia-300/45 bg-fuchsia-300/15 text-fuchsia-50 shadow-[0_0_18px_rgba(240,171,252,0.12)] hover:bg-fuchsia-300/25'
-                    }`}
-                    onClick={toggleSelectedOvertoneToneSolo}
-                    aria-label={`Lülita tooni solo: ${selectedOvertoneTone ? NOTE_LABELS[selectedOvertoneTone.noteId] : 'tone'}`}
-                  >
-                    <span
-                      className={`text-[9px] font-semibold uppercase tracking-[0.14em] ${
-                        isSelectedOvertoneToneSolo ? 'text-amber-100/65' : 'text-white/45'
-                      }`}
-                    >
-                      Tone
-                    </span>
-                    <span className="text-sm font-extrabold uppercase tracking-[0.12em]">
-                      {selectedOvertoneTone ? NOTE_LABELS[selectedOvertoneTone.noteId] : 'Tone'}
-                    </span>
-                  </button>
+                <div className="ml-2 hidden shrink-0 items-center gap-1.5 landscape:flex max-h-[500px]:flex">
+                  <OvertoneToneNavControls
+                    variant="landscape-inline"
+                    toneLabel={selectedOvertoneToneLabel}
+                    isSolo={isSelectedOvertoneToneSolo}
+                    canNavigate={canNavigateOvertoneTone}
+                    soloAriaLabel={selectedOvertoneToneSoloAriaLabel}
+                    onToggleSolo={toggleSelectedOvertoneToneSolo}
+                    onPrevious={() => selectAdjacentOvertoneTone('previous')}
+                    onNext={() => selectAdjacentOvertoneTone('next')}
+                  />
                   <button
                     type="button"
                     className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10"
