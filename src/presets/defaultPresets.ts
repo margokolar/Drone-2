@@ -7,7 +7,6 @@ export type Preset = {
   name: string
   tuningSystemId: TuningSystemId
   tonalCenter: TonalCenter
-  referenceA4Hz: number
   baseOctave: number
   masterGainDb: number
   tones: ToneConfig[]
@@ -77,7 +76,6 @@ function makePreset(
     name,
     tuningSystemId: 'just',
     tonalCenter: center,
-    referenceA4Hz: 440,
     baseOctave: 3,
     masterGainDb: -10,
     tones: withEnabledTones(toneIds),

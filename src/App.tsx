@@ -1120,7 +1120,7 @@ function App() {
                   <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
                     Preset
                   </h2>
-                  <p className="mt-4 truncate text-sm font-semibold text-white/90">
+                  <p className="mt-5 truncate rounded-md border border-white/10 bg-white/10 px-2 py-1 text-sm font-semibold text-white/95">
                     {presets.find((preset) => preset.id === activePresetId)?.name ?? 'Preset'}
                   </p>
                 </div>
@@ -1154,7 +1154,7 @@ function App() {
                   onLoadSong={loadSongFromLibrary}
                   onMoveSong={moveSongInLibrary}
                   onDeleteSong={deleteSongFromLibrary}
-                  triggerClassName={SONG_MENU_TRIGGER_CLASS}
+                  triggerClassName="mt-5 flex min-h-0 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-white/10 px-2 py-1 text-sm font-semibold text-white/95 transition hover:bg-white/15"
                 />
               </article>
             </div>

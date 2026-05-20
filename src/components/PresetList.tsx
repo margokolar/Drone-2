@@ -72,8 +72,7 @@ export function PresetList({
                     <div className="min-h-10 w-full min-w-0 text-left">
                       <div className="text-safe text-sm font-semibold text-white">{preset.name}</div>
                       <div className="text-xs text-white/60">
-                        {preset.tuningSystemId.toUpperCase()} • Center {preset.tonalCenter.toUpperCase()} • A4{' '}
-                        = {preset.referenceA4Hz.toFixed(1)}
+                        {preset.tuningSystemId.toUpperCase()} • Center {preset.tonalCenter.toUpperCase()}
                       </div>
                     </div>
                   )}

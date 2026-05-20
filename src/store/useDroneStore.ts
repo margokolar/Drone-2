@@ -111,7 +111,6 @@ function applyPresetState(preset: Preset): Pick<
   | 'activePresetId'
   | 'tuningSystemId'
   | 'tonalCenter'
-  | 'referenceA4Hz'
   | 'baseOctave'
   | 'masterGainDb'
   | 'timbreBlend'
@@ -122,7 +121,6 @@ function applyPresetState(preset: Preset): Pick<
     activePresetId: preset.id,
     tuningSystemId: preset.tuningSystemId,
     tonalCenter: preset.tonalCenter,
-    referenceA4Hz: preset.referenceA4Hz,
     baseOctave: clamp(preset.baseOctave, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
     masterGainDb: preset.masterGainDb,
     timbreBlend: { ...preset.timbreBlend },
@@ -169,7 +167,7 @@ export const useDroneStore = create<DroneState>()(
       activePresetId: INITIAL_PRESET.id,
       tuningSystemId: INITIAL_PRESET.tuningSystemId,
       tonalCenter: INITIAL_PRESET.tonalCenter,
-      referenceA4Hz: INITIAL_PRESET.referenceA4Hz,
+      referenceA4Hz: 440,
       baseOctave: clamp(INITIAL_PRESET.baseOctave, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
       masterGainDb: INITIAL_PRESET.masterGainDb,
       timbreBlend: { ...INITIAL_PRESET.timbreBlend },
@@ -454,7 +452,6 @@ export const useDroneStore = create<DroneState>()(
             name: state.presets[presetIndex].name,
             tuningSystemId: state.tuningSystemId,
             tonalCenter: state.tonalCenter,
-            referenceA4Hz: state.referenceA4Hz,
             baseOctave: state.baseOctave,
             masterGainDb: state.masterGainDb,
             timbreBlend: { ...state.timbreBlend },
@@ -477,7 +474,6 @@ export const useDroneStore = create<DroneState>()(
             name: `Preset ${sequence}`,
             tuningSystemId: state.tuningSystemId,
             tonalCenter: state.tonalCenter,
-            referenceA4Hz: state.referenceA4Hz,
             baseOctave: state.baseOctave,
             masterGainDb: state.masterGainDb,
             timbreBlend: { ...state.timbreBlend },
