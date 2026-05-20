@@ -1131,7 +1131,7 @@ function App() {
                   <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
                     Preset
                   </h2>
-                  <p className="mt-5 truncate rounded-md border border-white/10 bg-white/10 px-2 py-1 text-sm font-semibold text-white/95">
+                  <p className="mt-5 truncate rounded-md border border-fuchsia-300/50 bg-fuchsia-300/20 px-2 py-1 text-sm font-extrabold text-fuchsia-50 shadow-[0_0_18px_rgba(240,171,252,0.16)]">
                     {presets.find((preset) => preset.id === activePresetId)?.name ?? 'Preset'}
                   </p>
                 </div>
