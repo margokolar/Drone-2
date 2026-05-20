@@ -14,18 +14,6 @@ type PresetListProps = {
   onMovePreset: (presetId: string, direction: 'up' | 'down') => void
 }
 
-function selectAllEditableText(element: HTMLElement) {
-  element.focus({ preventScroll: true })
-  const range = document.createRange()
-  range.selectNodeContents(element)
-  const selection = window.getSelection()
-  if (!selection) {
-    return
-  }
-  selection.removeAllRanges()
-  selection.addRange(range)
-}
-
 export function PresetList({
   presets,
   activePresetId,
@@ -37,8 +25,9 @@ export function PresetList({
 }: PresetListProps) {
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
-  const renameEditorRef = useRef<HTMLDivElement | null>(null)
+  const renameInputRef = useRef<HTMLInputElement | null>(null)
   const renameBlurTimeoutRef = useRef<number | null>(null)
+  const renameIgnoreBlurRef = useRef(false)
 
   const clearRenameBlurTimeout = () => {
     if (renameBlurTimeoutRef.current !== null) {
@@ -47,45 +36,44 @@ export function PresetList({
     }
   }
 
-  const startEditing = (preset: Preset) => {
-    clearRenameBlurTimeout()
-    flushSync(() => {
-      setEditingPresetId(preset.id)
-      setEditingName(preset.name)
-    })
-    const editor = renameEditorRef.current
-    if (!editor) {
-      return
-    }
-    editor.textContent = preset.name
-    selectAllEditableText(editor)
-  }
-
-  const scheduleRenameBlur = (presetId: string) => {
-    clearRenameBlurTimeout()
-    renameBlurTimeoutRef.current = window.setTimeout(() => {
-      renameBlurTimeoutRef.current = null
-      const editor = renameEditorRef.current
-      const active = document.activeElement
-      if (editor && (active === editor || editor.contains(active))) {
-        return
-      }
-      if (active instanceof HTMLElement && active.closest('[data-preset-edit-toolbar]')) {
-        editor?.focus()
-        return
-      }
-      commitRename(presetId)
-    }, 50)
-  }
-
   const commitRename = (presetId: string) => {
     clearRenameBlurTimeout()
-    const raw = renameEditorRef.current?.textContent ?? editingName
-    const trimmed = raw.replace(/\s+/g, ' ').trim()
+    const trimmed = editingName.replace(/\s+/g, ' ').trim()
     if (trimmed) {
       onRenamePreset(presetId, trimmed)
     }
     setEditingPresetId(null)
+  }
+
+  const scheduleRenameBlur = (presetId: string) => {
+    if (renameIgnoreBlurRef.current) {
+      return
+    }
+    clearRenameBlurTimeout()
+    renameBlurTimeoutRef.current = window.setTimeout(() => {
+      renameBlurTimeoutRef.current = null
+      if (document.activeElement === renameInputRef.current) {
+        return
+      }
+      commitRename(presetId)
+    }, 120)
+  }
+
+  const startEditing = (preset: Preset) => {
+    clearRenameBlurTimeout()
+    renameIgnoreBlurRef.current = true
+    flushSync(() => {
+      setEditingPresetId(preset.id)
+      setEditingName(preset.name)
+    })
+    const input = renameInputRef.current
+    if (input) {
+      input.focus({ preventScroll: true })
+      input.select()
+    }
+    window.setTimeout(() => {
+      renameIgnoreBlurRef.current = false
+    }, 400)
   }
 
   return (
@@ -119,37 +107,32 @@ export function PresetList({
               <div className="mb-1.5 flex min-h-8 items-center">
                 <div className="flex min-w-0 flex-1 items-center">
                   {(isEditing) ? (
-                    <div
-                      className="w-full min-w-0"
+                    <input
+                      ref={renameInputRef}
+                      type="text"
+                      inputMode="text"
+                      value={editingName}
+                      onChange={(event) => setEditingName(event.target.value)}
+                      onBlur={() => scheduleRenameBlur(preset.id)}
                       onClick={(event) => event.stopPropagation()}
-                      onPointerDown={(event) => event.stopPropagation()}
-                    >
-                      <div
-                        ref={renameEditorRef}
-                        contentEditable
-                        suppressContentEditableWarning
-                        role="textbox"
-                        aria-label="Preset label"
-                        spellCheck={false}
-                        autoCapitalize="off"
-                        onInput={(event) => setEditingName(event.currentTarget.textContent ?? '')}
-                        onFocus={clearRenameBlurTimeout}
-                        onBlur={() => scheduleRenameBlur(preset.id)}
-                        onKeyDown={(event) => {
-                          event.stopPropagation()
-                          if (event.key === 'Enter') {
-                            event.preventDefault()
-                            commitRename(preset.id)
-                          }
-                        }}
-                        onPaste={(event) => {
+                      onKeyDown={(event) => {
+                        event.stopPropagation()
+                        if (event.key === 'Enter') {
                           event.preventDefault()
-                          const text = event.clipboardData.getData('text/plain').replace(/[\r\n]+/g, ' ')
-                          document.execCommand('insertText', false, text)
-                        }}
-                        className="min-h-8 w-full rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-sm font-semibold leading-tight text-white outline-none focus:border-fuchsia-300/50 [user-select:text]"
-                      />
-                    </div>
+                          commitRename(preset.id)
+                        }
+                      }}
+                      className="min-h-8 w-full rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-sm font-semibold leading-tight text-white outline-none focus:border-fuchsia-300/50 [user-select:text]"
+                      aria-label="Preset label"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      enterKeyHint="done"
+                      data-form-type="other"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                    />
                   ) : (
                     <div className="flex min-h-8 w-full min-w-0 items-center justify-between gap-3">
                       <div className="text-safe min-w-0 flex-1 truncate text-sm font-semibold text-white">
@@ -164,10 +147,7 @@ export function PresetList({
                   )}
                 </div>
               </div>
-              <div
-                className="flex flex-wrap items-center gap-1.5"
-                data-preset-edit-toolbar={isEditing ? '' : undefined}
-              >
+              <div className="flex flex-wrap items-center gap-1.5">
                 {(isEditing) ? (
                   <button
                     type="button"
