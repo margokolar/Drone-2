@@ -567,6 +567,17 @@ function App() {
     // Best effort deep-link. Works only if JBL registers this URL scheme.
     window.location.href = 'jblportable://'
   }, [])
+  const saveAsSong = useCallback(() => {
+    const inputName = window.prompt('Song name', `${songName} copy`)
+    if (inputName === null) {
+      return
+    }
+    const trimmedName = inputName.trim()
+    if (!trimmedName) {
+      return
+    }
+    saveCurrentSongToLibrary(trimmedName)
+  }, [saveCurrentSongToLibrary, songName])
 
   const handleTogglePlay = useCallback(() => {
     const currentlyPlaying = useDroneStore.getState().playing
@@ -1143,10 +1154,28 @@ function App() {
                   </button>
                 </div>
               </article>
-              <article className="min-w-0 overflow-visible rounded-xl border border-white/10 bg-[#1a1825] p-3">
+              <article className="relative min-w-0 overflow-visible rounded-xl border border-white/10 bg-[#1a1825] p-3">
                 <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
                   Song
                 </h2>
+                <div className="absolute right-2 top-2 z-10 flex gap-1">
+                  <button
+                    type="button"
+                    className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] text-white/80 transition hover:bg-[#352a48]"
+                    onClick={() => saveCurrentSongToLibrary()}
+                    aria-label="Save current song"
+                  >
+                    <Save size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] text-white/80 transition hover:bg-[#352a48]"
+                    onClick={saveAsSong}
+                    aria-label="Save as new song"
+                  >
+                    <Copy size={15} />
+                  </button>
+                </div>
                 <SongLibraryMenu
                   songName={songName}
                   songLibrary={songLibrary}
