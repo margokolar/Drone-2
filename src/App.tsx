@@ -1119,7 +1119,7 @@ function App() {
           }`}
         >
           <div className="space-y-3" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
-            <div className="sticky top-[68px] z-20 -mx-3 grid grid-cols-2 gap-2 overflow-visible bg-[#111019] px-3 landscape:top-2 max-h-[500px]:top-2">
+            <div className="sticky top-[76px] z-20 -mx-3 grid grid-cols-2 gap-2 overflow-visible bg-[#111019] px-3 landscape:top-3 max-h-[500px]:top-3">
               <article className="relative rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
                 <button
                   type="button"
