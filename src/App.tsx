@@ -1301,7 +1301,7 @@ function App() {
             </SectionCard>
           </div>
           <div
-            className="space-y-4 pt-16 landscape:space-y-2 landscape:pt-16 max-h-[500px]:space-y-2 max-h-[500px]:pt-16"
+            className="space-y-4 pt-16 landscape:space-y-2 landscape:pt-0 max-h-[500px]:space-y-2 max-h-[500px]:pt-16"
             role="tabpanel"
             id="panel-overtones"
             aria-labelledby="tab-overtones"
