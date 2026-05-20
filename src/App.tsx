@@ -1024,11 +1024,13 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (activeTab !== 'overtones') {
+    if (activeTab !== 'overtones' && activeTab !== 'presets' && activeTab !== 'metronome') {
       return
     }
     window.requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: 'auto' })
+      document.documentElement.scrollTop = 0
+      document.body.scrollTop = 0
       previewScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' })
     })
   }, [activeTab])
