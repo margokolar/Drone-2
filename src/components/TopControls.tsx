@@ -24,12 +24,12 @@ export function TopControls({
   onTonalCenterChange,
 }: TopControlsProps) {
   const selectBaseClass =
-    'min-h-[50px] w-full appearance-none rounded-xl border border-white/15 bg-white/5 px-3 py-2 pr-10 text-sm leading-tight text-white outline-none transition focus:border-fuchsia-300/60'
+    'min-h-[36px] w-full appearance-none rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 pr-10 text-sm leading-none text-white outline-none transition focus:border-fuchsia-300/60'
 
   return (
     <div className="grid grid-cols-2 gap-3">
-      <label className="block space-y-2">
-        <span className="text-xs uppercase tracking-[0.16em] text-white/60">Tuning system</span>
+      <label className="block">
+        <span className="mb-3 block text-xs uppercase tracking-[0.16em] text-white/60">Tuning system</span>
         <div className="relative">
           <select
             value={tuningSystemId}
@@ -48,8 +48,8 @@ export function TopControls({
           />
         </div>
       </label>
-      <label className="block space-y-2">
-        <span className="text-xs uppercase tracking-[0.16em] text-white/60">Tonal center</span>
+      <label className="block">
+        <span className="mb-3 block text-xs uppercase tracking-[0.16em] text-white/60">Tonal center</span>
         <div className="relative">
           <select
             value={tonalCenter}
