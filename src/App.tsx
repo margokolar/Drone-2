@@ -109,6 +109,7 @@ function App() {
   const overtoneAnalyzeInputRef = useRef<HTMLInputElement | null>(null)
   const sideMenuRef = useRef<HTMLElement | null>(null)
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
+  const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const overtoneUndoRef = useRef<Map<NoteId, OvertoneSnapshot[]>>(new Map())
   const overtoneRedoRef = useRef<Map<NoteId, OvertoneSnapshot[]>>(new Map())
   const overtoneClipboardRef = useRef<PartialConfig[] | null>(null)
@@ -1012,6 +1013,16 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (activeTab !== 'overtones') {
+      return
+    }
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: 'auto' })
+      previewScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' })
+    })
+  }, [activeTab])
+
+  useEffect(() => {
     if (!menuOpen) {
       return
     }
@@ -1640,7 +1651,10 @@ function App() {
           maxWidth: '100vw',
         }}
       >
-        <div className="relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain">
+        <div
+          ref={previewScrollRef}
+          className="relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain"
+        >
           {appShell}
         </div>
       </div>
