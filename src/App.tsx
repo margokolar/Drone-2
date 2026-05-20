@@ -1424,7 +1424,7 @@ function App() {
         </main>
       </div>
       <div className="fixed bottom-2 left-0 right-0 z-30 px-3">
-        <div className="mx-auto w-full max-w-md space-y-2 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl">
+        <div className="mx-auto w-full max-w-md space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl">
           <nav
             className="overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm"
             aria-label="App sections"
