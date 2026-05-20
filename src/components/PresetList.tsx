@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { ArrowDown, ArrowUp, Check, Copy, Pencil, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Preset } from '../presets/defaultPresets'
 
 type PresetListProps = {
@@ -24,6 +24,22 @@ export function PresetList({
 }: PresetListProps) {
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
+  const renameInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!editingPresetId) {
+      return
+    }
+    const frame = window.requestAnimationFrame(() => {
+      const input = renameInputRef.current
+      if (!input) {
+        return
+      }
+      input.focus()
+      input.setSelectionRange(0, input.value.length)
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [editingPresetId])
 
   const startEditing = (preset: Preset) => {
     setEditingPresetId(preset.id)
@@ -88,26 +104,15 @@ export function PresetList({
                         readOnly
                       />
                       <input
-                        type="password"
-                        tabIndex={-1}
-                        aria-hidden
-                        autoComplete="new-password"
-                        className="pointer-events-none absolute h-0 w-0 opacity-0"
-                        readOnly
-                      />
-                      <input
+                        ref={renameInputRef}
                         id={`preset-rename-${preset.id}`}
                         type="text"
                         inputMode="text"
                         value={editingName}
-                        readOnly
                         onChange={(event) => setEditingName(event.target.value)}
                         onFocus={(event) => {
                           const input = event.currentTarget
-                          if (input.readOnly) {
-                            input.readOnly = false
-                          }
-                          input.select()
+                          input.setSelectionRange(0, input.value.length)
                         }}
                         onBlur={() => commitRename(preset.id)}
                         onKeyDown={(event) => {
@@ -119,7 +124,7 @@ export function PresetList({
                         }}
                         className="min-h-8 w-full rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-sm font-semibold leading-tight text-white outline-none focus:border-fuchsia-300/50 [user-select:text]"
                         aria-label="Rename preset"
-                        autoComplete="one-time-code"
+                        autoComplete="off"
                         autoCorrect="off"
                         autoCapitalize="off"
                         spellCheck={false}
@@ -127,7 +132,6 @@ export function PresetList({
                         data-form-type="other"
                         data-lpignore="true"
                         data-1p-ignore="true"
-                        autoFocus
                       />
                     </form>
                   ) : (
