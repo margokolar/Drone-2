@@ -37,6 +37,7 @@ export function PresetList({
       return
     }
     input.focus({ preventScroll: true })
+    input.readOnly = false
     input.setSelectionRange(0, input.value.length)
   }
 
@@ -91,23 +92,23 @@ export function PresetList({
                     >
                       <input
                         type="text"
+                        name="contact-autofill-trap"
                         tabIndex={-1}
                         aria-hidden
-                        autoComplete="off"
-                        className="pointer-events-none absolute h-0 w-0 opacity-0"
+                        autoComplete="name"
+                        className="pointer-events-none absolute -left-[9999px] h-px w-px opacity-0"
+                        defaultValue=""
                         readOnly
                       />
                       <input
                         ref={renameInputRef}
-                        id={`preset-rename-${preset.id}`}
+                        id={`preset-label-${preset.id}`}
+                        name={`preset-label-${preset.id}`}
                         type="text"
                         inputMode="text"
                         value={editingName}
+                        readOnly
                         onChange={(event) => setEditingName(event.target.value)}
-                        onFocus={(event) => {
-                          const input = event.currentTarget
-                          input.setSelectionRange(0, input.value.length)
-                        }}
                         onBlur={() => commitRename(preset.id)}
                         onKeyDown={(event) => {
                           event.stopPropagation()
@@ -117,7 +118,7 @@ export function PresetList({
                           }
                         }}
                         className="min-h-8 w-full rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-sm font-semibold leading-tight text-white outline-none focus:border-fuchsia-300/50 [user-select:text]"
-                        aria-label="Rename preset"
+                        aria-label="Preset label"
                         autoComplete="off"
                         autoCorrect="off"
                         autoCapitalize="off"
