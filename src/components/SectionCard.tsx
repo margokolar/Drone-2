@@ -3,12 +3,13 @@ import clsx from 'clsx'
 
 type SectionCardProps = {
   title: string
+  titleAddon?: ReactNode
   rightSlot?: ReactNode
   className?: string
   children: ReactNode
 }
 
-export function SectionCard({ title, rightSlot, className, children }: SectionCardProps) {
+export function SectionCard({ title, titleAddon, rightSlot, className, children }: SectionCardProps) {
   return (
     <section
       className={clsx(
@@ -17,9 +18,12 @@ export function SectionCard({ title, rightSlot, className, children }: SectionCa
       )}
     >
       <header className="relative z-30 mb-4 flex items-start justify-between gap-3 overflow-visible">
-        <h2 className="text-safe min-w-0 shrink text-sm font-semibold uppercase tracking-[0.16em] text-white/75">
-          {title}
-        </h2>
+        <div className="flex min-w-0 shrink items-center gap-2">
+          <h2 className="text-safe min-w-0 shrink text-sm font-semibold uppercase tracking-[0.16em] text-white/75">
+            {title}
+          </h2>
+          {titleAddon}
+        </div>
         {rightSlot ? (
           <div className="flex min-w-0 flex-1 justify-end pl-2">{rightSlot}</div>
         ) : null}

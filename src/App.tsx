@@ -31,7 +31,7 @@ import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from 
 import { MetronomeControls } from './components/MetronomeControls'
 import { NoteSelector } from './components/NoteSelector'
 import { OvertoneBars } from './components/OvertoneBars'
-import { OvertoneToneNavControls } from './components/OvertoneToneNavControls'
+import { OvertoneAllSoloButton, OvertoneToneNavControls, overtoneControlButtonSizeClass, overtoneIconButtonClass } from './components/OvertoneToneNavControls'
 import { OvertoneMidiPanel } from './components/OvertoneMidiPanel'
 import { PartialEditor } from './components/PartialEditor'
 import { PresetList } from './components/PresetList'
@@ -96,7 +96,11 @@ function getOvertoneNavigationTones(
   tones: ToneConfig[],
   overtoneToneOptions: ToneConfig[],
   toneSoloRestore: Map<NoteId, boolean> | null,
+  allCompareActive: boolean,
 ): ToneConfig[] {
+  if (allCompareActive) {
+    return sortTonesByNoteId(tones)
+  }
   if (toneSoloRestore !== null) {
     const preSoloActive = tones.filter((tone) => toneSoloRestore.get(tone.noteId) === true)
     return sortTonesByNoteId(preSoloActive)
@@ -126,6 +130,7 @@ function App() {
   const overtoneClipboardRef = useRef<PartialConfig[] | null>(null)
   const timbreMorphHistoryActiveRef = useRef(false)
   const [toneSoloRestore, setToneSoloRestore] = useState<Map<NoteId, boolean> | null>(null)
+  const [allTonesCompareActive, setAllTonesCompareActive] = useState(false)
   const [, setOvertoneHistoryVersion] = useState(0)
   const playing = useDroneStore((state) => state.playing)
   const activePresetId = useDroneStore((state) => state.activePresetId)
@@ -608,13 +613,16 @@ function App() {
   )
   const overtoneNavigationTones = useMemo(
     () =>
-      getOvertoneNavigationTones(tones, overtoneToneOptions, toneSoloRestore),
-    [tones, overtoneToneOptions, toneSoloRestore],
+      getOvertoneNavigationTones(tones, overtoneToneOptions, toneSoloRestore, allTonesCompareActive),
+    [allTonesCompareActive, tones, overtoneToneOptions, toneSoloRestore],
   )
-  const canNavigateOvertoneTone = overtoneNavigationTones.length > 1
+  const canNavigateOvertoneTone = allTonesCompareActive
+    ? tones.length > 1
+    : overtoneNavigationTones.length > 1
   const selectedOvertoneToneLabel = selectedOvertoneTone
     ? getTonePageLabel(selectedOvertoneTone.noteId)
     : 'Tone'
+  const isAllTonesCompareActive = allTonesCompareActive
   const selectedOvertoneToneSoloAriaLabel = `Lülita tooni solo: ${selectedOvertoneToneLabel}`
   const applyToneEnabledMap = useCallback((enabledByNoteId: Map<NoteId, boolean>) => {
     useDroneStore.setState((state) => ({
@@ -633,6 +641,7 @@ function App() {
     }
     applyToneEnabledMap(toneSoloRestore)
     setToneSoloRestore(null)
+    setAllTonesCompareActive(false)
     return true
   }, [applyToneEnabledMap, toneSoloRestore])
   const enterToneSoloForNote = useCallback(
@@ -648,10 +657,13 @@ function App() {
         restoreState.set(tone.noteId, tone.enabled)
         soloState.set(tone.noteId, tone.noteId === noteId)
       })
-      setToneSoloRestore(restoreState)
+      setAllTonesCompareActive(false)
+      if (toneSoloRestore === null) {
+        setToneSoloRestore(restoreState)
+      }
       applyToneEnabledMap(soloState)
     },
-    [applyToneEnabledMap],
+    [applyToneEnabledMap, toneSoloRestore],
   )
   const toggleToneSoloForNote = useCallback(
     (noteId: NoteId) => {
@@ -670,6 +682,32 @@ function App() {
   const toggleSelectedOvertoneToneSolo = useCallback(() => {
     toggleToneSoloForNote(selectedOvertoneNoteId)
   }, [toggleToneSoloForNote, selectedOvertoneNoteId])
+  const toggleAllTonesCompare = useCallback(() => {
+    if (allTonesCompareActive) {
+      restoreToneSoloState()
+      return
+    }
+    const currentTones = useDroneStore.getState().tones
+    if (toneSoloRestore === null) {
+      const restoreState = new Map<NoteId, boolean>()
+      currentTones.forEach((tone) => {
+        restoreState.set(tone.noteId, tone.enabled)
+      })
+      setToneSoloRestore(restoreState)
+    }
+    setAllTonesCompareActive(true)
+    const soloState = new Map<NoteId, boolean>()
+    currentTones.forEach((tone) => {
+      soloState.set(tone.noteId, tone.noteId === selectedOvertoneNoteId)
+    })
+    applyToneEnabledMap(soloState)
+  }, [
+    allTonesCompareActive,
+    applyToneEnabledMap,
+    restoreToneSoloState,
+    selectedOvertoneNoteId,
+    toneSoloRestore,
+  ])
   const selectAdjacentOvertoneTone = useCallback(
     (direction: 'previous' | 'next') => {
       const currentTones = useDroneStore.getState().tones
@@ -679,6 +717,7 @@ function App() {
         currentTones,
         toneOptionsNow,
         toneSoloRestore,
+        allTonesCompareActive,
       )
       if (navigationTones.length === 0) {
         return
@@ -689,7 +728,7 @@ function App() {
       const nextIndex = (fallbackIndex + delta + navigationTones.length) % navigationTones.length
       const nextNoteId = navigationTones[nextIndex].noteId
       setSelectedOvertoneNoteId(nextNoteId)
-      if (toneSoloRestore !== null || isToneStrictSolo(currentTones, selectedOvertoneNoteId)) {
+      if (toneSoloRestore !== null || allTonesCompareActive || isToneStrictSolo(currentTones, selectedOvertoneNoteId)) {
         const soloState = new Map<NoteId, boolean>()
         currentTones.forEach((tone) => {
           soloState.set(tone.noteId, tone.noteId === nextNoteId)
@@ -697,7 +736,7 @@ function App() {
         applyToneEnabledMap(soloState)
       }
     },
-    [applyToneEnabledMap, selectedOvertoneNoteId, toneSoloRestore],
+    [allTonesCompareActive, applyToneEnabledMap, selectedOvertoneNoteId, toneSoloRestore],
   )
   const partialReferenceFrequencyHz = useMemo(() => {
     const sourceTone = selectedOvertoneTone ?? activeTones[0] ?? tones[0]
@@ -1273,22 +1312,29 @@ function App() {
               className="landscape:p-2 landscape:[&>header]:hidden max-h-[500px]:p-2 max-h-[500px]:[&>header]:hidden [&>header]:mb-2"
               rightSlot={
                 <div className="flex w-full min-w-0 flex-col items-end gap-1.5 landscape:hidden max-h-[500px]:hidden">
-                  <OvertoneToneNavControls
-                    variant="portrait-solo"
-                    toneNoteId={selectedOvertoneNoteId}
-                    isSolo={isSelectedOvertoneToneSolo}
-                    canNavigate={canNavigateOvertoneTone}
-                    soloAriaLabel={selectedOvertoneToneSoloAriaLabel}
-                    onToggleSolo={toggleSelectedOvertoneToneSolo}
-                    onPrevious={() => selectAdjacentOvertoneTone('previous')}
-                    onNext={() => selectAdjacentOvertoneTone('next')}
-                  />
+                  <div className="flex items-center gap-2">
+                    <OvertoneAllSoloButton
+                      variant="portrait-solo"
+                      isActive={isAllTonesCompareActive}
+                      onClick={toggleAllTonesCompare}
+                    />
+                    <OvertoneToneNavControls
+                      variant="portrait-solo"
+                      toneNoteId={selectedOvertoneNoteId}
+                      isSolo={isSelectedOvertoneToneSolo}
+                      canNavigate={canNavigateOvertoneTone}
+                      soloAriaLabel={selectedOvertoneToneSoloAriaLabel}
+                      onToggleSolo={toggleSelectedOvertoneToneSolo}
+                      onPrevious={() => selectAdjacentOvertoneTone('previous')}
+                      onNext={() => selectAdjacentOvertoneTone('next')}
+                    />
+                  </div>
                   <div className="hide-scrollbar -mx-0.5 flex overflow-x-auto">
                     <div className="flex min-w-full items-center justify-between gap-9 px-0.5">
                       <div className="flex shrink-0 items-center gap-1">
                         <button
                           type="button"
-                          className="button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10"
+                          className={overtoneIconButtonClass('portrait-solo')}
                           onClick={saveActivePreset}
                           aria-label="Save current preset"
                         >
@@ -1296,7 +1342,7 @@ function App() {
                         </button>
                         <button
                           type="button"
-                          className="button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                          className={overtoneIconButtonClass('portrait-solo')}
                           onClick={resetOvertoneBalance}
                           aria-label="Reset overtone balance"
                           disabled={!canResetOvertones}
@@ -1305,7 +1351,7 @@ function App() {
                         </button>
                         <button
                           type="button"
-                          className="button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                          className={overtoneIconButtonClass('portrait-solo')}
                           onClick={undoOvertoneChange}
                           aria-label="Undo overtone change"
                           disabled={!canUndoOvertones}
@@ -1314,7 +1360,7 @@ function App() {
                         </button>
                         <button
                           type="button"
-                          className="button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                          className={overtoneIconButtonClass('portrait-solo')}
                           onClick={redoOvertoneChange}
                           aria-label="Redo overtone change"
                           disabled={!canRedoOvertones}
@@ -1351,7 +1397,7 @@ function App() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10"
+                    className={overtoneIconButtonClass('portrait-solo')}
                     onClick={copySelectedOvertones}
                     aria-label="Copy tone overtones"
                   >
@@ -1359,7 +1405,7 @@ function App() {
                   </button>
                   <button
                     type="button"
-                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                    className={overtoneIconButtonClass('portrait-solo')}
                     onClick={pasteSelectedOvertones}
                     aria-label="Paste tone overtones"
                     disabled={!canPasteOvertones}
@@ -1369,7 +1415,7 @@ function App() {
                 </div>
                 <button
                   type="button"
-                  className="button-safe flex h-9 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2 text-xs font-semibold text-white/85 transition hover:bg-white/10"
+                  className={`button-safe flex shrink-0 touch-manipulation items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 text-xs font-semibold text-white/85 transition hover:bg-white/10 ${overtoneControlButtonSizeClass('portrait-solo')}`}
                   onClick={() => overtoneAnalyzeInputRef.current?.click()}
                   aria-label="Choose audio file for overtone analysis"
                 >
@@ -1488,6 +1534,11 @@ function App() {
               ))}
               {activeTab === 'overtones' && (
                 <div className="ml-2 hidden shrink-0 items-center gap-1.5 landscape:flex max-h-[500px]:flex">
+                  <OvertoneAllSoloButton
+                    variant="landscape-inline"
+                    isActive={isAllTonesCompareActive}
+                    onClick={toggleAllTonesCompare}
+                  />
                   <OvertoneToneNavControls
                     variant="landscape-inline"
                     toneNoteId={selectedOvertoneNoteId}
@@ -1500,7 +1551,7 @@ function App() {
                   />
                   <button
                     type="button"
-                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10"
+                    className={overtoneIconButtonClass('landscape-inline')}
                     onClick={saveActivePreset}
                     aria-label="Save current preset"
                   >
@@ -1508,7 +1559,7 @@ function App() {
                   </button>
                   <button
                     type="button"
-                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                    className={overtoneIconButtonClass('landscape-inline')}
                     onClick={resetOvertoneBalance}
                     aria-label="Reset overtone balance"
                     disabled={!canResetOvertones}
@@ -1517,7 +1568,7 @@ function App() {
                   </button>
                   <button
                     type="button"
-                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                    className={overtoneIconButtonClass('landscape-inline')}
                     onClick={undoOvertoneChange}
                     aria-label="Undo overtone change"
                     disabled={!canUndoOvertones}
@@ -1526,7 +1577,7 @@ function App() {
                   </button>
                   <button
                     type="button"
-                    className="button-safe flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40"
+                    className={overtoneIconButtonClass('landscape-inline')}
                     onClick={redoOvertoneChange}
                     aria-label="Redo overtone change"
                     disabled={!canRedoOvertones}

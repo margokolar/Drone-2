@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { StepBack, StepForward } from 'lucide-react'
+import { GitCompareArrows, StepBack, StepForward } from 'lucide-react'
 import { tonePageLabelUsesUppercase, type NoteId } from '../music/notes'
 import { ToneLabel } from './ToneLabel'
 
@@ -13,6 +13,24 @@ type OvertoneToneNavControlsProps = {
   onNext: () => void
   variant: 'portrait-solo' | 'portrait-steps' | 'landscape-inline'
 }
+
+export function overtoneControlButtonSizeClass(
+  variant: 'portrait-solo' | 'portrait-steps' | 'landscape-inline',
+): string {
+  return variant === 'landscape-inline' ? 'h-10 px-2' : 'h-9 px-2.5'
+}
+
+export function overtoneIconButtonClass(
+  variant: 'portrait-solo' | 'portrait-steps' | 'landscape-inline',
+): string {
+  return clsx(
+    'button-safe flex shrink-0 touch-manipulation items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40',
+    variant === 'landscape-inline' ? 'size-10' : 'size-9',
+  )
+}
+
+const overtoneToneButtonShellClass =
+  'button-safe flex shrink-0 touch-manipulation items-center justify-center rounded-lg border transition'
 
 function soloButtonClass(isSolo: boolean, variant: OvertoneToneNavControlsProps['variant']): string {
   if (variant === 'landscape-inline') {
@@ -36,8 +54,7 @@ export function OvertoneToneNavControls({
   variant,
 }: OvertoneToneNavControlsProps) {
   const toneLabelUppercase = tonePageLabelUsesUppercase(toneNoteId)
-  const stepButtonClass =
-    'button-safe flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40'
+  const stepButtonClass = overtoneIconButtonClass(variant)
 
   const stepButtons = (
     <>
@@ -70,7 +87,12 @@ export function OvertoneToneNavControls({
     variant === 'landscape-inline' ? (
       <button
         type="button"
-        className={`button-safe flex h-9 shrink-0 touch-manipulation items-center gap-1 rounded-lg border px-2 transition ${soloButtonClass(isSolo, variant)}`}
+        className={clsx(
+          overtoneToneButtonShellClass,
+          overtoneControlButtonSizeClass(variant),
+          'gap-1',
+          soloButtonClass(isSolo, variant),
+        )}
         onClick={onToggleSolo}
         aria-label={soloAriaLabel}
       >
@@ -90,7 +112,9 @@ export function OvertoneToneNavControls({
       <button
         type="button"
         className={clsx(
-          'button-safe min-w-0 shrink touch-manipulation rounded-lg border px-2.5 py-1 tracking-[0.12em] transition',
+          overtoneToneButtonShellClass,
+          overtoneControlButtonSizeClass(variant),
+          'tracking-[0.12em]',
           soloButtonClass(isSolo, variant),
         )}
         onClick={onToggleSolo}
@@ -114,5 +138,40 @@ export function OvertoneToneNavControls({
       {stepButtons}
       {soloButton}
     </div>
+  )
+}
+
+type OvertoneAllSoloButtonProps = {
+  isActive: boolean
+  onClick: () => void
+  className?: string
+  variant?: 'portrait-solo' | 'landscape-inline'
+}
+
+export function OvertoneAllSoloButton({
+  isActive,
+  onClick,
+  className,
+  variant = 'portrait-solo',
+}: OvertoneAllSoloButtonProps) {
+  const sizeVariant = variant === 'landscape-inline' ? 'landscape-inline' : 'portrait-solo'
+
+  return (
+    <button
+      type="button"
+      className={clsx(
+        overtoneToneButtonShellClass,
+        sizeVariant === 'landscape-inline' ? 'size-10' : 'size-9',
+        isActive
+          ? 'border-amber-300/70 bg-amber-300/30 text-amber-50 shadow-[0_0_18px_rgba(251,191,36,0.28)] hover:bg-amber-300/40'
+          : 'border-fuchsia-300/50 bg-fuchsia-300/20 text-fuchsia-50 shadow-[0_0_18px_rgba(240,171,252,0.16)] hover:bg-fuchsia-300/30',
+        className,
+      )}
+      onClick={onClick}
+      aria-label="Lülita kõigi toonide võrdlus-solo"
+      aria-pressed={isActive}
+    >
+      <GitCompareArrows size={16} aria-hidden />
+    </button>
   )
 }
