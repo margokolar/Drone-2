@@ -15,24 +15,22 @@ type OvertoneToneNavControlsProps = {
 }
 
 export function overtoneControlButtonSizeClass(
-  variant: 'portrait-solo' | 'portrait-steps' | 'portrait-compact' | 'landscape-inline',
+  variant: 'portrait-solo' | 'portrait-steps' | 'landscape-inline',
 ): string {
-  if (variant === 'landscape-inline') return 'h-10 px-2'
-  if (variant === 'portrait-compact') return 'h-8 px-2'
-  return 'h-9 px-2.5'
+  return variant === 'landscape-inline' ? 'h-10 px-2' : 'h-9 px-2.5'
 }
 
 export function overtoneIconButtonClass(
-  variant: 'portrait-solo' | 'portrait-steps' | 'portrait-compact' | 'landscape-inline',
+  variant: 'portrait-solo' | 'portrait-steps' | 'landscape-inline',
 ): string {
   return clsx(
     'button-safe flex shrink-0 touch-manipulation items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40',
-    variant === 'landscape-inline' ? 'size-10' : variant === 'portrait-compact' ? 'size-8' : 'size-9',
+    variant === 'landscape-inline' ? 'size-10' : 'size-9',
   )
 }
 
 export function harmonicTimbreIconButtonClass(
-  variant: 'portrait-solo' | 'portrait-compact' | 'landscape-inline',
+  variant: 'portrait-solo' | 'landscape-inline',
   enabled: boolean,
 ): string {
   return clsx(
@@ -44,14 +42,12 @@ export function harmonicTimbreIconButtonClass(
 }
 
 type HarmonicTimbreToggleButtonProps = {
-  variant: 'portrait-solo' | 'portrait-compact' | 'landscape-inline'
+  variant: 'portrait-solo' | 'landscape-inline'
   enabled: boolean
   onClick: () => void
 }
 
 export function HarmonicTimbreToggleButton({ variant, enabled, onClick }: HarmonicTimbreToggleButtonProps) {
-  const iconSize = variant === 'portrait-compact' ? 14 : 16
-
   return (
     <button
       type="button"
@@ -61,8 +57,8 @@ export function HarmonicTimbreToggleButton({ variant, enabled, onClick }: Harmon
       aria-pressed={enabled}
     >
       <svg
-        width={iconSize}
-        height={iconSize}
+        width="16"
+        height="16"
         viewBox="0 0 24 24"
         fill={enabled ? 'currentColor' : 'none'}
         stroke="currentColor"

@@ -1480,46 +1480,46 @@ function App() {
                 }}
               />
               <div className="mt-2 flex items-center gap-1 landscape:hidden max-h-[500px]:hidden">
-                <div className="flex shrink-0 items-center gap-0.5">
+                <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
-                    className={overtoneIconButtonClass('portrait-compact')}
+                    className={overtoneIconButtonClass('portrait-solo')}
                     onClick={copySelectedOvertones}
                     aria-label="Copy tone overtones"
                   >
-                    <Copy size={15} />
+                    <Copy size={16} />
                   </button>
                   <button
                     type="button"
-                    className={overtoneIconButtonClass('portrait-compact')}
+                    className={overtoneIconButtonClass('portrait-solo')}
                     onClick={pasteSelectedOvertones}
                     aria-label="Paste tone overtones"
                     disabled={!canPasteOvertones}
                   >
-                    <ClipboardPaste size={15} />
+                    <ClipboardPaste size={16} />
                   </button>
                   <button
                     type="button"
-                    className={overtoneIconButtonClass('portrait-compact')}
+                    className={overtoneIconButtonClass('portrait-solo')}
                     onClick={deactivateAllPartials}
                     aria-label="Deactivate all partials"
                     disabled={!canDeactivateAllPartials}
                   >
-                    <PowerOff size={15} />
+                    <PowerOff size={16} />
                   </button>
                   <HarmonicTimbreToggleButton
-                    variant="portrait-compact"
+                    variant="portrait-solo"
                     enabled={harmonicTimbreEnabled}
                     onClick={toggleHarmonicTimbreEnabled}
                   />
                 </div>
                 <button
                   type="button"
-                  className={`button-safe ml-auto flex shrink-0 touch-manipulation items-center gap-1 rounded-lg border border-white/15 bg-white/5 text-xs font-semibold text-white/85 transition hover:bg-white/10 ${overtoneControlButtonSizeClass('portrait-compact')}`}
+                  className={`button-safe ml-auto flex shrink-0 touch-manipulation items-center gap-1 rounded-lg border border-white/15 bg-white/5 text-xs font-semibold text-white/85 transition hover:bg-white/10 ${overtoneControlButtonSizeClass('portrait-solo')}`}
                   onClick={() => overtoneAnalyzeInputRef.current?.click()}
                   aria-label="Choose audio file for overtone analysis"
                 >
-                  <AudioWaveform size={15} />
+                  <AudioWaveform size={16} />
                   Analyse audio
                 </button>
               </div>
