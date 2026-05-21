@@ -28,7 +28,7 @@ import {
   type ChangeEvent,
 } from 'react'
 import { droneEngine } from './audio/DroneEngine'
-import { analyzeWavOvertones } from './audio/overtoneAnalysis'
+import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
 import { MetronomeControls } from './components/MetronomeControls'
 import { NoteSelector } from './components/NoteSelector'
@@ -70,6 +70,13 @@ type OvertoneSnapshot = {
   partials: PartialConfig[]
   timbreBlend: TimbreBlend
 }
+
+type PendingOvertoneAnalysis = {
+  fileName: string
+  analysis: OvertoneAnalysisResult
+}
+
+type OvertoneAnalysisApplyMode = 'gain-only' | 'gain-ratios' | 'gain-integer-ratios'
 
 function isToneStrictSolo(tones: ToneConfig[], noteId: NoteId): boolean {
   const selected = tones.find((tone) => tone.noteId === noteId)
@@ -135,6 +142,8 @@ function App() {
   const [toneSoloRestore, setToneSoloRestore] = useState<Map<NoteId, boolean> | null>(null)
   const [allTonesCompareActive, setAllTonesCompareActive] = useState(false)
   const [, setOvertoneHistoryVersion] = useState(0)
+  const [pendingOvertoneAnalysis, setPendingOvertoneAnalysis] = useState<PendingOvertoneAnalysis | null>(null)
+  const [overtoneAnalysisError, setOvertoneAnalysisError] = useState<string | null>(null)
   const playing = useDroneStore((state) => state.playing)
   const activePresetId = useDroneStore((state) => state.activePresetId)
   const songName = useDroneStore((state) => state.songName)
@@ -570,33 +579,54 @@ function App() {
       }
       try {
         const analysis = await analyzeWavOvertones(file, selectedOvertonePartials.length)
-        const includeRatios = window.confirm(
-          'Include overtone ratio analysis too? Press Cancel to update only balance (gain/mute).',
-        )
         const presetNameFromFile = file.name.replace(/\.[^/.]+$/, '').trim() || 'Analyzed WAV'
-        const current = selectedOvertonePartials
-        const analyzed = current.map((partial, index) => {
-          const gainDb = analysis.gainsDb[index] ?? -48
-          return {
-            ...partial,
-            ratio: includeRatios ? (analysis.ratios[index] ?? partial.ratio) : partial.ratio,
-            gainDb,
-            enabled: gainDb > -47.5,
-          }
+        setOvertoneAnalysisError(null)
+        setPendingOvertoneAnalysis({
+          fileName: presetNameFromFile,
+          analysis,
         })
-        setSelectedOvertonePartials(analyzed)
-        saveAsPreset()
-        const nextActivePresetId = useDroneStore.getState().activePresetId
-        renamePreset(nextActivePresetId, presetNameFromFile)
       } catch {
-        window.alert('Could not analyze overtone balance from this audio file.')
+        setOvertoneAnalysisError('Could not analyze overtone balance from this audio file.')
       } finally {
         if (overtoneAnalyzeInputRef.current) {
           overtoneAnalyzeInputRef.current.value = ''
         }
       }
     },
-    [renamePreset, saveAsPreset, selectedOvertonePartials, setSelectedOvertonePartials],
+    [selectedOvertonePartials.length],
+  )
+
+  const applyPendingOvertoneAnalysis = useCallback(
+    (mode: OvertoneAnalysisApplyMode) => {
+      if (!pendingOvertoneAnalysis) {
+        return
+      }
+      const { fileName, analysis } = pendingOvertoneAnalysis
+      const integerRatios =
+        mode === 'gain-integer-ratios'
+          ? integerizeAnalysisRatios(analysis.ratios, selectedOvertonePartials.length)
+          : null
+      const analyzed = selectedOvertonePartials.map((partial, index) => {
+        const gainDb = analysis.gainsDb[index] ?? -48
+        let ratio = partial.ratio
+        if (mode === 'gain-ratios') {
+          ratio = analysis.ratios[index] ?? partial.ratio
+        } else if (mode === 'gain-integer-ratios') {
+          ratio = integerRatios?.[index] ?? index + 1
+        }
+        return {
+          ...partial,
+          ratio,
+          gainDb,
+        }
+      })
+      setSelectedOvertonePartials(analyzed)
+      saveAsPreset()
+      const nextActivePresetId = useDroneStore.getState().activePresetId
+      renamePreset(nextActivePresetId, fileName)
+      setPendingOvertoneAnalysis(null)
+    },
+    [pendingOvertoneAnalysis, renamePreset, saveAsPreset, selectedOvertonePartials, setSelectedOvertonePartials],
   )
 
   const openJblPortableApp = useCallback(() => {
@@ -1837,6 +1867,80 @@ function App() {
           void analyzeOvertoneBalanceFromFile(event)
         }}
       />
+      {pendingOvertoneAnalysis && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="overtone-analysis-dialog-title"
+            className="w-full max-w-sm rounded-xl border border-white/15 bg-[#252332] p-4 shadow-2xl"
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 id="overtone-analysis-dialog-title" className="text-sm font-semibold text-white">
+                  Apply analysis
+                </h2>
+                <p className="mt-1 text-sm text-white/70">
+                  Choose how to apply overtone ratios.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="flex size-8 shrink-0 items-center justify-center rounded-md border border-white/10 text-white/70 transition hover:bg-white/10"
+                onClick={() => setPendingOvertoneAnalysis(null)}
+                aria-label="Dismiss analysis"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                className="button-safe min-h-[44px] rounded-lg border border-fuchsia-300/50 bg-fuchsia-300/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-300/25"
+                onClick={() => applyPendingOvertoneAnalysis('gain-integer-ratios')}
+              >
+                Gain + integer ratios (1, 2, 3…)
+              </button>
+              <button
+                type="button"
+                className="button-safe min-h-[44px] rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
+                onClick={() => applyPendingOvertoneAnalysis('gain-ratios')}
+              >
+                Gain + measured ratios
+              </button>
+              <button
+                type="button"
+                className="button-safe min-h-[44px] rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
+                onClick={() => applyPendingOvertoneAnalysis('gain-only')}
+              >
+                Gain only
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {overtoneAnalysisError && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="overtone-analysis-error-title"
+            className="w-full max-w-sm rounded-xl border border-white/15 bg-[#252332] p-4 shadow-2xl"
+          >
+            <h2 id="overtone-analysis-error-title" className="text-sm font-semibold text-white">
+              Analysis failed
+            </h2>
+            <p className="mt-2 text-sm text-white/70">{overtoneAnalysisError}</p>
+            <button
+              type="button"
+              className="button-safe mt-4 min-h-[44px] w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
+              onClick={() => setOvertoneAnalysisError(null)}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 

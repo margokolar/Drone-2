@@ -4,8 +4,18 @@ type OvertoneAnalysisResult = {
   ratios: number[]
 }
 
+export type { OvertoneAnalysisResult }
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
+}
+
+export function integerizeAnalysisRatios(_ratios: number[], partialCount: number): number[] {
+  return Array.from({ length: partialCount }, (_, index) => index + 1)
+}
+
+function isNearFrequency(hz: number, others: number[], toleranceRatio = 0.045): boolean {
+  return others.some((other) => other > 0 && Math.abs(hz - other) / other < toleranceRatio)
 }
 
 function estimateFundamentalHz(
@@ -111,6 +121,8 @@ export async function analyzeWavOvertones(
       1e-9,
     )
 
+    const claimedPeakHz: number[] = []
+
     for (let index = 0; index < partialCount; index += 1) {
       const harmonic = index + 1
       const harmonicHz = fundamentalHz * harmonic
@@ -126,12 +138,20 @@ export async function analyzeWavOvertones(
       const scanSteps = 40
       for (let step = 0; step <= scanSteps; step += 1) {
         const hz = minHz + ((maxHz - minHz) * step) / scanSteps
+        if (isNearFrequency(hz, claimedPeakHz)) {
+          continue
+        }
         const mag = goertzelMagnitude(analysisSamples, decoded.sampleRate, hz)
         if (mag > bestMag) {
           bestMag = mag
           bestHz = hz
         }
       }
+
+      if (isNearFrequency(bestHz, claimedPeakHz)) {
+        bestHz = harmonicHz
+      }
+      claimedPeakHz.push(bestHz)
 
       const magnitude = goertzelMagnitude(analysisSamples, decoded.sampleRate, harmonicHz)
       const relative = Math.max(magnitude / fundamentalMagnitude, 1e-9)

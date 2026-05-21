@@ -29,10 +29,6 @@ function gainToDb(gain: number): number {
   return 20 * Math.log10(gain)
 }
 
-function isNearlyInteger(value: number): boolean {
-  return Math.abs(value - Math.round(value)) < 0.001
-}
-
 type ComponentGains = {
   sine: number
   saw: number
@@ -40,21 +36,11 @@ type ComponentGains = {
   total: number
 }
 
-function harmonicComponentContribution(
-  targetRatio: number,
-  sourceRatio: number,
-  blend: TimbreBlend,
-): Omit<ComponentGains, 'total'> {
-  if (sourceRatio <= 0 || targetRatio <= 0) {
+/** Harmonics implied by timbre on the fundamental only (Fourier series). */
+function seriesSpreadWeights(harmonicIndex: number, blend: TimbreBlend): Omit<ComponentGains, 'total'> {
+  if (harmonicIndex < 1) {
     return { sine: 0, saw: 0, square: 0 }
   }
-
-  const harmonic = targetRatio / sourceRatio
-  if (harmonic < 1 || !isNearlyInteger(harmonic)) {
-    return { sine: 0, saw: 0, square: 0 }
-  }
-
-  const harmonicIndex = Math.round(harmonic)
   return {
     sine: harmonicIndex === 1 ? blend.sine : 0,
     saw: blend.saw / harmonicIndex,
@@ -62,26 +48,67 @@ function harmonicComponentContribution(
   }
 }
 
+/** Per-partial timbre: sine on every enabled partial; saw/square follow harmonic rolloff. */
+function explicitPartialWeights(harmonicIndex: number, blend: TimbreBlend): Omit<ComponentGains, 'total'> {
+  if (harmonicIndex < 1) {
+    return { sine: 0, saw: 0, square: 0 }
+  }
+  return {
+    sine: blend.sine,
+    saw: blend.saw / harmonicIndex,
+    square: harmonicIndex % 2 === 1 ? blend.square / harmonicIndex : 0,
+  }
+}
+
+function ratiosMatch(a: number, b: number): boolean {
+  return Math.abs(a - b) < 0.01
+}
+
 function effectiveHarmonicComponents(
+  harmonicNumber: number,
   targetRatio: number,
   sourcePartials: PartialConfig[],
   activePartialId: string | null,
   dragGainDb: number | null,
   blend: TimbreBlend,
 ): ComponentGains {
+  const seriesIndex = Math.max(1, harmonicNumber)
+  const hasExplicitAtTarget = sourcePartials.some(
+    (partial) => partial.enabled && ratiosMatch(partial.ratio, targetRatio),
+  )
+
   const gains = sourcePartials.reduce<ComponentGains>((sum, source) => {
     if (!source.enabled) {
       return sum
     }
+
     const sourceGainDb = activePartialId === source.id && dragGainDb !== null ? dragGainDb : source.gainDb
     const sourceGain = dbToGain(sourceGainDb)
-    const contribution = harmonicComponentContribution(targetRatio, source.ratio, blend)
-    sum.sine += sourceGain * contribution.sine
-    sum.saw += sourceGain * contribution.saw
-    sum.square += sourceGain * contribution.square
+
+    if (ratiosMatch(source.ratio, targetRatio)) {
+      const weights = explicitPartialWeights(seriesIndex, blend)
+      sum.sine += sourceGain * weights.sine
+      sum.saw += sourceGain * weights.saw
+      sum.square += sourceGain * weights.square
+    } else if (
+      !hasExplicitAtTarget &&
+      ratiosMatch(source.ratio, 1) &&
+      !ratiosMatch(targetRatio, 1)
+    ) {
+      const weights = seriesSpreadWeights(seriesIndex, blend)
+      sum.sine += sourceGain * weights.sine
+      sum.saw += sourceGain * weights.saw
+      sum.square += sourceGain * weights.square
+    }
+
     sum.total = sum.sine + sum.saw + sum.square
     return sum
   }, { sine: 0, saw: 0, square: 0, total: 0 })
+
+  if (harmonicNumber % 2 === 0) {
+    gains.square = 0
+    gains.total = gains.sine + gains.saw
+  }
 
   return gains
 }
@@ -197,8 +224,11 @@ export function OvertoneBars({
       <div className="hide-scrollbar touch-pan-x overflow-x-auto">
         <div className="grid min-w-[620px] grid-cols-16 gap-1 landscape:min-w-0 landscape:w-full landscape:gap-0.5 max-h-[500px]:min-w-0 max-h-[500px]:w-full max-h-[500px]:gap-0.5">
           {partials.map((partial, index) => {
-            const gainDbForHeight = activePartialId === partial.id && dragGainDb !== null ? dragGainDb : partial.gainDb
+            const gainDbForHeight =
+              activePartialId === partial.id && dragGainDb !== null ? dragGainDb : partial.gainDb
+            const harmonicNumber = index + 1
             const componentGains = effectiveHarmonicComponents(
+              harmonicNumber,
               partial.ratio,
               partials,
               activePartialId,
@@ -208,6 +238,7 @@ export function OvertoneBars({
             const heightPercent = toPercentFromDb(gainDbForHeight)
             const totalEffectPercent = toPercentFromDb(gainToDb(componentGains.total))
             const layerPercents = logLayerPercents(componentGains)
+            const squareLayerPercent = harmonicNumber % 2 === 1 ? layerPercents.square : 0
             const isSoloMode = soloPartialId !== null
             const isSoloTarget = soloPartialId === partial.id
             const barClass = partial.enabled
@@ -265,7 +296,7 @@ export function OvertoneBars({
                   >
                     <div
                       className={partial.enabled ? 'bg-cyan-300/85' : 'bg-cyan-900/70'}
-                      style={{ height: `${layerPercents.square}%` }}
+                      style={{ height: `${squareLayerPercent}%` }}
                     />
                     <div
                       className={partial.enabled ? 'bg-fuchsia-400/90' : 'bg-fuchsia-950/75'}
