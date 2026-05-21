@@ -78,17 +78,21 @@ export function TimbreMorphSlider({
   if (orientation === 'vertical') {
     return (
       <div
-        className={`flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-[#111019]/90 p-2 shadow-lg backdrop-blur-sm ${className}`}
+        className={`flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-[#111019]/90 p-2 shadow-lg backdrop-blur-sm ${className}`}
       >
-        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">Square</span>
-        <div className="relative flex h-36 w-10 items-center justify-center">
+        <span className="flex h-7 shrink-0 items-center text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">
+          Square
+        </span>
+        <div className="relative flex h-44 w-10 items-center justify-center">
           <input
             type="range"
             {...sharedRangeProps}
-            className="absolute left-1/2 top-1/2 h-2 w-36 -translate-x-1/2 -translate-y-1/2 -rotate-90 accent-fuchsia-300"
+            className="absolute left-1/2 top-1/2 h-2 w-44 -translate-x-1/2 -translate-y-1/2 -rotate-90 accent-fuchsia-300"
           />
         </div>
-        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">Sine</span>
+        <span className="flex h-7 shrink-0 items-center text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">
+          Sine
+        </span>
       </div>
     )
   }
