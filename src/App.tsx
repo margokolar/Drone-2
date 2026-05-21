@@ -1503,7 +1503,7 @@ function App() {
             aria-labelledby="tab-overtones"
             hidden={activeTab !== 'overtones'}
           >
-            <div className="landscape:flex landscape:items-start landscape:gap-2 max-h-[500px]:flex max-h-[500px]:items-start max-h-[500px]:gap-2">
+            <div className="landscape:flex landscape:items-end landscape:gap-2 max-h-[500px]:flex max-h-[500px]:items-end max-h-[500px]:gap-2">
             <SectionCard
               title="Overtones"
               titleAddon={
@@ -1647,7 +1647,7 @@ function App() {
                 </button>
               </div>
             </SectionCard>
-            <div className="hidden shrink-0 self-start landscape:sticky landscape:top-3 landscape:block max-h-[500px]:sticky max-h-[500px]:top-3 max-h-[500px]:block">
+            <div className="hidden shrink-0 landscape:block max-h-[500px]:block">
               <TimbreMorphSlider
                 orientation="vertical"
                 timbreBlend={timbreBlend}
