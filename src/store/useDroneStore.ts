@@ -68,6 +68,7 @@ type DroneState = {
   setMetronomeBpm: (bpm: number) => void
   setMetronomeVolumeDb: (db: number) => void
   saveActivePreset: () => void
+  savePreset: (presetId: string) => void
   saveAsPreset: () => void
   createNewPreset: () => void
   loadPreset: (presetId: string) => void
@@ -127,6 +128,27 @@ function applyPresetState(preset: Preset): Pick<
     timbreBlend: { ...preset.timbreBlend },
     tones: migrateTones(preset.tones, preset.partials ?? DEFAULT_PARTIALS),
     partials: normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial }))),
+  }
+}
+
+function snapshotPresetFromState(
+  state: Pick<
+    DroneState,
+    'tuningSystemId' | 'tonalCenter' | 'baseOctave' | 'masterGainDb' | 'timbreBlend' | 'tones' | 'partials'
+  >,
+  presetId: string,
+  name: string,
+): Preset {
+  return {
+    id: presetId,
+    name,
+    tuningSystemId: state.tuningSystemId,
+    tonalCenter: state.tonalCenter,
+    baseOctave: state.baseOctave,
+    masterGainDb: state.masterGainDb,
+    timbreBlend: { ...state.timbreBlend },
+    tones: state.tones.map((tone) => normalizeTonePartials(tone, state.partials)),
+    partials: normalizePartials(state.partials.map((partial) => ({ ...partial }))),
   }
 }
 
@@ -477,30 +499,20 @@ export const useDroneStore = create<DroneState>()(
       setMetronomeEnabled: (enabled) => set({ metronomeEnabled: enabled }),
       setMetronomeBpm: (bpm) => set({ metronomeBpm: clamp(bpm, 30, 220) }),
       setMetronomeVolumeDb: (db) => set({ metronomeVolumeDb: clamp(db, -40, 0) }),
-      saveActivePreset: () =>
+      saveActivePreset: () => {
+        const { activePresetId } = get()
+        get().savePreset(activePresetId)
+      },
+      savePreset: (presetId) =>
         set((state) => {
-          const presetIndex = state.presets.findIndex((preset) => preset.id === state.activePresetId)
-          if (presetIndex < 0) {
+          const target = state.presets.find((preset) => preset.id === presetId)
+          if (!target) {
             return state
           }
-          const updatedPreset: Preset = {
-            id: state.activePresetId,
-            name: state.presets[presetIndex].name,
-            tuningSystemId: state.tuningSystemId,
-            tonalCenter: state.tonalCenter,
-            baseOctave: state.baseOctave,
-            masterGainDb: state.masterGainDb,
-            timbreBlend: { ...state.timbreBlend },
-            tones: state.tones.map((tone) => normalizeTonePartials(tone, state.partials)),
-            partials: normalizePartials(state.partials.map((partial) => ({ ...partial }))),
+          const updatedPreset = snapshotPresetFromState(state, presetId, target.name)
+          return {
+            presets: state.presets.map((preset) => (preset.id === presetId ? updatedPreset : preset)),
           }
-          const presets = state.presets.map((preset) => {
-            if (preset.id !== state.activePresetId) {
-              return preset
-            }
-            return updatedPreset
-          })
-          return { presets }
         }),
       saveAsPreset: () =>
         set((state) => {

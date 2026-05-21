@@ -1577,6 +1577,7 @@ function App() {
                 onLoadPreset={(presetId) => {
                   loadPreset(presetId)
                 }}
+                onSavePreset={saveActivePreset}
                 onRenamePreset={renamePreset}
                 onDuplicatePreset={duplicatePreset}
                 onDeletePreset={deletePreset}
