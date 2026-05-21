@@ -37,6 +37,7 @@ import { OvertoneBars } from './components/OvertoneBars'
 import { OvertoneAllSoloButton, OvertoneToneNavControls, HarmonicTimbreToggleButton, overtoneControlButtonSizeClass, overtoneIconButtonClass } from './components/OvertoneToneNavControls'
 import { OvertoneMidiPanel } from './components/OvertoneMidiPanel'
 import { PartialEditor } from './components/PartialEditor'
+import { TimbreMorphSlider } from './components/TimbreMorphSlider'
 import { PresetList } from './components/PresetList'
 import { SectionCard } from './components/SectionCard'
 import { SongLibraryMenu } from './components/SongLibraryMenu'
@@ -1733,6 +1734,18 @@ function App() {
           <div className="space-y-4" role="tabpanel" id="panel-blank" aria-labelledby="tab-blank" hidden={activeTab !== 'blank'} />
         </main>
       </div>
+      {activeTab === 'overtones' && (
+        <div className="pointer-events-none fixed right-2 top-1/2 z-30 hidden -translate-y-1/2 landscape:block max-h-[500px]:block">
+          <TimbreMorphSlider
+            orientation="vertical"
+            timbreBlend={timbreBlend}
+            onSetTimbreValue={setTimbreValue}
+            onTimbreChangeStart={beginTimbreMorphChange}
+            onTimbreChangeEnd={endTimbreMorphChange}
+            className="pointer-events-auto"
+          />
+        </div>
+      )}
       <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#111019] px-3 pb-2">
         <div className="mx-auto w-full max-w-md space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl">
           <nav

@@ -1,7 +1,8 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { useRef, type KeyboardEvent } from 'react'
+import { useRef } from 'react'
 import type { PartialConfig } from '../audio/types'
 import { NumericValueField } from './NumericValueField'
+import { TimbreMorphSlider } from './TimbreMorphSlider'
 
 const SOLO_LONG_PRESS_MS = 800
 
@@ -40,48 +41,6 @@ export function PartialEditor({
   const soloPressTimerRef = useRef<number | null>(null)
   const soloPressTriggeredRef = useRef(false)
 
-  const morphFromBlend = (sine: number, saw: number, square: number): number => {
-    const total = Math.max(0, sine) + Math.max(0, saw) + Math.max(0, square)
-    if (total <= 0) {
-      return 0
-    }
-    return (Math.max(0, saw) * 0.5 + Math.max(0, square)) / total
-  }
-
-  const blendFromMorph = (morph: number): { sine: number; saw: number; square: number } => {
-    const clamped = Math.max(0, Math.min(1, morph))
-    if (clamped <= 0.5) {
-      const t = clamped / 0.5
-      return {
-        sine: 1 - t,
-        saw: t,
-        square: 0,
-      }
-    }
-    const t = (clamped - 0.5) / 0.5
-    return {
-      sine: 0,
-      saw: 1 - t,
-      square: t,
-    }
-  }
-
-  const timbreMorph = morphFromBlend(timbreBlend.sine, timbreBlend.saw, timbreBlend.square)
-
-  const applyMorph = (nextMorph: number) => {
-    onTimbreChangeStart?.()
-    const nextBlend = blendFromMorph(nextMorph)
-    onSetTimbreValue('sine', nextBlend.sine)
-    onSetTimbreValue('saw', nextBlend.saw)
-    onSetTimbreValue('square', nextBlend.square)
-  }
-
-  const handleTimbreKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
-      onTimbreChangeStart?.()
-    }
-  }
-
   const setEnabledForAll = (enabledById: Map<string, boolean>) => {
     partials.forEach((partial) => {
       const nextEnabled = enabledById.get(partial.id)
@@ -108,29 +67,13 @@ export function PartialEditor({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-3">
-        <div className="flex items-center justify-between text-xs uppercase tracking-[0.14em] text-white/60">
-          <span>Sine</span>
-          <span>Saw</span>
-          <span>Square</span>
-        </div>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={timbreMorph}
-          onPointerDown={onTimbreChangeStart}
-          onPointerUp={onTimbreChangeEnd}
-          onPointerCancel={onTimbreChangeEnd}
-          onKeyDown={handleTimbreKeyDown}
-          onKeyUp={onTimbreChangeEnd}
-          onBlur={onTimbreChangeEnd}
-          onChange={(event) => applyMorph(Number(event.target.value))}
-          className="h-2 w-full accent-fuchsia-300"
-          aria-label="Timbre morph from sine to saw to square"
-        />
-      </div>
+      <TimbreMorphSlider
+        timbreBlend={timbreBlend}
+        onSetTimbreValue={onSetTimbreValue}
+        onTimbreChangeStart={onTimbreChangeStart}
+        onTimbreChangeEnd={onTimbreChangeEnd}
+        className="landscape:hidden max-h-[500px]:hidden"
+      />
 
       <div className="space-y-3">
         {partials.map((partial, index) => (
