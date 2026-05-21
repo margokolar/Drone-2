@@ -1503,7 +1503,18 @@ function App() {
             hidden={activeTab !== 'overtones'}
           >
             <SectionCard
-              title={globalOvertoneEditEnabled ? 'Overtones · Global' : 'Overtones'}
+              title="Overtones"
+              titleAddon={
+                globalOvertoneEditEnabled ? (
+                  <span
+                    className="shrink-0 text-cyan-300"
+                    title="Global overtone edit"
+                    aria-label="Global overtone edit"
+                  >
+                    <Globe size={14} aria-hidden />
+                  </span>
+                ) : null
+              }
               className="landscape:p-2 landscape:[&>header]:hidden max-h-[500px]:p-2 max-h-[500px]:[&>header]:hidden [&>header]:mb-2"
               rightSlot={
                 <div className="flex w-full min-w-0 flex-col items-end gap-1.5 landscape:hidden max-h-[500px]:hidden">
