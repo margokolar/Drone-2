@@ -1760,14 +1760,14 @@ function App() {
                   aria-selected={activeTab === id}
                   aria-controls={`panel-${id}`}
                   id={`tab-${id}`}
-                  className={`button-safe shrink-0 rounded-lg border px-3 py-2 text-center text-sm font-medium transition ${activeTab === id ? 'border-white/25 bg-white/15 text-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'}`}
+                  className={`button-safe shrink-0 rounded-lg border px-3 py-2 text-center text-sm font-medium transition landscape:hidden max-h-[500px]:hidden ${activeTab === id ? 'border-white/25 bg-white/15 text-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'}`}
                   onClick={() => setActiveTab(id)}
                 >
                   {label}
                 </button>
               ))}
               {activeTab === 'overtones' && (
-                <div className="ml-2 hidden shrink-0 items-center gap-1.5 landscape:flex max-h-[500px]:flex">
+                <div className="hidden shrink-0 items-center gap-1.5 landscape:flex max-h-[500px]:flex">
                   <OvertoneAllSoloButton
                     variant="landscape-inline"
                     isActive={isAllTonesCompareActive}
