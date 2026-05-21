@@ -33,6 +33,7 @@ type DroneState = {
     saw: number
     square: number
   }
+  harmonicTimbreEnabled: boolean
   tones: ToneConfig[]
   partials: PartialConfig[]
   metronomeEnabled: boolean
@@ -48,6 +49,8 @@ type DroneState = {
   setTonalCenter: (center: TonalCenter) => void
   setMasterGainDb: (db: number) => void
   setTimbreValue: (key: 'sine' | 'saw' | 'square', value: number) => void
+  setHarmonicTimbreEnabled: (enabled: boolean) => void
+  toggleHarmonicTimbreEnabled: () => void
   toggleToneEnabled: (noteId: NoteId) => void
   setToneEnabled: (noteId: NoteId, enabled: boolean) => void
   setToneGain: (noteId: NoteId, gainDb: number) => void
@@ -229,6 +232,7 @@ export const useDroneStore = create<DroneState>()(
       baseOctave: clamp(INITIAL_PRESET.baseOctave, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
       masterGainDb: INITIAL_PRESET.masterGainDb,
       timbreBlend: { ...INITIAL_PRESET.timbreBlend },
+      harmonicTimbreEnabled: true,
       tones: INITIAL_PRESET.tones.map((tone) => ({ ...tone })),
       partials: normalizePartials(INITIAL_PRESET.partials.map((partial) => ({ ...partial }))),
       metronomeEnabled: false,
@@ -269,6 +273,9 @@ export const useDroneStore = create<DroneState>()(
             [key]: clamp(value, 0, 1),
           },
         })),
+      setHarmonicTimbreEnabled: (enabled) => set({ harmonicTimbreEnabled: enabled }),
+      toggleHarmonicTimbreEnabled: () =>
+        set((state) => ({ harmonicTimbreEnabled: !state.harmonicTimbreEnabled })),
       toggleToneEnabled: (noteId) =>
         set((state) => ({
           tones: state.tones.map((tone) => {
@@ -893,6 +900,7 @@ export const useDroneStore = create<DroneState>()(
           metronomeEnabled: typed.metronomeEnabled ?? false,
           metronomeBpm: typed.metronomeBpm ?? 72,
           metronomeVolumeDb: typed.metronomeVolumeDb ?? -15,
+          harmonicTimbreEnabled: typed.harmonicTimbreEnabled ?? true,
         }
       },
       partialize: (state) => ({
@@ -906,6 +914,7 @@ export const useDroneStore = create<DroneState>()(
         baseOctave: state.baseOctave,
         masterGainDb: state.masterGainDb,
         timbreBlend: state.timbreBlend,
+        harmonicTimbreEnabled: state.harmonicTimbreEnabled,
         tones: state.tones,
         partials: state.partials,
         metronomeEnabled: state.metronomeEnabled,

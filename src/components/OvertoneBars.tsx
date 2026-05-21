@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react'
 import type { PartialConfig, TimbreBlend } from '../audio/types'
-import { clamp, dbToGain, normalizedBlend } from '../audio/audioMath'
+import { clamp, dbToGain, partialTimbreWeights, normalizedBlend } from '../audio/audioMath'
 
 type OvertoneBarsProps = {
   partials: PartialConfig[]
   timbreBlend: TimbreBlend
+  harmonicTimbreEnabled: boolean
   onGainChange: (partialId: string, gainDb: number) => void
   onToggleEnabled: (partialId: string, enabled: boolean) => void
   onGainDragStart?: () => void
@@ -49,15 +50,12 @@ function seriesSpreadWeights(harmonicIndex: number, blend: TimbreBlend): Omit<Co
 }
 
 /** Per-partial timbre: sine on every enabled partial; saw/square follow harmonic rolloff. */
-function explicitPartialWeights(harmonicIndex: number, blend: TimbreBlend): Omit<ComponentGains, 'total'> {
-  if (harmonicIndex < 1) {
-    return { sine: 0, saw: 0, square: 0 }
-  }
-  return {
-    sine: blend.sine,
-    saw: blend.saw / harmonicIndex,
-    square: harmonicIndex % 2 === 1 ? blend.square / harmonicIndex : 0,
-  }
+function explicitPartialWeights(
+  harmonicIndex: number,
+  blend: TimbreBlend,
+  harmonicTimbreEnabled: boolean,
+): Omit<ComponentGains, 'total'> {
+  return partialTimbreWeights(harmonicIndex, blend, harmonicTimbreEnabled)
 }
 
 function ratiosMatch(a: number, b: number): boolean {
@@ -71,6 +69,7 @@ function effectiveHarmonicComponents(
   activePartialId: string | null,
   dragGainDb: number | null,
   blend: TimbreBlend,
+  harmonicTimbreEnabled: boolean,
 ): ComponentGains {
   const seriesIndex = Math.max(1, harmonicNumber)
   const hasExplicitAtTarget = sourcePartials.some(
@@ -86,7 +85,7 @@ function effectiveHarmonicComponents(
     const sourceGain = dbToGain(sourceGainDb)
 
     if (ratiosMatch(source.ratio, targetRatio)) {
-      const weights = explicitPartialWeights(seriesIndex, blend)
+      const weights = explicitPartialWeights(seriesIndex, blend, harmonicTimbreEnabled)
       sum.sine += sourceGain * weights.sine
       sum.saw += sourceGain * weights.saw
       sum.square += sourceGain * weights.square
@@ -105,7 +104,7 @@ function effectiveHarmonicComponents(
     return sum
   }, { sine: 0, saw: 0, square: 0, total: 0 })
 
-  if (harmonicNumber % 2 === 0) {
+  if (harmonicTimbreEnabled && harmonicNumber % 2 === 0) {
     gains.square = 0
     gains.total = gains.sine + gains.saw
   }
@@ -133,6 +132,7 @@ function logLayerPercents(components: ComponentGains): Omit<ComponentGains, 'tot
 export function OvertoneBars({
   partials,
   timbreBlend,
+  harmonicTimbreEnabled,
   onGainChange,
   onToggleEnabled,
   onGainDragStart,
@@ -234,11 +234,13 @@ export function OvertoneBars({
               activePartialId,
               dragGainDb,
               blend,
+              harmonicTimbreEnabled,
             )
             const heightPercent = toPercentFromDb(gainDbForHeight)
             const totalEffectPercent = toPercentFromDb(gainToDb(componentGains.total))
             const layerPercents = logLayerPercents(componentGains)
-            const squareLayerPercent = harmonicNumber % 2 === 1 ? layerPercents.square : 0
+            const squareLayerPercent =
+              !harmonicTimbreEnabled || harmonicNumber % 2 === 1 ? layerPercents.square : 0
             const isSoloMode = soloPartialId !== null
             const isSoloTarget = soloPartialId === partial.id
             const barClass = partial.enabled

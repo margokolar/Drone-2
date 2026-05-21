@@ -29,6 +29,50 @@ export function overtoneIconButtonClass(
   )
 }
 
+export function harmonicTimbreIconButtonClass(
+  variant: 'portrait-solo' | 'landscape-inline',
+  enabled: boolean,
+): string {
+  return clsx(
+    overtoneIconButtonClass(variant),
+    enabled
+      ? 'border-cyan-200/90 bg-cyan-400/35 text-white shadow-[0_0_20px_rgba(34,211,238,0.45)] hover:bg-cyan-400/45'
+      : 'border-white/10 bg-white/3 text-white/35 hover:bg-white/8 hover:text-white/60',
+  )
+}
+
+type HarmonicTimbreToggleButtonProps = {
+  variant: 'portrait-solo' | 'landscape-inline'
+  enabled: boolean
+  onClick: () => void
+}
+
+export function HarmonicTimbreToggleButton({ variant, enabled, onClick }: HarmonicTimbreToggleButtonProps) {
+  return (
+    <button
+      type="button"
+      className={harmonicTimbreIconButtonClass(variant, enabled)}
+      onClick={onClick}
+      aria-label="Toggle harmonic timbre (square and saw follow overtone graph)"
+      aria-pressed={enabled}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill={enabled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth={enabled ? 1.75 : 2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        <rect x="4" y="4" width="16" height="16" rx="1" />
+      </svg>
+    </button>
+  )
+}
+
 const overtoneToneButtonShellClass =
   'button-safe flex shrink-0 touch-manipulation items-center justify-center rounded-lg border transition'
 

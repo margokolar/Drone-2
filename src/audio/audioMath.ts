@@ -27,3 +27,33 @@ export function normalizedBlend(blend: {
     square: Math.max(0, blend.square) / sum,
   }
 }
+
+/** Per-partial timbre weights matching the overtone graph (Fourier series rolloff). */
+export function harmonicTimbreWeights(
+  harmonicIndex: number,
+  blend: { sine: number; saw: number; square: number },
+): { sine: number; saw: number; square: number } {
+  if (harmonicIndex < 1) {
+    return { sine: 0, saw: 0, square: 0 }
+  }
+  return {
+    sine: blend.sine,
+    saw: blend.saw / harmonicIndex,
+    square: harmonicIndex % 2 === 1 ? blend.square / harmonicIndex : 0,
+  }
+}
+
+export function partialTimbreWeights(
+  harmonicIndex: number,
+  blend: { sine: number; saw: number; square: number },
+  harmonicTimbreEnabled: boolean,
+): { sine: number; saw: number; square: number } {
+  if (!harmonicTimbreEnabled) {
+    return {
+      sine: blend.sine,
+      saw: blend.saw,
+      square: blend.square,
+    }
+  }
+  return harmonicTimbreWeights(harmonicIndex, blend)
+}

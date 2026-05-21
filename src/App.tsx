@@ -33,7 +33,7 @@ import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from 
 import { MetronomeControls } from './components/MetronomeControls'
 import { NoteSelector } from './components/NoteSelector'
 import { OvertoneBars } from './components/OvertoneBars'
-import { OvertoneAllSoloButton, OvertoneToneNavControls, overtoneControlButtonSizeClass, overtoneIconButtonClass } from './components/OvertoneToneNavControls'
+import { OvertoneAllSoloButton, OvertoneToneNavControls, HarmonicTimbreToggleButton, overtoneControlButtonSizeClass, overtoneIconButtonClass } from './components/OvertoneToneNavControls'
 import { OvertoneMidiPanel } from './components/OvertoneMidiPanel'
 import { PartialEditor } from './components/PartialEditor'
 import { PresetList } from './components/PresetList'
@@ -156,6 +156,7 @@ function App() {
   const referenceA4Hz = useDroneStore((state) => state.referenceA4Hz)
   const baseOctave = useDroneStore((state) => state.baseOctave)
   const timbreBlend = useDroneStore((state) => state.timbreBlend)
+  const harmonicTimbreEnabled = useDroneStore((state) => state.harmonicTimbreEnabled)
   const masterGainDb = useDroneStore((state) => state.masterGainDb)
   const metronomeEnabled = useDroneStore((state) => state.metronomeEnabled)
   const metronomeBpm = useDroneStore((state) => state.metronomeBpm)
@@ -178,6 +179,7 @@ function App() {
   const addTonePartial = useDroneStore((state) => state.addTonePartial)
   const removeTonePartial = useDroneStore((state) => state.removeTonePartial)
   const setTimbreValue = useDroneStore((state) => state.setTimbreValue)
+  const toggleHarmonicTimbreEnabled = useDroneStore((state) => state.toggleHarmonicTimbreEnabled)
   const setMetronomeEnabled = useDroneStore((state) => state.setMetronomeEnabled)
   const setMetronomeBpm = useDroneStore((state) => state.setMetronomeBpm)
   const setMetronomeVolumeDb = useDroneStore((state) => state.setMetronomeVolumeDb)
@@ -809,10 +811,11 @@ function App() {
       tonalCenter,
       masterGainDb,
       timbreBlend,
+      harmonicTimbreEnabled,
       tones,
       partials,
     }),
-    [referenceA4Hz, baseOctave, tuningSystemId, tonalCenter, masterGainDb, timbreBlend, tones, partials],
+    [referenceA4Hz, baseOctave, tuningSystemId, tonalCenter, masterGainDb, timbreBlend, harmonicTimbreEnabled, tones, partials],
   )
 
   const latestRuntimeConfigRef = useRef<DroneRuntimeConfig>(runtimeConfig)
@@ -1468,6 +1471,7 @@ function App() {
               <OvertoneBars
                 partials={selectedOvertonePartials}
                 timbreBlend={timbreBlend}
+                harmonicTimbreEnabled={harmonicTimbreEnabled}
                 onGainChange={overtoneMidi.onPartialGainFromUi}
                 onGainDragStart={rememberOvertoneState}
                 onToggleEnabled={(partialId, enabled) => {
@@ -1503,6 +1507,11 @@ function App() {
                   >
                     <PowerOff size={16} />
                   </button>
+                  <HarmonicTimbreToggleButton
+                    variant="portrait-solo"
+                    enabled={harmonicTimbreEnabled}
+                    onClick={toggleHarmonicTimbreEnabled}
+                  />
                 </div>
                 <button
                   type="button"
@@ -1702,6 +1711,11 @@ function App() {
                   >
                     <PowerOff size={16} />
                   </button>
+                  <HarmonicTimbreToggleButton
+                    variant="landscape-inline"
+                    enabled={harmonicTimbreEnabled}
+                    onClick={toggleHarmonicTimbreEnabled}
+                  />
                 </div>
               )}
             </div>

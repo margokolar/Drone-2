@@ -29,6 +29,7 @@ export type DroneRuntimeConfig = {
   tonalCenter: TonalCenter
   masterGainDb: number
   timbreBlend: TimbreBlend
+  harmonicTimbreEnabled: boolean
   tones: ToneConfig[]
   partials: PartialConfig[]
 }

@@ -1,4 +1,4 @@
-import { dbToGain, normalizedBlend } from './audioMath'
+import { dbToGain, partialTimbreWeights, normalizedBlend } from './audioMath'
 import type { DroneRuntimeConfig, PartialConfig, ToneConfig } from './types'
 import { getFrequency } from '../music/tuning'
 
@@ -275,16 +275,17 @@ export class DroneEngine {
       config.baseOctave,
     )
     const oscillators: OscBundle[] = []
-    for (const partial of toneConfig.partials ?? config.partials) {
-      if (!partial.enabled) {
-        continue
-      }
+    const activePartials = (toneConfig.partials ?? config.partials).filter((partial) => partial.enabled)
+    for (let partialIndex = 0; partialIndex < activePartials.length; partialIndex += 1) {
+      const partial = activePartials[partialIndex]
       const ratio = Math.max(0.0625, partial.ratio)
       const fundamentalPartialGain = dbToGain(partial.gainDb)
+      const harmonicIndex = partialIndex + 1
+      const timbreWeights = partialTimbreWeights(harmonicIndex, blend, config.harmonicTimbreEnabled)
       const waveGains = [
-        { type: 'sine' as const, amount: blend.sine },
-        { type: 'sawtooth' as const, amount: blend.saw },
-        { type: 'square' as const, amount: blend.square },
+        { type: 'sine' as const, amount: timbreWeights.sine },
+        { type: 'sawtooth' as const, amount: timbreWeights.saw },
+        { type: 'square' as const, amount: timbreWeights.square },
       ]
       for (const waveGain of waveGains) {
         const oscillator = this.context.createOscillator()
@@ -351,17 +352,21 @@ export class DroneEngine {
 
     const blend = normalizedBlend(config.timbreBlend)
     const activePartials = (toneConfig.partials ?? config.partials).filter((partial) => partial.enabled)
-    const waveTarget = [blend.sine, blend.saw, blend.square]
     let index = 0
-    for (const partial of activePartials) {
+    for (let partialIndex = 0; partialIndex < activePartials.length; partialIndex += 1) {
+      const partial = activePartials[partialIndex]
       const ratio = Math.max(0.0625, partial.ratio)
       const partialLinear = dbToGain(partial.gainDb)
+      const harmonicIndex = partialIndex + 1
+      const timbreWeights = partialTimbreWeights(harmonicIndex, blend, config.harmonicTimbreEnabled)
+      const waveTarget = [timbreWeights.sine, timbreWeights.saw, timbreWeights.square]
       for (let waveIndex = 0; waveIndex < 3; waveIndex += 1) {
         const bundle = voice.oscillators[index]
         if (!bundle) {
           continue
         }
-        const nextWaveGain = Math.max(0.0001, partialLinear * waveTarget[waveIndex])
+        const weightedAmount = waveTarget[waveIndex] ?? 0
+        const nextWaveGain = weightedAmount > 0 ? Math.max(0.0001, partialLinear * weightedAmount) : 0.0001
         bundle.ratio = ratio
         bundle.waveGain = nextWaveGain
         bundle.oscillator.frequency.cancelScheduledValues(now)
