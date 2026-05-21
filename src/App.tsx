@@ -1503,6 +1503,7 @@ function App() {
             aria-labelledby="tab-overtones"
             hidden={activeTab !== 'overtones'}
           >
+            <div className="landscape:flex landscape:items-start landscape:gap-2 max-h-[500px]:flex max-h-[500px]:items-start max-h-[500px]:gap-2">
             <SectionCard
               title="Overtones"
               titleAddon={
@@ -1516,7 +1517,7 @@ function App() {
                   </span>
                 ) : null
               }
-              className="landscape:p-2 landscape:[&>header]:hidden max-h-[500px]:p-2 max-h-[500px]:[&>header]:hidden [&>header]:mb-2"
+              className="landscape:min-w-0 landscape:flex-1 landscape:p-2 landscape:[&>header]:hidden max-h-[500px]:min-w-0 max-h-[500px]:flex-1 max-h-[500px]:p-2 max-h-[500px]:[&>header]:hidden [&>header]:mb-2"
               rightSlot={
                 <div className="flex w-full min-w-0 flex-col items-end gap-1.5 landscape:hidden max-h-[500px]:hidden">
                   <div className="flex items-center gap-2">
@@ -1646,6 +1647,16 @@ function App() {
                 </button>
               </div>
             </SectionCard>
+            <div className="hidden shrink-0 self-start landscape:sticky landscape:top-3 landscape:block max-h-[500px]:sticky max-h-[500px]:top-3 max-h-[500px]:block">
+              <TimbreMorphSlider
+                orientation="vertical"
+                timbreBlend={timbreBlend}
+                onSetTimbreValue={setTimbreValue}
+                onTimbreChangeStart={beginTimbreMorphChange}
+                onTimbreChangeEnd={endTimbreMorphChange}
+              />
+            </div>
+            </div>
             <SectionCard title="Partials & timbre">
               <PartialEditor
                 partials={selectedOvertonePartials}
@@ -1734,18 +1745,6 @@ function App() {
           <div className="space-y-4" role="tabpanel" id="panel-blank" aria-labelledby="tab-blank" hidden={activeTab !== 'blank'} />
         </main>
       </div>
-      {activeTab === 'overtones' && (
-        <div className="pointer-events-none fixed right-2 top-1/2 z-30 hidden -translate-y-1/2 landscape:block max-h-[500px]:block">
-          <TimbreMorphSlider
-            orientation="vertical"
-            timbreBlend={timbreBlend}
-            onSetTimbreValue={setTimbreValue}
-            onTimbreChangeStart={beginTimbreMorphChange}
-            onTimbreChangeEnd={endTimbreMorphChange}
-            className="pointer-events-auto"
-          />
-        </div>
-      )}
       <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#111019] px-3 pb-2">
         <div className="mx-auto w-full max-w-md space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl">
           <nav
