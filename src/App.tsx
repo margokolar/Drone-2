@@ -4,6 +4,7 @@ import {
   ClipboardPaste,
   Copy,
   Download,
+  Globe,
   Info,
   Menu,
   Pause,
@@ -137,6 +138,8 @@ function App() {
   const previousTabRef = useRef<TabId>('tone')
   const overtoneUndoRef = useRef<Map<NoteId, OvertoneSnapshot[]>>(new Map())
   const overtoneRedoRef = useRef<Map<NoteId, OvertoneSnapshot[]>>(new Map())
+  const globalOvertoneUndoRef = useRef<OvertoneSnapshot[]>([])
+  const globalOvertoneRedoRef = useRef<OvertoneSnapshot[]>([])
   const overtoneClipboardRef = useRef<PartialConfig[] | null>(null)
   const timbreMorphHistoryActiveRef = useRef(false)
   const [toneSoloRestore, setToneSoloRestore] = useState<Map<NoteId, boolean> | null>(null)
@@ -157,6 +160,7 @@ function App() {
   const baseOctave = useDroneStore((state) => state.baseOctave)
   const timbreBlend = useDroneStore((state) => state.timbreBlend)
   const harmonicTimbreEnabled = useDroneStore((state) => state.harmonicTimbreEnabled)
+  const globalOvertoneEditEnabled = useDroneStore((state) => state.globalOvertoneEditEnabled)
   const masterGainDb = useDroneStore((state) => state.masterGainDb)
   const metronomeEnabled = useDroneStore((state) => state.metronomeEnabled)
   const metronomeBpm = useDroneStore((state) => state.metronomeBpm)
@@ -180,6 +184,14 @@ function App() {
   const removeTonePartial = useDroneStore((state) => state.removeTonePartial)
   const setTimbreValue = useDroneStore((state) => state.setTimbreValue)
   const toggleHarmonicTimbreEnabled = useDroneStore((state) => state.toggleHarmonicTimbreEnabled)
+  const setGlobalOvertoneEditEnabled = useDroneStore((state) => state.setGlobalOvertoneEditEnabled)
+  const enableGlobalOvertoneEditFromTone = useDroneStore((state) => state.enableGlobalOvertoneEditFromTone)
+  const applyPartialsGlobally = useDroneStore((state) => state.applyPartialsGlobally)
+  const setAllPartialGain = useDroneStore((state) => state.setAllPartialGain)
+  const setAllPartialRatio = useDroneStore((state) => state.setAllPartialRatio)
+  const setAllPartialEnabled = useDroneStore((state) => state.setAllPartialEnabled)
+  const addPartialGlobally = useDroneStore((state) => state.addPartialGlobally)
+  const removePartialGlobally = useDroneStore((state) => state.removePartialGlobally)
   const setMetronomeEnabled = useDroneStore((state) => state.setMetronomeEnabled)
   const setMetronomeBpm = useDroneStore((state) => state.setMetronomeBpm)
   const setMetronomeVolumeDb = useDroneStore((state) => state.setMetronomeVolumeDb)
@@ -207,36 +219,77 @@ function App() {
     [selectedOvertoneNoteId, tones],
   )
   const selectedOvertonePartials = useMemo(
-    () => selectedOvertoneTone?.partials ?? partials,
-    [partials, selectedOvertoneTone],
+    () =>
+      globalOvertoneEditEnabled
+        ? partials
+        : (selectedOvertoneTone?.partials ?? partials),
+    [globalOvertoneEditEnabled, partials, selectedOvertoneTone],
   )
   const setSelectedOvertonePartials = useCallback(
-    (nextPartials: PartialConfig[]) => setTonePartials(selectedOvertoneNoteId, nextPartials),
-    [selectedOvertoneNoteId, setTonePartials],
+    (nextPartials: PartialConfig[]) => {
+      if (globalOvertoneEditEnabled) {
+        applyPartialsGlobally(nextPartials)
+        return
+      }
+      setTonePartials(selectedOvertoneNoteId, nextPartials)
+    },
+    [applyPartialsGlobally, globalOvertoneEditEnabled, selectedOvertoneNoteId, setTonePartials],
   )
   const setSelectedOvertoneGain = useCallback(
-    (partialId: string, gainDb: number) =>
-      setTonePartialGain(selectedOvertoneNoteId, partialId, gainDb),
-    [selectedOvertoneNoteId, setTonePartialGain],
+    (partialId: string, gainDb: number) => {
+      if (globalOvertoneEditEnabled) {
+        setAllPartialGain(partialId, gainDb)
+        return
+      }
+      setTonePartialGain(selectedOvertoneNoteId, partialId, gainDb)
+    },
+    [globalOvertoneEditEnabled, selectedOvertoneNoteId, setAllPartialGain, setTonePartialGain],
   )
   const setSelectedOvertoneRatio = useCallback(
-    (partialId: string, ratio: number) =>
-      setTonePartialRatio(selectedOvertoneNoteId, partialId, ratio),
-    [selectedOvertoneNoteId, setTonePartialRatio],
+    (partialId: string, ratio: number) => {
+      if (globalOvertoneEditEnabled) {
+        setAllPartialRatio(partialId, ratio)
+        return
+      }
+      setTonePartialRatio(selectedOvertoneNoteId, partialId, ratio)
+    },
+    [globalOvertoneEditEnabled, selectedOvertoneNoteId, setAllPartialRatio, setTonePartialRatio],
   )
   const setSelectedOvertoneEnabled = useCallback(
-    (partialId: string, enabled: boolean) =>
-      setTonePartialEnabled(selectedOvertoneNoteId, partialId, enabled),
-    [selectedOvertoneNoteId, setTonePartialEnabled],
+    (partialId: string, enabled: boolean) => {
+      if (globalOvertoneEditEnabled) {
+        setAllPartialEnabled(partialId, enabled)
+        return
+      }
+      setTonePartialEnabled(selectedOvertoneNoteId, partialId, enabled)
+    },
+    [globalOvertoneEditEnabled, selectedOvertoneNoteId, setAllPartialEnabled, setTonePartialEnabled],
   )
-  const addSelectedOvertonePartial = useCallback(
-    () => addTonePartial(selectedOvertoneNoteId),
-    [addTonePartial, selectedOvertoneNoteId],
-  )
+  const addSelectedOvertonePartial = useCallback(() => {
+    if (globalOvertoneEditEnabled) {
+      addPartialGlobally()
+      return
+    }
+    addTonePartial(selectedOvertoneNoteId)
+  }, [addPartialGlobally, addTonePartial, globalOvertoneEditEnabled, selectedOvertoneNoteId])
   const removeSelectedOvertonePartial = useCallback(
-    (partialId: string) => removeTonePartial(selectedOvertoneNoteId, partialId),
-    [removeTonePartial, selectedOvertoneNoteId],
+    (partialId: string) => {
+      if (globalOvertoneEditEnabled) {
+        removePartialGlobally(partialId)
+        return
+      }
+      removeTonePartial(selectedOvertoneNoteId, partialId)
+    },
+    [globalOvertoneEditEnabled, removePartialGlobally, removeTonePartial, selectedOvertoneNoteId],
   )
+
+  const toggleGlobalOvertoneEdit = useCallback(() => {
+    if (globalOvertoneEditEnabled) {
+      setGlobalOvertoneEditEnabled(false)
+      return
+    }
+    enableGlobalOvertoneEditFromTone(selectedOvertoneNoteId)
+  }, [enableGlobalOvertoneEditFromTone, globalOvertoneEditEnabled, selectedOvertoneNoteId, setGlobalOvertoneEditEnabled])
 
   const overtoneMidi = useOvertoneMidi({
     partials: selectedOvertonePartials,
@@ -285,12 +338,15 @@ function App() {
 
   const getCurrentOvertoneSnapshot = useCallback((): OvertoneSnapshot => {
     const state = useDroneStore.getState()
-    const selectedTone = state.tones.find((tone) => tone.noteId === selectedOvertoneNoteId)
+    const sourcePartials = globalOvertoneEditEnabled
+      ? state.partials
+      : (state.tones.find((tone) => tone.noteId === selectedOvertoneNoteId)?.partials ??
+        selectedOvertonePartials)
     return {
-      partials: clonePartials(selectedTone?.partials ?? selectedOvertonePartials),
+      partials: clonePartials(sourcePartials),
       timbreBlend: cloneTimbreBlend(state.timbreBlend),
     }
-  }, [clonePartials, cloneTimbreBlend, selectedOvertoneNoteId, selectedOvertonePartials])
+  }, [clonePartials, cloneTimbreBlend, globalOvertoneEditEnabled, selectedOvertoneNoteId, selectedOvertonePartials])
 
   const applyOvertoneSnapshot = useCallback(
     (snapshot: OvertoneSnapshot) => {
@@ -317,6 +373,20 @@ function App() {
 
   const rememberOvertoneState = useCallback(() => {
     const snapshot = getCurrentOvertoneSnapshot()
+    if (globalOvertoneEditEnabled) {
+      const undoStack = globalOvertoneUndoRef.current
+      const currentTop = undoStack[undoStack.length - 1]
+      if (currentTop && sameOvertoneSnapshot(currentTop, snapshot)) {
+        return
+      }
+      undoStack.push(snapshot)
+      if (undoStack.length > MAX_OVERTONE_HISTORY) {
+        undoStack.shift()
+      }
+      globalOvertoneRedoRef.current = []
+      setOvertoneHistoryVersion((value) => value + 1)
+      return
+    }
     const undoStack = getOvertoneHistoryStack(overtoneUndoRef.current, selectedOvertoneNoteId)
     const currentTop = undoStack[undoStack.length - 1]
     if (currentTop && sameOvertoneSnapshot(currentTop, snapshot)) {
@@ -328,9 +398,25 @@ function App() {
     }
     overtoneRedoRef.current.set(selectedOvertoneNoteId, [])
     setOvertoneHistoryVersion((value) => value + 1)
-  }, [getCurrentOvertoneSnapshot, getOvertoneHistoryStack, sameOvertoneSnapshot, selectedOvertoneNoteId])
+  }, [
+    getCurrentOvertoneSnapshot,
+    getOvertoneHistoryStack,
+    globalOvertoneEditEnabled,
+    sameOvertoneSnapshot,
+    selectedOvertoneNoteId,
+  ])
 
   const undoOvertoneChange = useCallback(() => {
+    if (globalOvertoneEditEnabled) {
+      const previous = globalOvertoneUndoRef.current.pop()
+      if (!previous) {
+        return
+      }
+      globalOvertoneRedoRef.current.push(getCurrentOvertoneSnapshot())
+      applyOvertoneSnapshot(previous)
+      setOvertoneHistoryVersion((value) => value + 1)
+      return
+    }
     const undoStack = getOvertoneHistoryStack(overtoneUndoRef.current, selectedOvertoneNoteId)
     const previous = undoStack.pop()
     if (!previous) {
@@ -340,9 +426,25 @@ function App() {
     redoStack.push(getCurrentOvertoneSnapshot())
     applyOvertoneSnapshot(previous)
     setOvertoneHistoryVersion((value) => value + 1)
-  }, [applyOvertoneSnapshot, getCurrentOvertoneSnapshot, getOvertoneHistoryStack, selectedOvertoneNoteId])
+  }, [
+    applyOvertoneSnapshot,
+    getCurrentOvertoneSnapshot,
+    getOvertoneHistoryStack,
+    globalOvertoneEditEnabled,
+    selectedOvertoneNoteId,
+  ])
 
   const redoOvertoneChange = useCallback(() => {
+    if (globalOvertoneEditEnabled) {
+      const next = globalOvertoneRedoRef.current.pop()
+      if (!next) {
+        return
+      }
+      globalOvertoneUndoRef.current.push(getCurrentOvertoneSnapshot())
+      applyOvertoneSnapshot(next)
+      setOvertoneHistoryVersion((value) => value + 1)
+      return
+    }
     const redoStack = getOvertoneHistoryStack(overtoneRedoRef.current, selectedOvertoneNoteId)
     const next = redoStack.pop()
     if (!next) {
@@ -352,12 +454,20 @@ function App() {
     undoStack.push(getCurrentOvertoneSnapshot())
     applyOvertoneSnapshot(next)
     setOvertoneHistoryVersion((value) => value + 1)
-  }, [applyOvertoneSnapshot, getCurrentOvertoneSnapshot, getOvertoneHistoryStack, selectedOvertoneNoteId])
+  }, [
+    applyOvertoneSnapshot,
+    getCurrentOvertoneSnapshot,
+    getOvertoneHistoryStack,
+    globalOvertoneEditEnabled,
+    selectedOvertoneNoteId,
+  ])
 
-  const canUndoOvertones =
-    (overtoneUndoRef.current.get(selectedOvertoneNoteId)?.length ?? 0) > 0
-  const canRedoOvertones =
-    (overtoneRedoRef.current.get(selectedOvertoneNoteId)?.length ?? 0) > 0
+  const canUndoOvertones = globalOvertoneEditEnabled
+    ? globalOvertoneUndoRef.current.length > 0
+    : (overtoneUndoRef.current.get(selectedOvertoneNoteId)?.length ?? 0) > 0
+  const canRedoOvertones = globalOvertoneEditEnabled
+    ? globalOvertoneRedoRef.current.length > 0
+    : (overtoneRedoRef.current.get(selectedOvertoneNoteId)?.length ?? 0) > 0
   const canPasteOvertones = overtoneClipboardRef.current !== null
 
   const beginTimbreMorphChange = useCallback(() => {
@@ -1393,7 +1503,7 @@ function App() {
             hidden={activeTab !== 'overtones'}
           >
             <SectionCard
-              title="Overtones"
+              title={globalOvertoneEditEnabled ? 'Overtones · Global' : 'Overtones'}
               className="landscape:p-2 landscape:[&>header]:hidden max-h-[500px]:p-2 max-h-[500px]:[&>header]:hidden [&>header]:mb-2"
               rightSlot={
                 <div className="flex w-full min-w-0 flex-col items-end gap-1.5 landscape:hidden max-h-[500px]:hidden">
@@ -1788,6 +1898,19 @@ function App() {
               </button>
             </div>
             <div className="space-y-2">
+              <button
+                type="button"
+                aria-pressed={globalOvertoneEditEnabled}
+                className={`button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border px-4 py-3 text-left transition ${
+                  globalOvertoneEditEnabled
+                    ? 'border-cyan-300/60 bg-cyan-400/15 text-white hover:bg-cyan-400/25'
+                    : 'border-white/10 bg-white/5 text-white hover:bg-white/10'
+                }`}
+                onClick={toggleGlobalOvertoneEdit}
+              >
+                <Globe size={20} />
+                Global overtone edit
+              </button>
               <button
                 type="button"
                 className="button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"

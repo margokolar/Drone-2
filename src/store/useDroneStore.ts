@@ -34,6 +34,7 @@ type DroneState = {
     square: number
   }
   harmonicTimbreEnabled: boolean
+  globalOvertoneEditEnabled: boolean
   tones: ToneConfig[]
   partials: PartialConfig[]
   metronomeEnabled: boolean
@@ -51,6 +52,14 @@ type DroneState = {
   setTimbreValue: (key: 'sine' | 'saw' | 'square', value: number) => void
   setHarmonicTimbreEnabled: (enabled: boolean) => void
   toggleHarmonicTimbreEnabled: () => void
+  setGlobalOvertoneEditEnabled: (enabled: boolean) => void
+  enableGlobalOvertoneEditFromTone: (noteId: NoteId) => void
+  applyPartialsGlobally: (partials: PartialConfig[]) => void
+  setAllPartialGain: (partialId: string, gainDb: number) => void
+  setAllPartialRatio: (partialId: string, ratio: number) => void
+  setAllPartialEnabled: (partialId: string, enabled: boolean) => void
+  addPartialGlobally: () => void
+  removePartialGlobally: (partialId: string) => void
   toggleToneEnabled: (noteId: NoteId) => void
   setToneEnabled: (noteId: NoteId, enabled: boolean) => void
   setToneGain: (noteId: NoteId, gainDb: number) => void
@@ -176,6 +185,20 @@ function normalizeTonePartials(tone: ToneConfig, fallbackPartials: PartialConfig
   }
 }
 
+function syncAllTonesWithPartials(
+  state: Pick<DroneState, 'tones'>,
+  partials: PartialConfig[],
+): Pick<DroneState, 'partials' | 'tones'> {
+  const normalized = normalizePartials(partials.map((partial) => ({ ...partial })))
+  return {
+    partials: normalized,
+    tones: state.tones.map((tone) => ({
+      ...tone,
+      partials: normalized.map((partial) => ({ ...partial })),
+    })),
+  }
+}
+
 function migrateTones(tones: ToneConfig[], fallbackPartials: PartialConfig[]): ToneConfig[] {
   const migratedById = new Map<NoteId, ToneConfig>()
 
@@ -233,6 +256,7 @@ export const useDroneStore = create<DroneState>()(
       masterGainDb: INITIAL_PRESET.masterGainDb,
       timbreBlend: { ...INITIAL_PRESET.timbreBlend },
       harmonicTimbreEnabled: true,
+      globalOvertoneEditEnabled: false,
       tones: INITIAL_PRESET.tones.map((tone) => ({ ...tone })),
       partials: normalizePartials(INITIAL_PRESET.partials.map((partial) => ({ ...partial }))),
       metronomeEnabled: false,
@@ -276,6 +300,83 @@ export const useDroneStore = create<DroneState>()(
       setHarmonicTimbreEnabled: (enabled) => set({ harmonicTimbreEnabled: enabled }),
       toggleHarmonicTimbreEnabled: () =>
         set((state) => ({ harmonicTimbreEnabled: !state.harmonicTimbreEnabled })),
+      setGlobalOvertoneEditEnabled: (enabled) => set({ globalOvertoneEditEnabled: enabled }),
+      enableGlobalOvertoneEditFromTone: (noteId) =>
+        set((state) => {
+          const tone = state.tones.find((entry) => entry.noteId === noteId)
+          const source = tone?.partials ?? state.partials
+          return {
+            globalOvertoneEditEnabled: true,
+            ...syncAllTonesWithPartials(state, source),
+          }
+        }),
+      applyPartialsGlobally: (partials) =>
+        set((state) => syncAllTonesWithPartials(state, partials)),
+      setAllPartialGain: (partialId, gainDb) =>
+        set((state) => ({
+          ...syncAllTonesWithPartials(
+            state,
+            state.partials.map((partial) =>
+              partial.id === partialId
+                ? {
+                    ...partial,
+                    gainDb: clamp(gainDb, -48, 0),
+                  }
+                : partial,
+            ),
+          ),
+        })),
+      setAllPartialRatio: (partialId, ratio) =>
+        set((state) => ({
+          ...syncAllTonesWithPartials(
+            state,
+            state.partials.map((partial) =>
+              partial.id === partialId
+                ? {
+                    ...partial,
+                    ratio: clamp(ratio, 0.0625, 32),
+                  }
+                : partial,
+            ),
+          ),
+        })),
+      setAllPartialEnabled: (partialId, enabled) =>
+        set((state) => ({
+          ...syncAllTonesWithPartials(
+            state,
+            state.partials.map((partial) =>
+              partial.id === partialId
+                ? {
+                    ...partial,
+                    enabled,
+                  }
+                : partial,
+            ),
+          ),
+        })),
+      addPartialGlobally: () =>
+        set((state) => {
+          const nextIndex = state.partials.length + 1
+          return syncAllTonesWithPartials(state, [
+            ...state.partials,
+            {
+              id: `p-${Date.now()}-${nextIndex}`,
+              ratio: nextIndex,
+              gainDb: -24,
+              enabled: true,
+            },
+          ])
+        }),
+      removePartialGlobally: (partialId) =>
+        set((state) => {
+          if (state.partials.length <= 1) {
+            return state
+          }
+          return syncAllTonesWithPartials(
+            state,
+            state.partials.filter((partial) => partial.id !== partialId),
+          )
+        }),
       toggleToneEnabled: (noteId) =>
         set((state) => ({
           tones: state.tones.map((tone) => {
@@ -901,6 +1002,7 @@ export const useDroneStore = create<DroneState>()(
           metronomeBpm: typed.metronomeBpm ?? 72,
           metronomeVolumeDb: typed.metronomeVolumeDb ?? -15,
           harmonicTimbreEnabled: typed.harmonicTimbreEnabled ?? true,
+          globalOvertoneEditEnabled: typed.globalOvertoneEditEnabled ?? false,
         }
       },
       partialize: (state) => ({
@@ -915,6 +1017,7 @@ export const useDroneStore = create<DroneState>()(
         masterGainDb: state.masterGainDb,
         timbreBlend: state.timbreBlend,
         harmonicTimbreEnabled: state.harmonicTimbreEnabled,
+        globalOvertoneEditEnabled: state.globalOvertoneEditEnabled,
         tones: state.tones,
         partials: state.partials,
         metronomeEnabled: state.metronomeEnabled,
