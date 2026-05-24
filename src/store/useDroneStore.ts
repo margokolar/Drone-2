@@ -234,6 +234,13 @@ function migrateTones(tones: ToneConfig[], fallbackPartials: PartialConfig[]): T
   })
 }
 
+function resolveActivePresetId(presets: Preset[], activePresetId: string | undefined): string {
+  if (activePresetId && presets.some((preset) => preset.id === activePresetId)) {
+    return activePresetId
+  }
+  return presets[0]?.id ?? INITIAL_PRESET.id
+}
+
 export const useDroneStore = create<DroneState>()(
   persist(
     (set, get) => ({
@@ -659,9 +666,7 @@ export const useDroneStore = create<DroneState>()(
         if (!preset) {
           return
         }
-        set({
-          ...applyPresetState(preset),
-        })
+        set(applyPresetState(preset))
       },
       renamePreset: (presetId, name) =>
         set((state) => {
@@ -932,11 +937,11 @@ export const useDroneStore = create<DroneState>()(
         }),
       selectNextPreset: () => {
         const state = get()
-        const index = state.presets.findIndex((preset) => preset.id === state.activePresetId)
-        if (index < 0) {
+        if (state.presets.length === 0) {
           return
         }
-        const nextIndex = (index + 1) % state.presets.length
+        const index = state.presets.findIndex((preset) => preset.id === state.activePresetId)
+        const nextIndex = index < 0 ? 0 : (index + 1) % state.presets.length
         const preset = state.presets[nextIndex]
         set({
           ...applyPresetState(preset),
@@ -944,11 +949,12 @@ export const useDroneStore = create<DroneState>()(
       },
       selectPreviousPreset: () => {
         const state = get()
-        const index = state.presets.findIndex((preset) => preset.id === state.activePresetId)
-        if (index < 0) {
+        if (state.presets.length === 0) {
           return
         }
-        const nextIndex = (index - 1 + state.presets.length) % state.presets.length
+        const index = state.presets.findIndex((preset) => preset.id === state.activePresetId)
+        const nextIndex =
+          index < 0 ? 0 : (index - 1 + state.presets.length) % state.presets.length
         const preset = state.presets[nextIndex]
         set({
           ...applyPresetState(preset),
@@ -976,10 +982,15 @@ export const useDroneStore = create<DroneState>()(
             tones: migrateTones(preset.tones ?? [], preset.partials ?? incomingPartials),
           }),
         )
+        const resolvedActivePresetId = resolveActivePresetId(
+          migratedPresets.length ? migratedPresets : DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset)),
+          typed.activePresetId,
+        )
         const migratedTones = migrateTones(typed.tones ?? INITIAL_PRESET.tones, incomingPartials)
         return {
           ...typed,
           presets: migratedPresets,
+          activePresetId: resolvedActivePresetId,
           partials: incomingPartials,
           tones: migratedTones,
           baseOctave: clamp(typed.baseOctave ?? 3, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),

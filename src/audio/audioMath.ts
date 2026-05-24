@@ -28,6 +28,18 @@ export function normalizedBlend(blend: {
   }
 }
 
+/** Peak-normalized Web Audio oscillators have different RMS; nudge toward similar loudness. */
+export function waveformGainCompensation(type: OscillatorType): number {
+  switch (type) {
+    case 'sawtooth':
+      return Math.sqrt(3 / 2)
+    case 'square':
+      return Math.SQRT1_2
+    default:
+      return 1
+  }
+}
+
 /** Per-partial timbre weights matching the overtone graph (Fourier series rolloff). */
 export function harmonicTimbreWeights(
   harmonicIndex: number,

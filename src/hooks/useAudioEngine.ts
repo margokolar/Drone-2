@@ -6,18 +6,19 @@ export function useAudioEngine(config: DroneRuntimeConfig, playing: boolean): vo
   const latestConfigRef = useRef<DroneRuntimeConfig>(config)
 
   useEffect(() => {
+    droneEngine.setPlaybackIntent(playing)
     latestConfigRef.current = config
     if (!playing) {
+      droneEngine.stop()
       return
     }
     droneEngine.syncConfig(config, false)
   }, [config, playing])
 
   useEffect(() => {
-    if (playing) {
-      void droneEngine.start(latestConfigRef.current)
+    if (!playing) {
       return
     }
-    droneEngine.stop()
+    void droneEngine.start(latestConfigRef.current)
   }, [playing])
 }

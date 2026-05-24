@@ -1,4 +1,4 @@
-import { dbToGain, partialTimbreWeights, normalizedBlend } from './audioMath'
+import { dbToGain, partialTimbreWeights, normalizedBlend, waveformGainCompensation } from './audioMath'
 import type { DroneRuntimeConfig, PartialConfig, ToneConfig } from './types'
 import { getFrequency } from '../music/tuning'
 
@@ -27,6 +27,32 @@ export class DroneEngine {
   private masterGain: GainNode | null = null
   private voiceMap = new Map<string, ToneVoice>()
   private started = false
+  private shouldPlay = false
+
+  setPlaybackIntent(shouldPlay: boolean): void {
+    this.shouldPlay = shouldPlay
+  }
+
+  /**
+   * Resume the AudioContext from a user gesture without starting voices.
+   * iOS Safari only honours AudioContext.resume() when it runs within the
+   * same microtask as the gesture.
+   */
+  prepareContext(): void {
+    const context = this.ensureContext()
+    const contextState = context.state as AudioContextState | 'interrupted'
+    if (context.state !== 'running') {
+      void context
+        .resume()
+        .catch(() => {
+          // iOS can reject resume() while the page is still warming up; the
+          // caller may retry on the next user gesture.
+        })
+    }
+    if (contextState === 'interrupted') {
+      void this.kickContext()
+    }
+  }
 
   private ensureContext(): AudioContext {
     if (this.context) {
@@ -73,18 +99,9 @@ export class DroneEngine {
    * `await` anything before calling it.
    */
   ensureRunning(config: DroneRuntimeConfig): void {
-    const context = this.ensureContext()
-    const contextState = context.state as AudioContextState | 'interrupted'
-    if (context.state !== 'running') {
-      void context
-        .resume()
-        .catch(() => {
-          // iOS can reject resume() while the page is still warming up; the
-          // caller may retry on the next user gesture.
-        })
-    }
-    if (contextState === 'interrupted') {
-      void this.kickContext()
+    this.prepareContext()
+    if (!this.shouldPlay) {
+      return
     }
     this.started = true
     this.syncConfig(config, this.voiceMap.size === 0)
@@ -92,7 +109,7 @@ export class DroneEngine {
 
   fastResume(config: DroneRuntimeConfig): void {
     this.ensureRunning(config)
-    if (!this.context || !this.masterGain) {
+    if (!this.shouldPlay || !this.context || !this.masterGain) {
       return
     }
     const now = this.context.currentTime
@@ -159,17 +176,29 @@ export class DroneEngine {
     return this.context?.state === 'running'
   }
 
+  private forceMute(now: number): void {
+    if (!this.masterGain) {
+      return
+    }
+    this.masterGain.gain.cancelScheduledValues(now)
+    this.masterGain.gain.setValueAtTime(0.0001, now)
+    for (const voice of this.voiceMap.values()) {
+      voice.outputGain.gain.cancelScheduledValues(now)
+      voice.outputGain.gain.setValueAtTime(0.0001, now)
+      for (const bundle of voice.oscillators) {
+        bundle.gainNode.gain.cancelScheduledValues(now)
+        bundle.gainNode.gain.setValueAtTime(0.0001, now)
+      }
+    }
+  }
+
   stop(): void {
+    this.shouldPlay = false
+    this.started = false
     if (!this.context || !this.masterGain) {
       return
     }
-    const now = this.context.currentTime
-    this.masterGain.gain.cancelScheduledValues(now)
-    this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now)
-    this.masterGain.gain.linearRampToValueAtTime(0.0001, now + RELEASE_SECONDS)
-    // Soft-pause: keep oscillators alive behind the muted master gain so
-    // Bluetooth/lock-screen resume can become audible immediately.
-    this.started = false
+    this.forceMute(this.context.currentTime)
   }
 
   syncConfig(config: DroneRuntimeConfig, forceRebuild = false): void {
@@ -177,6 +206,11 @@ export class DroneEngine {
       return
     }
     const now = this.context.currentTime
+    if (!this.started || !this.shouldPlay) {
+      this.started = false
+      this.forceMute(now)
+      return
+    }
     const masterTarget = dbToGain(config.masterGainDb)
     this.masterGain.gain.cancelScheduledValues(now)
     this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now)
@@ -299,7 +333,10 @@ export class DroneEngine {
         oscillators.push({
           oscillator,
           gainNode,
-          waveGain: waveGain.amount * fundamentalPartialGain,
+          waveGain:
+            waveGain.amount *
+            fundamentalPartialGain *
+            waveformGainCompensation(waveGain.type),
           ratio,
         })
       }
@@ -359,6 +396,7 @@ export class DroneEngine {
       const partialLinear = dbToGain(partial.gainDb)
       const harmonicIndex = partialIndex + 1
       const timbreWeights = partialTimbreWeights(harmonicIndex, blend, config.harmonicTimbreEnabled)
+      const waveTypes = ['sine', 'sawtooth', 'square'] as const
       const waveTarget = [timbreWeights.sine, timbreWeights.saw, timbreWeights.square]
       for (let waveIndex = 0; waveIndex < 3; waveIndex += 1) {
         const bundle = voice.oscillators[index]
@@ -366,7 +404,14 @@ export class DroneEngine {
           continue
         }
         const weightedAmount = waveTarget[waveIndex] ?? 0
-        const nextWaveGain = weightedAmount > 0 ? Math.max(0.0001, partialLinear * weightedAmount) : 0.0001
+        const waveType = waveTypes[waveIndex]
+        const nextWaveGain =
+          weightedAmount > 0
+            ? Math.max(
+                0.0001,
+                partialLinear * weightedAmount * waveformGainCompensation(waveType),
+              )
+            : 0.0001
         bundle.ratio = ratio
         bundle.waveGain = nextWaveGain
         bundle.oscillator.frequency.cancelScheduledValues(now)

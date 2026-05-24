@@ -167,7 +167,6 @@ function App() {
   const metronomeBpm = useDroneStore((state) => state.metronomeBpm)
   const metronomeVolumeDb = useDroneStore((state) => state.metronomeVolumeDb)
 
-  const togglePlaying = useDroneStore((state) => state.togglePlaying)
   const setPlaying = useDroneStore((state) => state.setPlaying)
   const nudgeReferenceA4Hz = useDroneStore((state) => state.nudgeReferenceA4Hz)
   const nudgeBaseOctave = useDroneStore((state) => state.nudgeBaseOctave)
@@ -760,13 +759,17 @@ function App() {
 
   const handleTogglePlay = useCallback(() => {
     const currentlyPlaying = useDroneStore.getState().playing
-    if (!currentlyPlaying) {
-      // Must run synchronously inside the user-gesture call stack so Safari
-      // honours AudioContext.resume().
-      droneEngine.ensureRunning(latestRuntimeConfigRef.current)
+    if (currentlyPlaying) {
+      droneEngine.stop()
+      setPlaying(false)
+      return
     }
-    togglePlaying()
-  }, [togglePlaying])
+    // Must run synchronously inside the user-gesture call stack so Safari
+    // honours AudioContext.resume().
+    droneEngine.setPlaybackIntent(true)
+    droneEngine.ensureRunning(latestRuntimeConfigRef.current)
+    setPlaying(true)
+  }, [setPlaying])
 
   const activeTones = useMemo(() => tones.filter((tone) => tone.enabled), [tones])
   const overtoneToneOptions = activeTones.length > 0 ? activeTones : tones
@@ -967,7 +970,7 @@ function App() {
 
   useAudioEngine(runtimeConfig, playing)
   useMetronome({
-    enabled: metronomeEnabled,
+    enabled: metronomeEnabled && playing,
     bpm: metronomeBpm,
     volumeDb: metronomeVolumeDb,
   })
@@ -989,10 +992,12 @@ function App() {
     }
 
     setActionHandler('play', () => {
+      droneEngine.setPlaybackIntent(true)
       droneEngine.ensureRunning(latestRuntimeConfigRef.current)
       useDroneStore.getState().setPlaying(true)
     })
     setActionHandler('pause', () => {
+      droneEngine.stop()
       useDroneStore.getState().setPlaying(false)
     })
     setActionHandler('nexttrack', () => {
@@ -1185,10 +1190,14 @@ function App() {
       if (isTurnDownKey) {
         event.preventDefault()
         const wasPlaying = useDroneStore.getState().playing
-        if (!wasPlaying) {
+        if (wasPlaying) {
+          droneEngine.stop()
+          setPlaying(false)
+        } else {
+          droneEngine.setPlaybackIntent(true)
           droneEngine.ensureRunning(latestRuntimeConfigRef.current)
+          setPlaying(true)
         }
-        togglePlaying()
         return
       }
 
@@ -1209,30 +1218,24 @@ function App() {
 
       if (event.code === 'Space' || event.key === ' ') {
         event.preventDefault()
-        const wasPlaying = useDroneStore.getState().playing
-        if (!wasPlaying) {
-          droneEngine.ensureRunning(latestRuntimeConfigRef.current)
-        }
-        togglePlaying()
+        handleTogglePlay()
         return
       }
       if (mediaKey === 'MediaPlayPause') {
         event.preventDefault()
-        const wasPlaying = useDroneStore.getState().playing
-        if (!wasPlaying) {
-          droneEngine.ensureRunning(latestRuntimeConfigRef.current)
-        }
-        togglePlaying()
+        handleTogglePlay()
         return
       }
       if (mediaKey === 'MediaPlay') {
         event.preventDefault()
+        droneEngine.setPlaybackIntent(true)
         droneEngine.fastResume(latestRuntimeConfigRef.current)
         setPlaying(true)
         return
       }
       if (mediaKey === 'MediaPause') {
         event.preventDefault()
+        droneEngine.stop()
         setPlaying(false)
       }
     }
@@ -1244,7 +1247,7 @@ function App() {
       }
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [selectNextPreset, selectPreviousPreset, setPlaying, togglePlaying])
+  }, [handleTogglePlay, selectNextPreset, selectPreviousPreset, setPlaying])
 
   useEffect(() => {
     const timerId = window.setInterval(() => {

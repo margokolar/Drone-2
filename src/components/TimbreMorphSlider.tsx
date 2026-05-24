@@ -15,7 +15,7 @@ function morphFromBlend(sine: number, saw: number, square: number): number {
   if (total <= 0) {
     return 0
   }
-  return (Math.max(0, saw) * 0.5 + Math.max(0, square)) / total
+  return (Math.max(0, sine) * 0.5 + Math.max(0, square)) / total
 }
 
 function blendFromMorph(morph: number): TimbreBlend {
@@ -23,15 +23,15 @@ function blendFromMorph(morph: number): TimbreBlend {
   if (clamped <= 0.5) {
     const t = clamped / 0.5
     return {
-      sine: 1 - t,
-      saw: t,
+      sine: t,
+      saw: 1 - t,
       square: 0,
     }
   }
   const t = (clamped - 0.5) / 0.5
   return {
-    sine: 0,
-    saw: 1 - t,
+    sine: 1 - t,
+    saw: 0,
     square: t,
   }
 }
@@ -54,6 +54,11 @@ export function TimbreMorphSlider({
     onSetTimbreValue('square', nextBlend.square)
   }
 
+  const restoreToSine = () => {
+    applyMorph(0.5)
+    onTimbreChangeEnd?.()
+  }
+
   const handleTimbreKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
       onTimbreChangeStart?.()
@@ -72,7 +77,8 @@ export function TimbreMorphSlider({
     onKeyUp: onTimbreChangeEnd,
     onBlur: onTimbreChangeEnd,
     onChange: (event: ChangeEvent<HTMLInputElement>) => applyMorph(Number(event.target.value)),
-    'aria-label': 'Timbre morph from sine to saw to square',
+    onDoubleClick: restoreToSine,
+    'aria-label': 'Timbre morph from saw to sine to square. Double-click to reset to sine.',
   }
 
   if (orientation === 'vertical') {
@@ -93,7 +99,7 @@ export function TimbreMorphSlider({
           </div>
         </div>
         <span className="flex h-7 shrink-0 items-center justify-center text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">
-          Sine
+          Saw
         </span>
       </div>
     )
@@ -102,8 +108,8 @@ export function TimbreMorphSlider({
   return (
     <div className={`space-y-2 rounded-xl border border-white/10 bg-white/5 p-3 ${className}`}>
       <div className="flex items-center justify-between text-xs uppercase tracking-[0.14em] text-white/60">
-        <span>Sine</span>
         <span>Saw</span>
+        <span>Sine</span>
         <span>Square</span>
       </div>
       <input type="range" {...sharedRangeProps} className="h-2 w-full accent-fuchsia-300" />
