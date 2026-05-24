@@ -27,6 +27,16 @@ export class MetronomeEngine {
     return this.context
   }
 
+  /** Synchronous resume for user-gesture handlers (iOS Safari). */
+  prepareContext(): void {
+    const context = this.ensureContext()
+    if (context.state !== 'running') {
+      void context.resume().catch(() => {
+        // iOS can reject resume() outside a gesture; the toggle click may retry.
+      })
+    }
+  }
+
   async setConfig(config: MetronomeConfig): Promise<void> {
     this.config = config
     if (!config.enabled) {
@@ -93,3 +103,5 @@ export class MetronomeEngine {
     oscillator.stop(when + release + 0.02)
   }
 }
+
+export const metronomeEngine = new MetronomeEngine()

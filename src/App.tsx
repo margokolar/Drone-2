@@ -29,6 +29,7 @@ import {
   type ChangeEvent,
 } from 'react'
 import { droneEngine } from './audio/DroneEngine'
+import { metronomeEngine } from './audio/MetronomeEngine'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
 import { MetronomeControls } from './components/MetronomeControls'
@@ -771,6 +772,16 @@ function App() {
     setPlaying(true)
   }, [setPlaying])
 
+  const handleMetronomeEnabledChange = useCallback(
+    (enabled: boolean) => {
+      if (enabled) {
+        metronomeEngine.prepareContext()
+      }
+      setMetronomeEnabled(enabled)
+    },
+    [setMetronomeEnabled],
+  )
+
   const activeTones = useMemo(() => tones.filter((tone) => tone.enabled), [tones])
   const overtoneToneOptions = activeTones.length > 0 ? activeTones : tones
   const isSelectedOvertoneToneSolo = useMemo(
@@ -970,7 +981,7 @@ function App() {
 
   useAudioEngine(runtimeConfig, playing)
   useMetronome({
-    enabled: metronomeEnabled && playing,
+    enabled: metronomeEnabled,
     bpm: metronomeBpm,
     volumeDb: metronomeVolumeDb,
   })
@@ -1688,7 +1699,7 @@ function App() {
                 enabled={metronomeEnabled}
                 bpm={metronomeBpm}
                 volumeDb={metronomeVolumeDb}
-                onEnabledChange={setMetronomeEnabled}
+                onEnabledChange={handleMetronomeEnabledChange}
                 onBpmChange={setMetronomeBpm}
                 onVolumeChange={setMetronomeVolumeDb}
               />
