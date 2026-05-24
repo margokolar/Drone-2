@@ -133,24 +133,14 @@ export function OvertoneToneNavControls({
         type="button"
         className={clsx(
           overtoneToneButtonShellClass,
-          overtoneControlButtonSizeClass(variant),
-          'gap-1',
+          'size-10',
+          'tracking-[0.12em]',
           soloButtonClass(isSolo, variant),
         )}
         onClick={onToggleSolo}
         aria-label={soloAriaLabel}
       >
-        <span
-          className={`text-[9px] font-semibold uppercase tracking-[0.14em] ${
-            isSolo ? 'text-amber-100/65' : 'text-white/45'
-          }`}
-        >
-          Tone
-        </span>
-        <ToneLabel
-          noteId={toneNoteId}
-          className={clsx('tracking-[0.12em]', toneLabelUppercase && 'uppercase')}
-        />
+        <ToneLabel noteId={toneNoteId} className={toneLabelUppercase ? 'uppercase' : undefined} />
       </button>
     ) : (
       <button

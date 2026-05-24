@@ -1767,22 +1767,8 @@ function App() {
                 </button>
               ))}
               {activeTab === 'overtones' && (
-                <div className="hidden shrink-0 items-center gap-1.5 landscape:flex max-h-[500px]:flex">
-                  <OvertoneAllSoloButton
-                    variant="landscape-inline"
-                    isActive={isAllTonesCompareActive}
-                    onClick={toggleAllTonesCompare}
-                  />
-                  <OvertoneToneNavControls
-                    variant="landscape-inline"
-                    toneNoteId={selectedOvertoneNoteId}
-                    isSolo={isSelectedOvertoneToneSolo}
-                    canNavigate={canNavigateOvertoneTone}
-                    soloAriaLabel={selectedOvertoneToneSoloAriaLabel}
-                    onToggleSolo={toggleSelectedOvertoneToneSolo}
-                    onPrevious={() => selectAdjacentOvertoneTone('previous')}
-                    onNext={() => selectAdjacentOvertoneTone('next')}
-                  />
+                <div className="hidden w-full min-w-0 items-center gap-1.5 landscape:flex max-h-[500px]:flex">
+                  <div className="flex shrink-0 items-center gap-1.5">
                   <button
                     type="button"
                     className={overtoneIconButtonClass('landscape-inline')}
@@ -1849,6 +1835,24 @@ function App() {
                     enabled={harmonicTimbreEnabled}
                     onClick={toggleHarmonicTimbreEnabled}
                   />
+                  </div>
+                  <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                  <OvertoneAllSoloButton
+                    variant="landscape-inline"
+                    isActive={isAllTonesCompareActive}
+                    onClick={toggleAllTonesCompare}
+                  />
+                  <OvertoneToneNavControls
+                    variant="landscape-inline"
+                    toneNoteId={selectedOvertoneNoteId}
+                    isSolo={isSelectedOvertoneToneSolo}
+                    canNavigate={canNavigateOvertoneTone}
+                    soloAriaLabel={selectedOvertoneToneSoloAriaLabel}
+                    onToggleSolo={toggleSelectedOvertoneToneSolo}
+                    onPrevious={() => selectAdjacentOvertoneTone('previous')}
+                    onNext={() => selectAdjacentOvertoneTone('next')}
+                  />
+                  </div>
                 </div>
               )}
             </div>
