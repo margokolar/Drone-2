@@ -1,6 +1,7 @@
 import type { ChangeEvent, KeyboardEvent } from 'react'
 import type { TimbreBlend } from '../audio/types'
 import { DEFAULT_TIMBRE_BLEND } from '../presets/defaultPresets'
+import { ResettableRangeInput } from './ResettableRangeInput'
 
 type TimbreMorphSliderProps = {
   timbreBlend: TimbreBlend
@@ -81,8 +82,8 @@ export function TimbreMorphSlider({
     onKeyUp: onTimbreChangeEnd,
     onBlur: onTimbreChangeEnd,
     onChange: (event: ChangeEvent<HTMLInputElement>) => applyMorph(Number(event.target.value)),
-    onDoubleClick: restoreToDefault,
-    'aria-label': 'Timbre morph from saw to sine to square. Double-click to reset to default.',
+    onReset: restoreToDefault,
+    'aria-label': 'Timbre morph from saw to sine to square. Double-click or double-tap to reset to default.',
   }
 
   if (orientation === 'vertical') {
@@ -95,8 +96,7 @@ export function TimbreMorphSlider({
             Square
           </span>
           <div className="relative flex min-h-0 flex-1 items-center justify-center">
-            <input
-              type="range"
+            <ResettableRangeInput
               {...sharedRangeProps}
               className="absolute left-1/2 top-1/2 h-2 w-[calc(11rem-1.25rem)] -translate-x-1/2 -translate-y-1/2 -rotate-90 accent-fuchsia-300"
             />
@@ -116,7 +116,7 @@ export function TimbreMorphSlider({
         <span>Sine</span>
         <span>Square</span>
       </div>
-      <input type="range" {...sharedRangeProps} className="h-2 w-full accent-fuchsia-300" />
+      <ResettableRangeInput {...sharedRangeProps} className="h-2 w-full accent-fuchsia-300" />
     </div>
   )
 }

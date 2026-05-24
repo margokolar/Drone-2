@@ -2,6 +2,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useRef } from 'react'
 import type { PartialConfig } from '../audio/types'
 import { defaultPartialGainDb, defaultPartialRatio } from '../presets/defaultPresets'
+import { ResettableRangeInput } from './ResettableRangeInput'
 import { NumericValueField } from './NumericValueField'
 import { TimbreMorphSlider } from './TimbreMorphSlider'
 
@@ -176,15 +177,14 @@ export function PartialEditor({
                   <span className="text-xs text-white/60">Hz</span>
                 </div>
               </div>
-              <input
-                type="range"
+              <ResettableRangeInput
                 min={0.125}
                 max={16}
                 step={0.001}
                 value={partial.ratio}
                 onChange={(event) => onSetPartialRatio(partial.id, Number(event.target.value))}
-                onDoubleClick={() => onSetPartialRatio(partial.id, defaultPartialRatio(index + 1))}
-                aria-label={`Partial ${index + 1} ratio. Double-click to reset to default.`}
+                onReset={() => onSetPartialRatio(partial.id, defaultPartialRatio(index + 1))}
+                aria-label={`Partial ${index + 1} ratio. Double-click or double-tap to reset to default.`}
                 className="col-span-2 h-2 w-full accent-fuchsia-300"
               />
             </div>
@@ -200,15 +200,14 @@ export function PartialEditor({
                 className="w-24 rounded-md border border-white/20 bg-white/5 px-2 py-1 text-right tabular-nums text-white"
                 ariaLabel="Partial gain value in decibels"
               />
-              <input
-                type="range"
+              <ResettableRangeInput
                 min={-48}
                 max={0}
                 step={0.1}
                 value={partial.gainDb}
                 onChange={(event) => onSetPartialGain(partial.id, Number(event.target.value))}
-                onDoubleClick={() => onSetPartialGain(partial.id, defaultPartialGainDb(index + 1))}
-                aria-label={`Partial ${index + 1} gain. Double-click to reset to default.`}
+                onReset={() => onSetPartialGain(partial.id, defaultPartialGainDb(index + 1))}
+                aria-label={`Partial ${index + 1} gain. Double-click or double-tap to reset to default.`}
                 className="col-span-2 h-2 w-full accent-fuchsia-300"
               />
             </div>

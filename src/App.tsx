@@ -40,6 +40,7 @@ import { OvertoneMidiPanel } from './components/OvertoneMidiPanel'
 import { PartialEditor } from './components/PartialEditor'
 import { TimbreMorphSlider } from './components/TimbreMorphSlider'
 import { PresetList } from './components/PresetList'
+import { ResettableRangeInput } from './components/ResettableRangeInput'
 import { SectionCard } from './components/SectionCard'
 import { SongLibraryMenu } from './components/SongLibraryMenu'
 import { ToneMixer } from './components/ToneMixer'
@@ -1469,15 +1470,14 @@ function App() {
                     <span className="text-xs uppercase tracking-[0.16em] text-white/60">Master gain</span>
                     <span className="text-xs tabular-nums text-white/70">{masterGainDb.toFixed(1)} dB</span>
                   </div>
-                  <input
-                    type="range"
+                  <ResettableRangeInput
                     min={-30}
                     max={0}
                     step={0.1}
                     value={masterGainDb}
                     onChange={(event) => setMasterGainDb(Number(event.target.value))}
-                    onDoubleClick={() => setMasterGainDb(DEFAULT_MASTER_GAIN_DB)}
-                    aria-label="Master gain. Double-click to reset to default."
+                    onReset={() => setMasterGainDb(DEFAULT_MASTER_GAIN_DB)}
+                    aria-label="Master gain. Double-click or double-tap to reset to default."
                     className="h-1.5 w-full accent-fuchsia-300"
                   />
                 </div>

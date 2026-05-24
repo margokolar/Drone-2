@@ -1,6 +1,7 @@
 import { Pause, Play } from 'lucide-react'
 import { DEFAULT_METRONOME_BPM, DEFAULT_METRONOME_VOLUME_DB } from '../presets/defaultPresets'
 import { NumericValueField } from './NumericValueField'
+import { ResettableRangeInput } from './ResettableRangeInput'
 
 const TEMPO_PRESETS = Array.from({ length: 12 }, (_, index) => 40 + index * 10)
 
@@ -81,15 +82,14 @@ export function MetronomeControls({
               <span>BPM</span>
             </div>
           </div>
-          <input
-            type="range"
+          <ResettableRangeInput
             min={30}
             max={220}
             step={1}
             value={bpm}
             onChange={(event) => onBpmChange(Number(event.target.value))}
-            onDoubleClick={() => onBpmChange(DEFAULT_METRONOME_BPM)}
-            aria-label="Tempo BPM. Double-click to reset to default."
+            onReset={() => onBpmChange(DEFAULT_METRONOME_BPM)}
+            aria-label="Tempo BPM. Double-click or double-tap to reset to default."
             className="h-2 w-full accent-fuchsia-300"
           />
           <div className="mt-3">
@@ -127,15 +127,14 @@ export function MetronomeControls({
             <span className="text-white/70">Click volume</span>
             <span className="tabular-nums text-white/85">{volumeDb.toFixed(1)} dB</span>
           </div>
-          <input
-            type="range"
+          <ResettableRangeInput
             min={-40}
             max={0}
             step={0.1}
             value={volumeDb}
             onChange={(event) => onVolumeChange(Number(event.target.value))}
-            onDoubleClick={() => onVolumeChange(DEFAULT_METRONOME_VOLUME_DB)}
-            aria-label="Click volume. Double-click to reset to default."
+            onReset={() => onVolumeChange(DEFAULT_METRONOME_VOLUME_DB)}
+            aria-label="Click volume. Double-click or double-tap to reset to default."
             className="h-2 w-full accent-fuchsia-300"
           />
         </div>

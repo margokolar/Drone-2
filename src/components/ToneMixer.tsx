@@ -3,6 +3,7 @@ import { AudioWaveform } from 'lucide-react'
 import type { ToneConfig } from '../audio/types'
 import { getTonePageLabel, type NoteId } from '../music/notes'
 import { DEFAULT_TONE_PAN, defaultToneGainDb } from '../presets/defaultPresets'
+import { ResettableRangeInput } from './ResettableRangeInput'
 import { ToneLabel } from './ToneLabel'
 
 function isToneStrictSolo(tones: ToneConfig[], noteId: NoteId): boolean {
@@ -75,30 +76,28 @@ export function ToneMixer({
             <div className="grid grid-cols-[1fr_auto] items-center gap-2 text-sm">
               <span className="text-white/60">Gain</span>
               <span className="tabular-nums text-white/70">{tone.gainDb.toFixed(1)} dB</span>
-              <input
-                type="range"
+              <ResettableRangeInput
                 min={-40}
                 max={0}
                 step={0.1}
                 value={tone.gainDb}
                 onChange={(event) => onToneGain(tone.noteId, Number(event.target.value))}
-                onDoubleClick={() => onToneGain(tone.noteId, defaultToneGainDb(tone.noteId))}
-                aria-label={`${getTonePageLabel(tone.noteId)} gain. Double-click to reset to default.`}
+                onReset={() => onToneGain(tone.noteId, defaultToneGainDb(tone.noteId))}
+                aria-label={`${getTonePageLabel(tone.noteId)} gain. Double-click or double-tap to reset to default.`}
                 className={`col-span-2 h-2 w-full ${strictSolo ? 'accent-amber-300' : 'accent-fuchsia-300'}`}
               />
             </div>
             <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-2 text-sm">
               <span className="text-white/60">Pan</span>
               <span className="tabular-nums text-white/70">{tone.pan.toFixed(2)}</span>
-              <input
-                type="range"
+              <ResettableRangeInput
                 min={-1}
                 max={1}
                 step={0.01}
                 value={tone.pan}
                 onChange={(event) => onTonePan(tone.noteId, Number(event.target.value))}
-                onDoubleClick={() => onTonePan(tone.noteId, DEFAULT_TONE_PAN)}
-                aria-label={`${getTonePageLabel(tone.noteId)} pan. Double-click to reset to default.`}
+                onReset={() => onTonePan(tone.noteId, DEFAULT_TONE_PAN)}
+                aria-label={`${getTonePageLabel(tone.noteId)} pan. Double-click or double-tap to reset to default.`}
                 className={`col-span-2 h-2 w-full ${strictSolo ? 'accent-amber-300' : 'accent-fuchsia-300'}`}
               />
             </div>
