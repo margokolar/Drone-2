@@ -1,6 +1,25 @@
 import type { PartialConfig, ToneConfig, TimbreBlend } from '../audio/types'
+import type { NoteId } from '../music/notes'
 import type { TonalCenter } from '../music/notes'
 import type { TuningSystemId } from '../music/tuning'
+
+export const DEFAULT_MASTER_GAIN_DB = -10
+export const DEFAULT_METRONOME_BPM = 72
+export const DEFAULT_METRONOME_VOLUME_DB = -15
+export const DEFAULT_TONE_PAN = 0
+export const DEFAULT_TIMBRE_BLEND: TimbreBlend = {
+  sine: 0.55,
+  saw: 0.35,
+  square: 0.1,
+}
+
+export function defaultPartialRatio(harmonicIndex: number): number {
+  return harmonicIndex
+}
+
+export function defaultPartialGainDb(harmonicIndex: number): number {
+  return -8 - harmonicIndex * 2
+}
 
 export type Preset = {
   id: string
@@ -17,11 +36,10 @@ export type Preset = {
 export function createDefaultPartials(): PartialConfig[] {
   const partials: PartialConfig[] = []
   for (let harmonic = 1; harmonic <= 16; harmonic += 1) {
-    const gainDb = -8 - harmonic * 2
     partials.push({
       id: `p${harmonic}`,
-      ratio: harmonic,
-      gainDb,
+      ratio: defaultPartialRatio(harmonic),
+      gainDb: defaultPartialGainDb(harmonic),
       enabled: harmonic <= 10,
     })
   }
@@ -45,9 +63,14 @@ const TONES_TEMPLATE: ToneConfig[] = [
   { noteId: 'g1', enabled: false, gainDb: -18, pan: 0 },
   { noteId: 'a1', enabled: false, gainDb: -18, pan: 0 },
   { noteId: 'h1', enabled: false, gainDb: -18, pan: 0 },
-  { noteId: 'g0', enabled: false, gainDb: -18, pan: 0 },
-  { noteId: 'a0', enabled: false, gainDb: -18, pan: 0 },
+  { noteId: 'g0', enabled: false, gainDb: -12, pan: 0 },
+  { noteId: 'a0', enabled: false, gainDb: -12, pan: 0 },
 ]
+
+export function defaultToneGainDb(noteId: NoteId): number {
+  const tone = TONES_TEMPLATE.find((item) => item.noteId === noteId)
+  return tone?.gainDb ?? -12
+}
 
 function withEnabledTones(noteIds: string[]): ToneConfig[] {
   return TONES_TEMPLATE.map((tone) => ({
@@ -61,11 +84,7 @@ function clonePartials(): PartialConfig[] {
   return createDefaultPartials().map((partial) => ({ ...partial }))
 }
 
-const BASE_TIMBRE: TimbreBlend = {
-  sine: 0.55,
-  saw: 0.35,
-  square: 0.1,
-}
+const BASE_TIMBRE: TimbreBlend = { ...DEFAULT_TIMBRE_BLEND }
 
 function makePreset(
   id: string,
@@ -79,7 +98,7 @@ function makePreset(
     tuningSystemId: 'just',
     tonalCenter: center,
     baseOctave: 3,
-    masterGainDb: -10,
+    masterGainDb: DEFAULT_MASTER_GAIN_DB,
     tones: withEnabledTones(toneIds),
     partials: clonePartials(),
     timbreBlend: { ...BASE_TIMBRE },

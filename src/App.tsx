@@ -49,7 +49,7 @@ import { useMetronome } from './hooks/useMetronome'
 import { useOvertoneMidi } from './hooks/useOvertoneMidi'
 import { getTonePageLabel, NOTE_IDS, type NoteId } from './music/notes'
 import { getFrequency } from './music/tuning'
-import { createDefaultPartials, type Preset } from './presets/defaultPresets'
+import { createDefaultPartials, DEFAULT_MASTER_GAIN_DB, type Preset } from './presets/defaultPresets'
 import { useDroneStore } from './store/useDroneStore'
 
 type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi' | 'blank'
@@ -135,7 +135,6 @@ function App() {
   const sideMenuRef = useRef<HTMLElement | null>(null)
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
-  const overtonesPanelRef = useRef<HTMLDivElement | null>(null)
   const overtoneSelectionPinnedRef = useRef(false)
   const previousTabRef = useRef<TabId>('tone')
   const overtoneUndoRef = useRef<Map<NoteId, OvertoneSnapshot[]>>(new Map())
@@ -1281,15 +1280,6 @@ function App() {
       return
     }
     resetTabScroll()
-    if (activeTab === 'overtones') {
-      overtonesPanelRef.current?.scrollIntoView({ block: 'start', inline: 'nearest' })
-    }
-    requestAnimationFrame(() => {
-      resetTabScroll()
-      if (activeTab === 'overtones') {
-        overtonesPanelRef.current?.scrollIntoView({ block: 'start', inline: 'nearest' })
-      }
-    })
   }, [activeTab, resetTabScroll])
 
   useEffect(() => {
@@ -1297,10 +1287,7 @@ function App() {
       return
     }
     const onOrientationChange = () => {
-      requestAnimationFrame(() => {
-        resetTabScroll()
-        overtonesPanelRef.current?.scrollIntoView({ block: 'start', inline: 'nearest' })
-      })
+      resetTabScroll()
     }
     window.addEventListener('orientationchange', onOrientationChange)
     return () => window.removeEventListener('orientationchange', onOrientationChange)
@@ -1489,6 +1476,8 @@ function App() {
                     step={0.1}
                     value={masterGainDb}
                     onChange={(event) => setMasterGainDb(Number(event.target.value))}
+                    onDoubleClick={() => setMasterGainDb(DEFAULT_MASTER_GAIN_DB)}
+                    aria-label="Master gain. Double-click to reset to default."
                     className="h-1.5 w-full accent-fuchsia-300"
                   />
                 </div>
@@ -1510,7 +1499,6 @@ function App() {
             </SectionCard>
           </div>
           <div
-            ref={overtonesPanelRef}
             className="space-y-4 portrait:pt-16 landscape:space-y-2 landscape:pt-0 max-h-[500px]:space-y-2 max-h-[500px]:pt-0"
             role="tabpanel"
             id="panel-overtones"
@@ -1694,7 +1682,7 @@ function App() {
             aria-labelledby="tab-metronome"
             hidden={activeTab !== 'metronome'}
           >
-            <SectionCard title="Click" className="px-3 pb-3 pt-1.5 [&>header]:mb-0">
+            <SectionCard title="Click" className="[&>header]:mb-0">
               <MetronomeControls
                 enabled={metronomeEnabled}
                 bpm={metronomeBpm}

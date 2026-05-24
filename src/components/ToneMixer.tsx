@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { AudioWaveform } from 'lucide-react'
 import type { ToneConfig } from '../audio/types'
 import { getTonePageLabel, type NoteId } from '../music/notes'
+import { DEFAULT_TONE_PAN, defaultToneGainDb } from '../presets/defaultPresets'
 import { ToneLabel } from './ToneLabel'
 
 function isToneStrictSolo(tones: ToneConfig[], noteId: NoteId): boolean {
@@ -81,6 +82,8 @@ export function ToneMixer({
                 step={0.1}
                 value={tone.gainDb}
                 onChange={(event) => onToneGain(tone.noteId, Number(event.target.value))}
+                onDoubleClick={() => onToneGain(tone.noteId, defaultToneGainDb(tone.noteId))}
+                aria-label={`${getTonePageLabel(tone.noteId)} gain. Double-click to reset to default.`}
                 className={`col-span-2 h-2 w-full ${strictSolo ? 'accent-amber-300' : 'accent-fuchsia-300'}`}
               />
             </div>
@@ -94,6 +97,8 @@ export function ToneMixer({
                 step={0.01}
                 value={tone.pan}
                 onChange={(event) => onTonePan(tone.noteId, Number(event.target.value))}
+                onDoubleClick={() => onTonePan(tone.noteId, DEFAULT_TONE_PAN)}
+                aria-label={`${getTonePageLabel(tone.noteId)} pan. Double-click to reset to default.`}
                 className={`col-span-2 h-2 w-full ${strictSolo ? 'accent-amber-300' : 'accent-fuchsia-300'}`}
               />
             </div>

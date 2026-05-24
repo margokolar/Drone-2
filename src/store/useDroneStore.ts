@@ -226,7 +226,7 @@ function migrateTones(tones: ToneConfig[], fallbackPartials: PartialConfig[]): T
       {
         noteId,
         enabled: false,
-        gainDb: noteId.endsWith('1') || noteId === 'g0' || noteId === 'a0' ? -18 : -12,
+        gainDb: noteId.endsWith('1') ? -18 : -12,
         pan: 0,
       },
       fallbackPartials,

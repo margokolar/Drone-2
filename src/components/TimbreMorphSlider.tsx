@@ -1,5 +1,6 @@
 import type { ChangeEvent, KeyboardEvent } from 'react'
 import type { TimbreBlend } from '../audio/types'
+import { DEFAULT_TIMBRE_BLEND } from '../presets/defaultPresets'
 
 type TimbreMorphSliderProps = {
   timbreBlend: TimbreBlend
@@ -54,8 +55,11 @@ export function TimbreMorphSlider({
     onSetTimbreValue('square', nextBlend.square)
   }
 
-  const restoreToSine = () => {
-    applyMorph(0.5)
+  const restoreToDefault = () => {
+    onTimbreChangeStart?.()
+    onSetTimbreValue('sine', DEFAULT_TIMBRE_BLEND.sine)
+    onSetTimbreValue('saw', DEFAULT_TIMBRE_BLEND.saw)
+    onSetTimbreValue('square', DEFAULT_TIMBRE_BLEND.square)
     onTimbreChangeEnd?.()
   }
 
@@ -77,8 +81,8 @@ export function TimbreMorphSlider({
     onKeyUp: onTimbreChangeEnd,
     onBlur: onTimbreChangeEnd,
     onChange: (event: ChangeEvent<HTMLInputElement>) => applyMorph(Number(event.target.value)),
-    onDoubleClick: restoreToSine,
-    'aria-label': 'Timbre morph from saw to sine to square. Double-click to reset to sine.',
+    onDoubleClick: restoreToDefault,
+    'aria-label': 'Timbre morph from saw to sine to square. Double-click to reset to default.',
   }
 
   if (orientation === 'vertical') {

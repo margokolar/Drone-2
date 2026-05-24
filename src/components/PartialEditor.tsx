@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { useRef } from 'react'
 import type { PartialConfig } from '../audio/types'
+import { defaultPartialGainDb, defaultPartialRatio } from '../presets/defaultPresets'
 import { NumericValueField } from './NumericValueField'
 import { TimbreMorphSlider } from './TimbreMorphSlider'
 
@@ -182,6 +183,8 @@ export function PartialEditor({
                 step={0.001}
                 value={partial.ratio}
                 onChange={(event) => onSetPartialRatio(partial.id, Number(event.target.value))}
+                onDoubleClick={() => onSetPartialRatio(partial.id, defaultPartialRatio(index + 1))}
+                aria-label={`Partial ${index + 1} ratio. Double-click to reset to default.`}
                 className="col-span-2 h-2 w-full accent-fuchsia-300"
               />
             </div>
@@ -204,6 +207,8 @@ export function PartialEditor({
                 step={0.1}
                 value={partial.gainDb}
                 onChange={(event) => onSetPartialGain(partial.id, Number(event.target.value))}
+                onDoubleClick={() => onSetPartialGain(partial.id, defaultPartialGainDb(index + 1))}
+                aria-label={`Partial ${index + 1} gain. Double-click to reset to default.`}
                 className="col-span-2 h-2 w-full accent-fuchsia-300"
               />
             </div>
