@@ -6,8 +6,6 @@ import { ResettableRangeInput } from './ResettableRangeInput'
 import { NumericValueField } from './NumericValueField'
 import { TimbreMorphSlider } from './TimbreMorphSlider'
 
-const SOLO_LONG_PRESS_MS = 800
-
 type PartialEditorProps = {
   partials: PartialConfig[]
   referenceFrequencyHz: number | null
@@ -40,8 +38,6 @@ export function PartialEditor({
   onTimbreChangeEnd,
 }: PartialEditorProps) {
   const soloRestoreRef = useRef<Map<string, boolean> | null>(null)
-  const soloPressTimerRef = useRef<number | null>(null)
-  const soloPressTriggeredRef = useRef(false)
 
   const setEnabledForAll = (enabledById: Map<string, boolean>) => {
     partials.forEach((partial) => {
@@ -60,11 +56,36 @@ export function PartialEditor({
     return partials.every((partial) => (partial.id === partialId ? partial.enabled : !partial.enabled))
   }
 
-  const clearSoloPressTimer = () => {
-    if (soloPressTimerRef.current !== null) {
-      window.clearTimeout(soloPressTimerRef.current)
-      soloPressTimerRef.current = null
+  const restoreSoloState = (): boolean => {
+    if (!soloRestoreRef.current) {
+      return false
     }
+    setEnabledForAll(soloRestoreRef.current)
+    soloRestoreRef.current = null
+    return true
+  }
+
+  const enterSoloFor = (partialId: string) => {
+    if (!soloRestoreRef.current) {
+      const restoreState = new Map<string, boolean>()
+      partials.forEach((item) => {
+        restoreState.set(item.id, item.enabled)
+      })
+      soloRestoreRef.current = restoreState
+    }
+
+    const soloState = new Map<string, boolean>()
+    partials.forEach((item) => {
+      soloState.set(item.id, item.id === partialId)
+    })
+    setEnabledForAll(soloState)
+  }
+
+  const toggleSoloFor = (partialId: string) => {
+    if (isSoloFor(partialId) && restoreSoloState()) {
+      return
+    }
+    enterSoloFor(partialId)
   }
 
   return (
@@ -88,41 +109,8 @@ export function PartialEditor({
                     ? 'bg-amber-300/20 text-amber-100'
                     : 'text-white/85 hover:bg-white/10'
                 }`}
-                onPointerDown={() => {
-                  soloPressTriggeredRef.current = false
-                  clearSoloPressTimer()
-                  soloPressTimerRef.current = window.setTimeout(() => {
-                    soloPressTriggeredRef.current = true
-                    if (isSoloFor(partial.id) && soloRestoreRef.current) {
-                      setEnabledForAll(soloRestoreRef.current)
-                      soloRestoreRef.current = null
-                      return
-                    }
-                    const restoreState = new Map<string, boolean>()
-                    partials.forEach((item) => {
-                      restoreState.set(item.id, item.enabled)
-                    })
-                    soloRestoreRef.current = restoreState
-                    const soloState = new Map<string, boolean>()
-                    partials.forEach((item) => {
-                      soloState.set(item.id, item.id === partial.id)
-                    })
-                    setEnabledForAll(soloState)
-                  }, SOLO_LONG_PRESS_MS)
-                }}
-                onPointerUp={clearSoloPressTimer}
-                onPointerLeave={clearSoloPressTimer}
-                onPointerCancel={clearSoloPressTimer}
-                onClick={() => {
-                  if (soloPressTriggeredRef.current) {
-                    soloPressTriggeredRef.current = false
-                    return
-                  }
-                  if (soloRestoreRef.current) {
-                    setEnabledForAll(soloRestoreRef.current)
-                    soloRestoreRef.current = null
-                  }
-                }}
+                onClick={() => toggleSoloFor(partial.id)}
+                aria-label={`Lülita partial ${index + 1} solo`}
               >
                 Partial {index + 1}
               </button>
