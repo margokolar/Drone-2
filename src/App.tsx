@@ -1338,7 +1338,7 @@ function App() {
           activeTab === 'overtones' ? 'landscape:pt-0 max-h-[500px]:pt-0' : ''
         }`}
       >
-        <header className="fixed left-3 right-3 top-2 z-40 mx-auto flex max-w-md items-center gap-3 rounded-xl border border-white/10 bg-[#111019]/90 px-3 py-2 backdrop-blur-sm landscape:hidden max-h-[500px]:hidden md:max-w-5xl">
+        <header className="fixed left-3 right-3 top-2 z-40 mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019]/90 px-3 py-2 backdrop-blur-sm landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem]">
           {activeTab !== 'blank' && (
             <button
               type="button"
@@ -1384,7 +1384,7 @@ function App() {
           }`}
         >
           <div className="space-y-3 pt-40 landscape:pt-24 max-h-[500px]:pt-24" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
-            <div className="fixed left-3 right-3 top-[76px] z-20 mx-auto grid max-w-md grid-cols-2 gap-3 bg-[#111019] landscape:top-3 max-h-[500px]:top-3 md:max-w-5xl">
+            <div className="fixed left-3 right-3 top-[76px] z-20 mx-auto grid max-w-[26.5rem] grid-cols-2 gap-3 landscape:top-3 max-h-[500px]:top-3 md:max-w-[62.5rem]">
               <article className="relative min-w-0 overflow-hidden rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
                 <button
                   type="button"
@@ -1747,8 +1747,8 @@ function App() {
           <div className="space-y-4" role="tabpanel" id="panel-blank" aria-labelledby="tab-blank" hidden={activeTab !== 'blank'} />
         </main>
       </div>
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#111019] px-3 pb-2">
-        <div className="mx-auto w-full max-w-md space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl">
+      <div className="fixed bottom-0 left-0 right-0 z-30 px-3 pb-2">
+        <div className="mx-auto w-full max-w-[26.5rem] space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-[62.5rem]">
           <nav
             className="overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm"
             aria-label="App sections"
