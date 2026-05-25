@@ -2,6 +2,7 @@ import { useRef, type InputHTMLAttributes } from 'react'
 
 type ResettableRangeInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & {
   onReset: () => void
+  onTripleReset?: () => void
 }
 
 const DOUBLE_TAP_MS = 350
@@ -9,22 +10,42 @@ const DRAG_THRESHOLD_PX = 8
 
 export function ResettableRangeInput({
   onReset,
+  onTripleReset,
+  onClick,
   onPointerDown,
   onPointerUp,
+  onPointerCancel,
   onDoubleClick,
   ...props
 }: ResettableRangeInputProps) {
   const lastTapMsRef = useRef(0)
+  const tapCountRef = useRef(0)
   const pointerDownRef = useRef<{ x: number; y: number } | null>(null)
+
+  const clearTapState = () => {
+    lastTapMsRef.current = 0
+    tapCountRef.current = 0
+  }
 
   const tryResetFromTap = () => {
     const now = Date.now()
-    if (now - lastTapMsRef.current <= DOUBLE_TAP_MS) {
-      lastTapMsRef.current = 0
-      onReset()
+    const tapCount = now - lastTapMsRef.current <= DOUBLE_TAP_MS ? tapCountRef.current + 1 : 1
+
+    lastTapMsRef.current = now
+    tapCountRef.current = tapCount
+
+    if (onTripleReset && tapCount >= 3) {
+      clearTapState()
+      onTripleReset()
       return
     }
-    lastTapMsRef.current = now
+
+    if (tapCount === 2) {
+      if (!onTripleReset) {
+        clearTapState()
+      }
+      onReset()
+    }
   }
 
   return (
@@ -38,7 +59,7 @@ export function ResettableRangeInput({
       onPointerUp={(event) => {
         const origin = pointerDownRef.current
         pointerDownRef.current = null
-        if (origin) {
+        if (origin && event.pointerType !== 'mouse') {
           const moved = Math.hypot(event.clientX - origin.x, event.clientY - origin.y)
           if (moved <= DRAG_THRESHOLD_PX) {
             tryResetFromTap()
@@ -48,11 +69,18 @@ export function ResettableRangeInput({
       }}
       onPointerCancel={(event) => {
         pointerDownRef.current = null
-        props.onPointerCancel?.(event)
+        onPointerCancel?.(event)
+      }}
+      onClick={(event) => {
+        if (onTripleReset && event.detail >= 3) {
+          event.preventDefault()
+          onTripleReset()
+        }
+        onClick?.(event)
       }}
       onDoubleClick={(event) => {
         event.preventDefault()
-        lastTapMsRef.current = 0
+        clearTapState()
         onReset()
         onDoubleClick?.(event)
       }}

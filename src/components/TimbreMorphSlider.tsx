@@ -64,6 +64,14 @@ export function TimbreMorphSlider({
     onTimbreChangeEnd?.()
   }
 
+  const restoreToSineOnly = () => {
+    onTimbreChangeStart?.()
+    onSetTimbreValue('sine', 1)
+    onSetTimbreValue('saw', 0)
+    onSetTimbreValue('square', 0)
+    onTimbreChangeEnd?.()
+  }
+
   const handleTimbreKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
       onTimbreChangeStart?.()
@@ -83,7 +91,9 @@ export function TimbreMorphSlider({
     onBlur: onTimbreChangeEnd,
     onChange: (event: ChangeEvent<HTMLInputElement>) => applyMorph(Number(event.target.value)),
     onReset: restoreToDefault,
-    'aria-label': 'Timbre morph from saw to sine to square. Double-click or double-tap to reset to default.',
+    onTripleReset: restoreToSineOnly,
+    'aria-label':
+      'Timbre morph from saw to sine to square. Double-click or double-tap to reset to default. Triple-click or triple-tap for sine only.',
   }
 
   if (orientation === 'vertical') {
