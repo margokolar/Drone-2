@@ -177,6 +177,7 @@ function App() {
   const toggleToneEnabled = useDroneStore((state) => state.toggleToneEnabled)
   const setToneGain = useDroneStore((state) => state.setToneGain)
   const setTonePan = useDroneStore((state) => state.setTonePan)
+  const setToneDetune = useDroneStore((state) => state.setToneDetune)
   const setTonePartials = useDroneStore((state) => state.setTonePartials)
   const setTonePartialEnabled = useDroneStore((state) => state.setTonePartialEnabled)
   const setTonePartialRatio = useDroneStore((state) => state.setTonePartialRatio)
@@ -1491,6 +1492,7 @@ function App() {
                 allTones={tones}
                 onToneGain={setToneGain}
                 onTonePan={setTonePan}
+                onToneDetune={setToneDetune}
                 onToggleToneSolo={toggleToneSoloForNote}
                 onEditOvertones={(noteId) => {
                   overtoneSelectionPinnedRef.current = true

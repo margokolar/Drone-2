@@ -326,6 +326,7 @@ export class DroneEngine {
         const gainNode = this.context.createGain()
         oscillator.type = waveGain.type
         oscillator.frequency.value = toneFrequency * ratio
+        oscillator.detune.value = toneConfig.detuneCents
         gainNode.gain.value = 0.0001
         oscillator.connect(gainNode)
         gainNode.connect(outputGain)
@@ -386,6 +387,13 @@ export class DroneEngine {
     voice.panner.pan.cancelScheduledValues(now)
     voice.panner.pan.setValueAtTime(voice.panner.pan.value, now)
     voice.panner.pan.linearRampToValueAtTime(toneConfig.pan, now + PARAM_SMOOTH_SECONDS)
+
+    const detuneTarget = toneConfig.detuneCents
+    for (const bundle of voice.oscillators) {
+      bundle.oscillator.detune.cancelScheduledValues(now)
+      bundle.oscillator.detune.setValueAtTime(bundle.oscillator.detune.value, now)
+      bundle.oscillator.detune.linearRampToValueAtTime(detuneTarget, now + PARAM_SMOOTH_SECONDS)
+    }
 
     const blend = normalizedBlend(config.timbreBlend)
     const activePartials = (toneConfig.partials ?? config.partials).filter((partial) => partial.enabled)

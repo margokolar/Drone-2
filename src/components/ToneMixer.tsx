@@ -1,8 +1,15 @@
 import clsx from 'clsx'
-import { AudioWaveform } from 'lucide-react'
+import { AudioWaveform, ChevronDown } from 'lucide-react'
+import { useState } from 'react'
 import type { ToneConfig } from '../audio/types'
 import { getTonePageLabel, type NoteId } from '../music/notes'
-import { DEFAULT_TONE_PAN, defaultToneGainDb } from '../presets/defaultPresets'
+import {
+  DEFAULT_TONE_DETUNE_CENTS,
+  DEFAULT_TONE_PAN,
+  MAX_TONE_DETUNE_CENTS,
+  MIN_TONE_DETUNE_CENTS,
+  defaultToneGainDb,
+} from '../presets/defaultPresets'
 import { ResettableRangeInput } from './ResettableRangeInput'
 import { ToneLabel } from './ToneLabel'
 
@@ -19,6 +26,7 @@ type ToneMixerProps = {
   allTones: ToneConfig[]
   onToneGain: (noteId: NoteId, gainDb: number) => void
   onTonePan: (noteId: NoteId, pan: number) => void
+  onToneDetune: (noteId: NoteId, detuneCents: number) => void
   onToggleToneSolo: (noteId: NoteId) => void
   onEditOvertones: (noteId: NoteId) => void
 }
@@ -28,13 +36,27 @@ export function ToneMixer({
   allTones,
   onToneGain,
   onTonePan,
+  onToneDetune,
   onToggleToneSolo,
   onEditOvertones,
 }: ToneMixerProps) {
+  const [spatialExpandedByNote, setSpatialExpandedByNote] = useState<Partial<Record<NoteId, boolean>>>({})
+
+  const isSpatialExpanded = (noteId: NoteId): boolean => spatialExpandedByNote[noteId] ?? true
+
+  const toggleSpatialExpanded = (noteId: NoteId) => {
+    setSpatialExpandedByNote((current) => ({
+      ...current,
+      [noteId]: !isSpatialExpanded(noteId),
+    }))
+  }
+
   return (
     <div className="space-y-3">
       {tones.map((tone) => {
         const strictSolo = isToneStrictSolo(allTones, tone.noteId)
+        const spatialExpanded = isSpatialExpanded(tone.noteId)
+        const detuneLabel = `${tone.detuneCents > 0 ? '+' : ''}${tone.detuneCents.toFixed(1)} c`
         return (
           <article
             key={tone.noteId}
@@ -63,15 +85,37 @@ export function ToneMixer({
                   <ToneLabel noteId={tone.noteId} />
                 </button>
               </div>
-              <button
-                type="button"
-                className="button-safe flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs font-semibold text-white/80 transition hover:bg-white/10"
-                onClick={() => onEditOvertones(tone.noteId)}
-                aria-label={`Edit ${getTonePageLabel(tone.noteId)} overtones`}
-              >
-                <AudioWaveform size={14} />
-                OT
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  className={clsx(
+                    'button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition',
+                    spatialExpanded
+                      ? 'border-white/20 bg-white/10 text-white/85 hover:bg-white/15'
+                      : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10',
+                  )}
+                  onClick={() => toggleSpatialExpanded(tone.noteId)}
+                  aria-expanded={spatialExpanded}
+                  aria-controls={`tone-spatial-${tone.noteId}`}
+                  aria-label={`${spatialExpanded ? 'Peida' : 'Näita'} detune ja pan: ${getTonePageLabel(tone.noteId)}`}
+                  title="Detune & Pan"
+                >
+                  <ChevronDown
+                    size={16}
+                    className={clsx('transition-transform', spatialExpanded && 'rotate-180')}
+                    aria-hidden
+                  />
+                </button>
+                <button
+                  type="button"
+                  className="button-safe flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs font-semibold text-white/80 transition hover:bg-white/10"
+                  onClick={() => onEditOvertones(tone.noteId)}
+                  aria-label={`Edit ${getTonePageLabel(tone.noteId)} overtones`}
+                >
+                  <AudioWaveform size={14} />
+                  OT
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-[1fr_auto] items-center gap-2 text-sm">
               <span className="text-white/60">Gain</span>
@@ -87,26 +131,44 @@ export function ToneMixer({
                 className={`col-span-2 h-2 w-full ${strictSolo ? 'accent-amber-300' : 'accent-fuchsia-300'}`}
               />
             </div>
-            <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-2 text-sm">
-              <span className="text-white/60">Pan</span>
-              <span className="tabular-nums text-white/70">{tone.pan.toFixed(2)}</span>
-              <ResettableRangeInput
-                min={-1}
-                max={1}
-                step={0.01}
-                value={tone.pan}
-                onChange={(event) => onTonePan(tone.noteId, Number(event.target.value))}
-                onReset={() => onTonePan(tone.noteId, DEFAULT_TONE_PAN)}
-                aria-label={`${getTonePageLabel(tone.noteId)} pan. Double-click or double-tap to reset to default.`}
-                className={`col-span-2 h-2 w-full ${strictSolo ? 'accent-amber-300' : 'accent-fuchsia-300'}`}
-              />
-            </div>
+            {spatialExpanded ? (
+              <div id={`tone-spatial-${tone.noteId}`} className="mt-3 space-y-3">
+                <div className="grid grid-cols-[1fr_auto] items-center gap-2 text-sm">
+                  <span className="text-white/60">Detune</span>
+                  <span className="tabular-nums text-white/70">{detuneLabel}</span>
+                  <ResettableRangeInput
+                    min={MIN_TONE_DETUNE_CENTS}
+                    max={MAX_TONE_DETUNE_CENTS}
+                    step={0.1}
+                    value={tone.detuneCents}
+                    onChange={(event) => onToneDetune(tone.noteId, Number(event.target.value))}
+                    onReset={() => onToneDetune(tone.noteId, DEFAULT_TONE_DETUNE_CENTS)}
+                    aria-label={`${getTonePageLabel(tone.noteId)} detune. Double-click or double-tap to reset to default.`}
+                    className={`col-span-2 h-2 w-full ${strictSolo ? 'accent-amber-300' : 'accent-fuchsia-300'}`}
+                  />
+                </div>
+                <div className="grid grid-cols-[1fr_auto] items-center gap-2 text-sm">
+                  <span className="text-white/60">Pan</span>
+                  <span className="tabular-nums text-white/70">{tone.pan.toFixed(2)}</span>
+                  <ResettableRangeInput
+                    min={-1}
+                    max={1}
+                    step={0.01}
+                    value={tone.pan}
+                    onChange={(event) => onTonePan(tone.noteId, Number(event.target.value))}
+                    onReset={() => onTonePan(tone.noteId, DEFAULT_TONE_PAN)}
+                    aria-label={`${getTonePageLabel(tone.noteId)} pan. Double-click or double-tap to reset to default.`}
+                    className={`col-span-2 h-2 w-full ${strictSolo ? 'accent-amber-300' : 'accent-fuchsia-300'}`}
+                  />
+                </div>
+              </div>
+            ) : null}
           </article>
         )
       })}
       {tones.length === 0 && (
         <div className="rounded-xl border border-dashed border-white/15 p-3 text-sm text-white/60">
-          Enable tones from the note grid to edit individual gain and pan.
+          Enable tones from the note grid to edit individual gain, detune, and pan.
         </div>
       )}
     </div>

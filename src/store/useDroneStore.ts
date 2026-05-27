@@ -8,7 +8,14 @@ import {
   TUNING_SYSTEMS,
   type TuningSystemId,
 } from '../music/tuning'
-import { createDefaultPartials, DEFAULT_PRESETS, type Preset } from '../presets/defaultPresets'
+import {
+  createDefaultPartials,
+  DEFAULT_PRESETS,
+  DEFAULT_TONE_DETUNE_CENTS,
+  MAX_TONE_DETUNE_CENTS,
+  MIN_TONE_DETUNE_CENTS,
+  type Preset,
+} from '../presets/defaultPresets'
 
 type SongEntry = {
   id: string
@@ -64,6 +71,7 @@ type DroneState = {
   setToneEnabled: (noteId: NoteId, enabled: boolean) => void
   setToneGain: (noteId: NoteId, gainDb: number) => void
   setTonePan: (noteId: NoteId, pan: number) => void
+  setToneDetune: (noteId: NoteId, detuneCents: number) => void
   setPartialGain: (partialId: string, gainDb: number) => void
   setPartialRatio: (partialId: string, ratio: number) => void
   setPartialEnabled: (partialId: string, enabled: boolean) => void
@@ -181,6 +189,7 @@ function normalizePartials(partials: PartialConfig[]): PartialConfig[] {
 function normalizeTonePartials(tone: ToneConfig, fallbackPartials: PartialConfig[]): ToneConfig {
   return {
     ...tone,
+    detuneCents: clamp(tone.detuneCents ?? DEFAULT_TONE_DETUNE_CENTS, MIN_TONE_DETUNE_CENTS, MAX_TONE_DETUNE_CENTS),
     partials: normalizePartials((tone.partials ?? fallbackPartials).map((partial) => ({ ...partial }))),
   }
 }
@@ -214,6 +223,7 @@ function migrateTones(tones: ToneConfig[], fallbackPartials: PartialConfig[]): T
       enabled: existing?.enabled === true || tone.enabled,
       gainDb: existing?.gainDb ?? tone.gainDb,
       pan: existing?.pan ?? tone.pan,
+      detuneCents: existing?.detuneCents ?? tone.detuneCents ?? DEFAULT_TONE_DETUNE_CENTS,
     })
   }
 
@@ -228,6 +238,7 @@ function migrateTones(tones: ToneConfig[], fallbackPartials: PartialConfig[]): T
         enabled: false,
         gainDb: noteId.endsWith('1') ? -18 : -12,
         pan: 0,
+        detuneCents: DEFAULT_TONE_DETUNE_CENTS,
       },
       fallbackPartials,
     )
@@ -445,6 +456,18 @@ export const useDroneStore = create<DroneState>()(
             return {
               ...tone,
               pan: clamp(pan, -1, 1),
+            }
+          }),
+        })),
+      setToneDetune: (noteId, detuneCents) =>
+        set((state) => ({
+          tones: state.tones.map((tone) => {
+            if (tone.noteId !== noteId) {
+              return tone
+            }
+            return {
+              ...tone,
+              detuneCents: clamp(detuneCents, MIN_TONE_DETUNE_CENTS, MAX_TONE_DETUNE_CENTS),
             }
           }),
         })),
@@ -981,7 +1004,7 @@ export const useDroneStore = create<DroneState>()(
     }),
     {
       name: 'bourdon-store-v1',
-      version: 6,
+      version: 7,
       migrate: (persistedState) => {
         const typed = persistedState as Partial<DroneState> | undefined
         if (!typed) {
