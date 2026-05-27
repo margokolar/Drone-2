@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { AudioWaveform, ChevronDown } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { ToneConfig } from '../audio/types'
 import { getTonePageLabel, type NoteId } from '../music/notes'
 import {
@@ -12,6 +12,8 @@ import {
 } from '../presets/defaultPresets'
 import { ResettableRangeInput } from './ResettableRangeInput'
 import { ToneLabel } from './ToneLabel'
+
+const SPATIAL_LONG_PRESS_MS = 800
 
 function isToneStrictSolo(tones: ToneConfig[], noteId: NoteId): boolean {
   const selected = tones.find((tone) => tone.noteId === noteId)
@@ -41,8 +43,31 @@ export function ToneMixer({
   onEditOvertones,
 }: ToneMixerProps) {
   const [spatialExpandedByNote, setSpatialExpandedByNote] = useState<Partial<Record<NoteId, boolean>>>({})
+  const spatialLongPressTimerRef = useRef<number | null>(null)
+  const spatialLongPressTriggeredRef = useRef(false)
 
   const isSpatialExpanded = (noteId: NoteId): boolean => spatialExpandedByNote[noteId] ?? true
+
+  const clearSpatialLongPressTimer = () => {
+    if (spatialLongPressTimerRef.current !== null) {
+      window.clearTimeout(spatialLongPressTimerRef.current)
+      spatialLongPressTimerRef.current = null
+    }
+  }
+
+  const toggleAllSpatialOnLongPress = () => {
+    if (tones.length === 0) {
+      return
+    }
+    setSpatialExpandedByNote((current) => {
+      const allExpanded = tones.every((tone) => current[tone.noteId] ?? true)
+      const next = { ...current }
+      for (const tone of tones) {
+        next[tone.noteId] = !allExpanded
+      }
+      return next
+    })
+  }
 
   const toggleSpatialExpanded = (noteId: NoteId) => {
     setSpatialExpandedByNote((current) => ({
@@ -94,11 +119,28 @@ export function ToneMixer({
                       ? 'border-white/20 bg-white/10 text-white/85 hover:bg-white/15'
                       : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10',
                   )}
-                  onClick={() => toggleSpatialExpanded(tone.noteId)}
+                  onPointerDown={() => {
+                    spatialLongPressTriggeredRef.current = false
+                    clearSpatialLongPressTimer()
+                    spatialLongPressTimerRef.current = window.setTimeout(() => {
+                      spatialLongPressTriggeredRef.current = true
+                      toggleAllSpatialOnLongPress()
+                    }, SPATIAL_LONG_PRESS_MS)
+                  }}
+                  onPointerUp={clearSpatialLongPressTimer}
+                  onPointerLeave={clearSpatialLongPressTimer}
+                  onPointerCancel={clearSpatialLongPressTimer}
+                  onClick={() => {
+                    if (spatialLongPressTriggeredRef.current) {
+                      spatialLongPressTriggeredRef.current = false
+                      return
+                    }
+                    toggleSpatialExpanded(tone.noteId)
+                  }}
                   aria-expanded={spatialExpanded}
                   aria-controls={`tone-spatial-${tone.noteId}`}
-                  aria-label={`${spatialExpanded ? 'Peida' : 'Näita'} detune ja pan: ${getTonePageLabel(tone.noteId)}`}
-                  title="Detune & Pan"
+                  aria-label={`${spatialExpanded ? 'Peida' : 'Näita'} detune ja pan: ${getTonePageLabel(tone.noteId)}. Pikalt vajuta, et avada või sulgeda kõigi toonide detune ja pan.`}
+                  title="Detune & Pan. Long-press to expand or collapse all tones."
                 >
                   <ChevronDown
                     size={16}
