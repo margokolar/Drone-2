@@ -669,6 +669,10 @@ function App() {
     })
   }, [])
 
+  const saveOvertoneToActivePreset = useCallback(() => {
+    saveActivePreset()
+  }, [saveActivePreset])
+
   const resetOvertoneBalance = useCallback(() => {
     const current = selectedOvertonePartials
     const resetTarget = buildResetOvertoneBalance(current)
@@ -714,7 +718,7 @@ function App() {
       if (!pendingOvertoneAnalysis) {
         return
       }
-      const { fileName, analysis } = pendingOvertoneAnalysis
+      const { analysis } = pendingOvertoneAnalysis
       const integerRatios =
         mode === 'gain-integer-ratios'
           ? integerizeAnalysisRatios(analysis.ratios, selectedOvertonePartials.length)
@@ -734,12 +738,10 @@ function App() {
         }
       })
       setSelectedOvertonePartials(analyzed)
-      saveAsPreset()
-      const nextActivePresetId = useDroneStore.getState().activePresetId
-      renamePreset(nextActivePresetId, fileName)
+      saveActivePreset()
       setPendingOvertoneAnalysis(null)
     },
-    [pendingOvertoneAnalysis, renamePreset, saveAsPreset, selectedOvertonePartials, setSelectedOvertonePartials],
+    [pendingOvertoneAnalysis, saveActivePreset, selectedOvertonePartials, setSelectedOvertonePartials],
   )
 
   const openJblPortableApp = useCallback(() => {
@@ -1545,8 +1547,8 @@ function App() {
                         <button
                           type="button"
                           className={overtoneIconButtonClass('portrait-solo')}
-                          onClick={saveActivePreset}
-                          aria-label="Save current preset"
+                          onClick={saveOvertoneToActivePreset}
+                          aria-label="Save overtone changes to current preset"
                         >
                           <Save size={16} />
                         </button>
@@ -1774,8 +1776,8 @@ function App() {
                   <button
                     type="button"
                     className={overtoneIconButtonClass('landscape-inline')}
-                    onClick={saveActivePreset}
-                    aria-label="Save current preset"
+                    onClick={saveOvertoneToActivePreset}
+                    aria-label="Save overtone changes to current preset"
                   >
                     <Save size={16} />
                   </button>

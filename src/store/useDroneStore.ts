@@ -234,6 +234,22 @@ function migrateTones(tones: ToneConfig[], fallbackPartials: PartialConfig[]): T
   })
 }
 
+function syncPresetsToCurrentSong(
+  state: Pick<DroneState, 'presets' | 'activePresetId' | 'songName' | 'songLibrary'>,
+): Pick<DroneState, 'songLibrary'> | Record<string, never> {
+  const currentIndex = state.songLibrary.findIndex((entry) => entry.name === state.songName)
+  if (currentIndex < 0) {
+    return {}
+  }
+  const nextLibrary = [...state.songLibrary]
+  nextLibrary[currentIndex] = {
+    ...nextLibrary[currentIndex],
+    presets: state.presets.map((preset) => duplicatePresetData(preset)),
+    activePresetId: state.activePresetId,
+  }
+  return { songLibrary: nextLibrary }
+}
+
 function resolveActivePresetId(presets: Preset[], activePresetId: string | undefined): string {
   if (activePresetId && presets.some((preset) => preset.id === activePresetId)) {
     return activePresetId
@@ -625,8 +641,10 @@ export const useDroneStore = create<DroneState>()(
             return state
           }
           const updatedPreset = snapshotPresetFromState(state, presetId, target.name)
+          const presets = state.presets.map((preset) => (preset.id === presetId ? updatedPreset : preset))
           return {
-            presets: state.presets.map((preset) => (preset.id === presetId ? updatedPreset : preset)),
+            presets,
+            ...syncPresetsToCurrentSong({ ...state, presets }),
           }
         }),
       saveAsPreset: () =>
