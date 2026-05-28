@@ -8,8 +8,8 @@ export const DEFAULT_METRONOME_BPM = 72
 export const DEFAULT_METRONOME_VOLUME_DB = -15
 export const DEFAULT_TONE_PAN = 0
 export const DEFAULT_TONE_DETUNE_CENTS = 0
-export const MIN_TONE_DETUNE_CENTS = -50
-export const MAX_TONE_DETUNE_CENTS = 50
+export const MIN_TONE_DETUNE_CENTS = -100
+export const MAX_TONE_DETUNE_CENTS = 100
 export const DEFAULT_TIMBRE_BLEND: TimbreBlend = {
   sine: 0.55,
   saw: 0.35,
@@ -50,24 +50,38 @@ export function createDefaultPartials(): PartialConfig[] {
 }
 
 const TONES_TEMPLATE: ToneConfig[] = [
+  { noteId: 'g0', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
+  { noteId: 'gis0', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
+  { noteId: 'a0', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
+  { noteId: 'b0', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
+  { noteId: 'h0', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
   { noteId: 'c', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
+  { noteId: 'cis', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
   { noteId: 'd', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
+  { noteId: 'dis', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
   { noteId: 'e', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
   { noteId: 'f', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
   { noteId: 'fis', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
   { noteId: 'g', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
+  { noteId: 'gis', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
   { noteId: 'a', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
+  { noteId: 'b', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
   { noteId: 'h', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
   { noteId: 'c1', enabled: false, gainDb: -18, pan: 0, detuneCents: 0 },
+  { noteId: 'cis1', enabled: false, gainDb: -18, pan: 0, detuneCents: 0 },
   { noteId: 'd1', enabled: false, gainDb: -18, pan: 0, detuneCents: 0 },
+  { noteId: 'dis1', enabled: false, gainDb: -18, pan: 0, detuneCents: 0 },
   { noteId: 'e1', enabled: false, gainDb: -18, pan: 0, detuneCents: 0 },
   { noteId: 'f1', enabled: false, gainDb: -18, pan: 0, detuneCents: 0 },
   { noteId: 'fis1', enabled: false, gainDb: -18, pan: 0, detuneCents: 0 },
   { noteId: 'g1', enabled: false, gainDb: -18, pan: 0, detuneCents: 0 },
+  { noteId: 'gis1', enabled: false, gainDb: -18, pan: 0, detuneCents: 0 },
   { noteId: 'a1', enabled: false, gainDb: -18, pan: 0, detuneCents: 0 },
+  { noteId: 'b1', enabled: false, gainDb: -18, pan: 0, detuneCents: 0 },
   { noteId: 'h1', enabled: false, gainDb: -18, pan: 0, detuneCents: 0 },
-  { noteId: 'g0', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
-  { noteId: 'a0', enabled: false, gainDb: -12, pan: 0, detuneCents: 0 },
+  { noteId: 'c2', enabled: false, gainDb: -20, pan: 0, detuneCents: 0 },
+  { noteId: 'cis2', enabled: false, gainDb: -20, pan: 0, detuneCents: 0 },
+  { noteId: 'd2', enabled: false, gainDb: -20, pan: 0, detuneCents: 0 },
 ]
 
 export function defaultToneGainDb(noteId: NoteId): number {

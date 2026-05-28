@@ -1,6 +1,7 @@
 import {
   AudioWaveform,
   BatteryMedium,
+  ChevronDown,
   ClipboardPaste,
   Copy,
   Download,
@@ -48,7 +49,11 @@ import { TopControls } from './components/TopControls'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useMetronome } from './hooks/useMetronome'
 import { useOvertoneMidi } from './hooks/useOvertoneMidi'
-import { getTonePageLabel, NOTE_IDS, type NoteId } from './music/notes'
+import {
+  getTonePageLabel,
+  NOTE_IDS,
+  type NoteId,
+} from './music/notes'
 import { getFrequency } from './music/tuning'
 import { createDefaultPartials, DEFAULT_MASTER_GAIN_DB, type Preset } from './presets/defaultPresets'
 import { useDroneStore } from './store/useDroneStore'
@@ -68,6 +73,8 @@ const DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS = 800
 const IPHONE_16_PRO_MAX_CSS_W = 440
 const IPHONE_16_PRO_MAX_CSS_H = 956
 const MAX_OVERTONE_HISTORY = 60
+const TONE_SET_STORAGE_KEY = 'drone-tone-set-v1'
+const TONE_SET_COLLECTION_STORAGE_KEY = 'drone-tone-sets-v1'
 const SONG_MENU_TRIGGER_CLASS =
   'flex min-h-[40px] w-full min-w-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-[#252332] px-3 py-2 text-sm text-white/90 transition hover:bg-[#2f2d3c]'
 type OvertoneSnapshot = {
@@ -81,6 +88,219 @@ type PendingOvertoneAnalysis = {
 }
 
 type OvertoneAnalysisApplyMode = 'gain-only' | 'gain-ratios' | 'gain-integer-ratios'
+
+type ToneSetLayout = {
+  name: string
+  subOctaveIds: NoteId[]
+  gridIds: NoteId[]
+  toneLabelOverrides?: Partial<Record<NoteId, string>>
+}
+
+type ToneSetCollection = {
+  customSets: ToneSetLayout[]
+}
+
+function buildDefaultToneSetLayout(): ToneSetLayout {
+  return {
+    name: 'Eesti Torupill',
+    subOctaveIds: ['g0', 'a0'],
+    gridIds: [
+      'c',
+      'd',
+      'e',
+      'f',
+      'fis',
+      'g',
+      'a',
+      'h',
+      'c1',
+      'd1',
+      'e1',
+      'f1',
+      'fis1',
+      'g1',
+      'a1',
+      'h1',
+    ],
+  }
+}
+
+function isUniqueNoteIdList(values: NoteId[]): boolean {
+  return new Set(values).size === values.length
+}
+
+function parseToneIdList(values: unknown): {
+  ids: NoteId[]
+  labelOverrides: Partial<Record<NoteId, string>>
+} {
+  if (!Array.isArray(values)) {
+    return { ids: [], labelOverrides: {} }
+  }
+  const NOTE_ID_ALIAS: Record<string, NoteId> = {
+    'ab0': 'gis0',
+    'a#0': 'b0',
+    'bb0': 'b0',
+    'cb1': 'h0',
+    'b#0': 'c',
+    'db': 'cis',
+    'c#': 'cis',
+    'eb': 'dis',
+    'd#': 'dis',
+    'gb': 'fis',
+    'f#': 'fis',
+    'ab': 'gis',
+    'g#': 'gis',
+    'a#': 'b',
+    'bb': 'b',
+    'cb2': 'h1',
+    'b#1': 'c1',
+    'db1': 'cis1',
+    'c#1': 'cis1',
+    'eb1': 'dis1',
+    'd#1': 'dis1',
+    'gb1': 'fis1',
+    'f#1': 'fis1',
+    'ab1': 'gis1',
+    'g#1': 'gis1',
+    'a#1': 'b1',
+    'bb1': 'b1',
+    'b#2': 'c2',
+    'db2': 'cis2',
+    'c#2': 'cis2',
+  }
+  const normalized: NoteId[] = []
+  const labelOverrides: Partial<Record<NoteId, string>> = {}
+  const formatAccidentalLabel = (token: string): string => {
+    if (token.includes('b')) {
+      return token.replace(/([a-z])b([0-9]?)/g, '$1♭$2')
+    }
+    if (token.includes('#')) {
+      return token.replace(/([a-z])#([0-9]?)/g, '$1♯$2')
+    }
+    return token
+  }
+  for (const value of values) {
+    if (typeof value !== 'string') {
+      continue
+    }
+    const token = value.trim().toLowerCase().replace('♯', '#').replace('♭', 'b')
+    const aliasResolved = NOTE_ID_ALIAS[token]
+    const next = (aliasResolved ?? token) as NoteId
+    if (NOTE_IDS.includes(next)) {
+      normalized.push(next)
+      if (token.includes('b') || token.includes('#')) {
+        labelOverrides[next] = formatAccidentalLabel(token)
+      }
+    }
+  }
+  return { ids: normalized, labelOverrides }
+}
+
+function isValidToneSetLayout(layout: ToneSetLayout): boolean {
+  if (layout.subOctaveIds.length > 8 || layout.gridIds.length < 1 || layout.gridIds.length > NOTE_IDS.length) {
+    return false
+  }
+  const merged = [...layout.subOctaveIds, ...layout.gridIds]
+  if (merged.length < 1 || merged.length > NOTE_IDS.length) {
+    return false
+  }
+  if (!isUniqueNoteIdList(merged) || merged.some((noteId) => !NOTE_IDS.includes(noteId))) {
+    return false
+  }
+  return true
+}
+
+function loadToneSetLayout(): ToneSetLayout {
+  if (typeof window === 'undefined') {
+    return buildDefaultToneSetLayout()
+  }
+  try {
+    const raw = window.localStorage.getItem(TONE_SET_STORAGE_KEY)
+    if (!raw) {
+      return buildDefaultToneSetLayout()
+    }
+    const parsed = JSON.parse(raw) as Partial<ToneSetLayout>
+    const parsedSubOctaves = parseToneIdList(parsed.subOctaveIds)
+    const parsedGrid = parseToneIdList(parsed.gridIds)
+    const parsedOverrides =
+      parsed.toneLabelOverrides && typeof parsed.toneLabelOverrides === 'object'
+        ? (parsed.toneLabelOverrides as Partial<Record<NoteId, string>>)
+        : {}
+    const candidate: ToneSetLayout = {
+      name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : 'Custom',
+      subOctaveIds: parsedSubOctaves.ids,
+      gridIds: parsedGrid.ids,
+      toneLabelOverrides: {
+        ...parsedOverrides,
+        ...parsedSubOctaves.labelOverrides,
+        ...parsedGrid.labelOverrides,
+      },
+    }
+    if (!isValidToneSetLayout(candidate)) {
+      return buildDefaultToneSetLayout()
+    }
+    return candidate
+  } catch {
+    return buildDefaultToneSetLayout()
+  }
+}
+
+function parseToneSetLayout(raw: unknown): ToneSetLayout | null {
+  if (!raw || typeof raw !== 'object') {
+    return null
+  }
+  const parsed = raw as Partial<ToneSetLayout>
+  const parsedSubOctaves = parseToneIdList(parsed.subOctaveIds)
+  const parsedGrid = parseToneIdList(parsed.gridIds)
+  const parsedOverrides =
+    parsed.toneLabelOverrides && typeof parsed.toneLabelOverrides === 'object'
+      ? (parsed.toneLabelOverrides as Partial<Record<NoteId, string>>)
+      : {}
+  const candidate: ToneSetLayout = {
+    name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : 'Custom',
+    subOctaveIds: parsedSubOctaves.ids,
+    gridIds: parsedGrid.ids,
+    toneLabelOverrides: {
+      ...parsedOverrides,
+      ...parsedSubOctaves.labelOverrides,
+      ...parsedGrid.labelOverrides,
+    },
+  }
+  return isValidToneSetLayout(candidate) ? candidate : null
+}
+
+function loadToneSetCollection(): ToneSetCollection {
+  if (typeof window === 'undefined') {
+    return { customSets: [] }
+  }
+  try {
+    const rawCollection = window.localStorage.getItem(TONE_SET_COLLECTION_STORAGE_KEY)
+    if (rawCollection) {
+      const parsed = JSON.parse(rawCollection) as Partial<ToneSetCollection>
+      const customSets = Array.isArray(parsed.customSets)
+        ? parsed.customSets
+            .map((entry) => parseToneSetLayout(entry))
+            .filter((entry): entry is ToneSetLayout => Boolean(entry))
+        : []
+      return { customSets }
+    }
+    const legacyRaw = window.localStorage.getItem(TONE_SET_STORAGE_KEY)
+    if (!legacyRaw) {
+      return { customSets: [] }
+    }
+    const legacyParsed = JSON.parse(legacyRaw) as Partial<ToneSetLayout>
+    const migrated = parseToneSetLayout(legacyParsed)
+    if (!migrated) {
+      return { customSets: [] }
+    }
+    if (migrated.name === buildDefaultToneSetLayout().name) {
+      return { customSets: [] }
+    }
+    return { customSets: [migrated] }
+  } catch {
+    return { customSets: [] }
+  }
+}
 
 function isToneStrictSolo(tones: ToneConfig[], noteId: NoteId): boolean {
   const selected = tones.find((tone) => tone.noteId === noteId)
@@ -122,8 +342,15 @@ function getOvertoneNavigationTones(
 }
 
 function App() {
+  const initialToneSetCollection = useMemo(() => loadToneSetCollection(), [])
+  const initialToneSetLayout = useMemo(() => loadToneSetLayout(), [])
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<TabId>('tone')
+  const [toneSetLayout, setToneSetLayout] = useState<ToneSetLayout>(initialToneSetLayout)
+  const [customToneSets, setCustomToneSets] = useState<ToneSetLayout[]>(initialToneSetCollection.customSets)
+  const [selectedCustomToneSetName, setSelectedCustomToneSetName] = useState<string>(
+    initialToneSetCollection.customSets[0]?.name ?? '',
+  )
   const [selectedOvertoneNoteId, setSelectedOvertoneNoteId] = useState<NoteId>('d')
   const [currentTime, setCurrentTime] = useState(() =>
     new Date().toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit' }),
@@ -150,6 +377,13 @@ function App() {
   const [, setOvertoneHistoryVersion] = useState(0)
   const [pendingOvertoneAnalysis, setPendingOvertoneAnalysis] = useState<PendingOvertoneAnalysis | null>(null)
   const [overtoneAnalysisError, setOvertoneAnalysisError] = useState<string | null>(null)
+  const [toneSetOptionsOpen, setToneSetOptionsOpen] = useState(false)
+  const [toneSetEditorOpen, setToneSetEditorOpen] = useState(false)
+  const [toneSetEditorDraft, setToneSetEditorDraft] = useState('')
+  const [toneSetQuickName, setToneSetQuickName] = useState('')
+  const [toneSetQuickGrid, setToneSetQuickGrid] = useState('')
+  const [toneSetJsonCollapsed, setToneSetJsonCollapsed] = useState(true)
+  const [toneSetEditorError, setToneSetEditorError] = useState<string | null>(null)
   const playing = useDroneStore((state) => state.playing)
   const activePresetId = useDroneStore((state) => state.activePresetId)
   const songName = useDroneStore((state) => state.songName)
@@ -761,7 +995,164 @@ function App() {
     }
     saveCurrentSongToLibrary(trimmedName)
   }, [saveCurrentSongToLibrary, songName])
+  const saveToneSetLayout = useCallback((layout: ToneSetLayout) => {
+    setToneSetLayout(layout)
+    try {
+      window.localStorage.setItem(TONE_SET_STORAGE_KEY, JSON.stringify(layout))
+    } catch {
+      // Ignore storage quota / private mode failures.
+    }
+  }, [])
+  const persistCustomToneSets = useCallback((next: ToneSetLayout[]) => {
+    setCustomToneSets(next)
+    try {
+      window.localStorage.setItem(TONE_SET_COLLECTION_STORAGE_KEY, JSON.stringify({ customSets: next }))
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [])
+  const upsertCustomToneSet = useCallback(
+    (layout: ToneSetLayout) => {
+      const next = [...customToneSets]
+      const existingIndex = next.findIndex((entry) => entry.name === layout.name)
+      if (existingIndex >= 0) {
+        next[existingIndex] = layout
+      } else {
+        next.push(layout)
+      }
+      persistCustomToneSets(next)
+      setSelectedCustomToneSetName(layout.name)
+    },
+    [customToneSets, persistCustomToneSets],
+  )
+  const setDefaultToneSet = useCallback(() => {
+    saveToneSetLayout(buildDefaultToneSetLayout())
+  }, [saveToneSetLayout])
+  const openToneSetOptions = useCallback(() => {
+    setToneSetOptionsOpen(true)
+    setMenuOpen(false)
+  }, [])
+  const loadSavedToneSetFromBrowser = useCallback(
+    (name: string) => {
+      const selected = customToneSets.find((entry) => entry.name === name)
+      if (!selected) {
+        window.alert('No saved custom tone set found in browser memory.')
+        return
+      }
+      saveToneSetLayout(selected)
+    },
+    [customToneSets, saveToneSetLayout],
+  )
+  const deleteSavedToneSetFromBrowser = useCallback(() => {
+    const targetName = selectedCustomToneSetName.trim()
+    if (!targetName) {
+      window.alert('Select a custom tone set to delete.')
+      return
+    }
+    const next = customToneSets.filter((entry) => entry.name !== targetName)
+    persistCustomToneSets(next)
+    setSelectedCustomToneSetName(next[0]?.name ?? '')
+    window.alert('Saved custom tone set deleted from browser memory.')
+    setToneSetOptionsOpen(false)
+  }, [customToneSets, persistCustomToneSets, selectedCustomToneSetName])
+  const loadCustomToneSet = useCallback(() => {
+    setToneSetEditorDraft(JSON.stringify(toneSetLayout, null, 2))
+    setToneSetQuickName(toneSetLayout.name)
+    setToneSetQuickGrid(
+      [...toneSetLayout.subOctaveIds, ...toneSetLayout.gridIds]
+        .map((noteId) => {
+          const override = toneSetLayout.toneLabelOverrides?.[noteId]
+          if (!override) {
+            return noteId
+          }
+          return override.toLowerCase().replaceAll('♭', 'b').replaceAll('♯', '#')
+        })
+        .join(', '),
+    )
+    setToneSetEditorError(null)
+    setToneSetJsonCollapsed(true)
+    setToneSetEditorOpen(true)
+    setToneSetOptionsOpen(false)
+  }, [toneSetLayout])
+  const syncDraftFromQuickEditor = useCallback((nextName: string, nextGrid: string) => {
+    const splitTokens = (raw: string): string[] =>
+      raw
+        .split(/[\s,;\n\r\t]+/)
+        .map((token) => token.trim())
+        .filter((token) => token.length > 0)
+        .map((token) => token.toLowerCase().replace('♭', 'b').replace('♯', '#'))
 
+    const rawTokens = splitTokens(nextGrid)
+    const parsedCombined = parseToneIdList(rawTokens)
+    const nextSubOctaves = rawTokens.filter((token) => /0$/.test(token))
+    const nextGridIds = rawTokens.filter((token) => !/0$/.test(token))
+
+    const next = {
+      name: nextName.trim() || 'Custom',
+      subOctaveIds: nextSubOctaves,
+      gridIds: nextGridIds,
+      toneLabelOverrides: {
+        ...parsedCombined.labelOverrides,
+      },
+    }
+    setToneSetEditorDraft(JSON.stringify(next, null, 2))
+    setToneSetEditorError(null)
+  }, [])
+  const saveAndApplyCustomToneSet = useCallback(() => {
+    try {
+      const parsed = JSON.parse(toneSetEditorDraft) as Partial<ToneSetLayout>
+      const parsedSubOctaves = parseToneIdList(parsed.subOctaveIds)
+      const parsedGrid = parseToneIdList(parsed.gridIds)
+      const candidate: ToneSetLayout = {
+        name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : 'Custom',
+        subOctaveIds: parsedSubOctaves.ids,
+        gridIds: parsedGrid.ids,
+        toneLabelOverrides: {
+          ...parsedSubOctaves.labelOverrides,
+          ...parsedGrid.labelOverrides,
+        },
+      }
+      if (!isValidToneSetLayout(candidate)) {
+        setToneSetEditorError(
+          'Invalid tone set. Use note ids from G0..D2 (also #/b accepted), with unique values only.',
+        )
+        return
+      }
+      upsertCustomToneSet(candidate)
+      saveToneSetLayout(candidate)
+      setToneSetEditorError(null)
+      setToneSetEditorOpen(false)
+      window.alert('Custom tone set saved and applied.')
+    } catch {
+      setToneSetEditorError('Invalid JSON for custom tone set.')
+    }
+  }, [saveToneSetLayout, toneSetEditorDraft, upsertCustomToneSet])
+  const saveCustomToneSetFile = useCallback(() => {
+    try {
+      const parsed = JSON.parse(toneSetEditorDraft) as Partial<ToneSetLayout>
+      const parsedSubOctaves = parseToneIdList(parsed.subOctaveIds)
+      const parsedGrid = parseToneIdList(parsed.gridIds)
+      const candidate: ToneSetLayout = {
+        name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : 'Custom',
+        subOctaveIds: parsedSubOctaves.ids,
+        gridIds: parsedGrid.ids,
+        toneLabelOverrides: {
+          ...parsedSubOctaves.labelOverrides,
+          ...parsedGrid.labelOverrides,
+        },
+      }
+      if (!isValidToneSetLayout(candidate)) {
+        setToneSetEditorError(
+          'Invalid tone set. Use note ids from G0..D2 (also #/b accepted), with unique values only.',
+        )
+        return
+      }
+      downloadJson(candidate, `${makeSafeFileName(candidate.name, 'tone-set')}.tone-set.json`)
+      setToneSetEditorError(null)
+    } catch {
+      setToneSetEditorError('Invalid JSON for custom tone set.')
+    }
+  }, [downloadJson, makeSafeFileName, toneSetEditorDraft])
   const handleTogglePlay = useCallback(() => {
     const currentlyPlaying = useDroneStore.getState().playing
     if (currentlyPlaying) {
@@ -786,7 +1177,22 @@ function App() {
     [setMetronomeEnabled],
   )
 
-  const activeTones = useMemo(() => tones.filter((tone) => tone.enabled), [tones])
+  const toneSetNoteIds = useMemo(
+    () => new Set<NoteId>([...toneSetLayout.subOctaveIds, ...toneSetLayout.gridIds]),
+    [toneSetLayout.gridIds, toneSetLayout.subOctaveIds],
+  )
+  const tonesInToneSet = useMemo(
+    () => tones.filter((tone) => toneSetNoteIds.has(tone.noteId)),
+    [toneSetNoteIds, tones],
+  )
+  const activeTones = useMemo(() => tonesInToneSet.filter((tone) => tone.enabled), [tonesInToneSet])
+  const toneMixerTones = useMemo(() => {
+    const toneById = new Map(tones.map((tone) => [tone.noteId, tone]))
+    const orderedIds = [...toneSetLayout.subOctaveIds, ...toneSetLayout.gridIds]
+    return orderedIds
+      .map((noteId) => toneById.get(noteId))
+      .filter((tone): tone is ToneConfig => Boolean(tone?.enabled))
+  }, [toneSetLayout.gridIds, toneSetLayout.subOctaveIds, tones])
   const overtoneToneOptions = activeTones.length > 0 ? activeTones : tones
   const isSelectedOvertoneToneSolo = useMemo(
     () => isToneStrictSolo(tones, selectedOvertoneNoteId),
@@ -968,16 +1374,32 @@ function App() {
       masterGainDb,
       timbreBlend,
       harmonicTimbreEnabled,
-      tones,
+      tones: tonesInToneSet,
       partials,
     }),
-    [referenceA4Hz, baseOctave, tuningSystemId, tonalCenter, masterGainDb, timbreBlend, harmonicTimbreEnabled, tones, partials],
+    [
+      referenceA4Hz,
+      baseOctave,
+      tuningSystemId,
+      tonalCenter,
+      masterGainDb,
+      timbreBlend,
+      harmonicTimbreEnabled,
+      tonesInToneSet,
+      partials,
+    ],
   )
 
   const latestRuntimeConfigRef = useRef<DroneRuntimeConfig>(runtimeConfig)
   useEffect(() => {
     latestRuntimeConfigRef.current = runtimeConfig
   }, [runtimeConfig])
+
+  useEffect(() => {
+    useDroneStore.setState((state) => ({
+      tones: state.tones.map((tone) => (toneSetNoteIds.has(tone.noteId) ? tone : { ...tone, enabled: false })),
+    }))
+  }, [toneSetNoteIds])
 
   useEffect(() => {
     if (!tones.some((tone) => tone.noteId === selectedOvertoneNoteId)) {
@@ -1497,6 +1919,10 @@ function App() {
                 />
                 <NoteSelector
                   tones={tones}
+                  toneSetName={toneSetLayout.name}
+                  subOctaveIds={toneSetLayout.subOctaveIds}
+                  gridIds={toneSetLayout.gridIds}
+                  toneLabelOverrides={toneSetLayout.toneLabelOverrides}
                   soloModeActive={toneSelectionSoloMode}
                   onTonePress={handleToneSelectionPress}
                   onToneLongPress={handleToneSelectionLongPress}
@@ -1521,7 +1947,7 @@ function App() {
             </SectionCard>
             <SectionCard title="Tone mixer">
               <ToneMixer
-                tones={activeTones}
+                tones={toneMixerTones}
                 allTones={tones}
                 onToneGain={setToneGain}
                 onTonePan={setTonePan}
@@ -2032,6 +2458,14 @@ function App() {
               <button
                 type="button"
                 className="button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
+                onClick={openToneSetOptions}
+              >
+                <Menu size={20} />
+                Tone set: {toneSetLayout.name}
+              </button>
+              <button
+                type="button"
+                className="button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
                 onClick={() => {
                   setActiveTab('midi')
                   setMenuOpen(false)
@@ -2071,6 +2505,208 @@ function App() {
           void analyzeOvertoneBalanceFromFile(event)
         }}
       />
+      {toneSetEditorOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="tone-set-editor-title"
+            className="w-full max-w-lg rounded-xl border border-white/15 bg-[#252332] p-4 shadow-2xl"
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 id="tone-set-editor-title" className="text-sm font-semibold text-white">
+                  Tone set custom JSON
+                </h2>
+                <p className="mt-1 text-sm text-white/70">
+                  Edit or paste tone set: 2 subOctaveIds and 16 gridIds.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="flex size-8 shrink-0 items-center justify-center rounded-md border border-white/10 text-white/70 transition hover:bg-white/10"
+                onClick={() => setToneSetEditorOpen(false)}
+                aria-label="Close tone set editor"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-3">
+              <div className="mb-2 text-xs uppercase tracking-[0.14em] text-white/60">Simple editor</div>
+              <div className="grid gap-2">
+                <input
+                  type="text"
+                  value={toneSetQuickName}
+                  onChange={(event) => {
+                    const next = event.target.value
+                    setToneSetQuickName(next)
+                    syncDraftFromQuickEditor(next, toneSetQuickGrid)
+                  }}
+                  placeholder="Tone set name"
+                  className="w-full rounded-md border border-white/15 bg-[#1b1827] px-3 py-2 text-sm text-white outline-none focus:border-fuchsia-300/50"
+                />
+                <input
+                  type="text"
+                  value={toneSetQuickGrid}
+                  onChange={(event) => {
+                    const next = event.target.value
+                    setToneSetQuickGrid(next)
+                    syncDraftFromQuickEditor(toneSetQuickName, next)
+                  }}
+                  placeholder="All tones (e.g. g0, a0, c, d, e, f, fis...)"
+                  className="w-full rounded-md border border-white/15 bg-[#1b1827] px-3 py-2 text-sm text-white outline-none focus:border-fuchsia-300/50"
+                />
+              </div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+              <button
+                type="button"
+                className="button-safe flex min-h-[34px] w-full items-center justify-between rounded-md border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-xs uppercase tracking-[0.14em] text-white/70 transition hover:bg-[#252332]"
+                onClick={() => setToneSetJsonCollapsed((current) => !current)}
+                aria-expanded={!toneSetJsonCollapsed}
+                aria-controls="tone-set-json-editor"
+              >
+                <span>JSON editor</span>
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform ${toneSetJsonCollapsed ? '' : 'rotate-180'}`}
+                />
+              </button>
+              {!toneSetJsonCollapsed ? (
+                <div id="tone-set-json-editor" className="mt-3">
+                  <textarea
+                    value={toneSetEditorDraft}
+                    onChange={(event) => {
+                      setToneSetEditorDraft(event.target.value)
+                      if (toneSetEditorError) {
+                        setToneSetEditorError(null)
+                      }
+                    }}
+                    className="min-h-[220px] w-full rounded-lg border border-white/15 bg-[#1b1827] p-3 font-mono text-xs text-white/90 outline-none focus:border-fuchsia-300/50"
+                    spellCheck={false}
+                    aria-label="Tone set JSON"
+                  />
+                  <p className="mt-2 text-[11px] leading-relaxed text-white/55">
+                    Allowed tone symbols: G0..D2 chromatic range. Accepted forms include plain names
+                    (<code className="rounded bg-white/10 px-1">g0</code>, <code className="rounded bg-white/10 px-1">a1</code>,
+                    <code className="rounded bg-white/10 px-1">d2</code>) and accidentals with sharps/flats
+                    (<code className="rounded bg-white/10 px-1">g#1</code>, <code className="rounded bg-white/10 px-1">ab1</code>,
+                    <code className="rounded bg-white/10 px-1">db2</code>, also <code className="rounded bg-white/10 px-1">♯</code>/<code className="rounded bg-white/10 px-1">♭</code>).
+                  </p>
+                </div>
+              ) : null}
+            </div>
+            {toneSetEditorError ? (
+              <p className="mt-2 text-xs text-red-200">{toneSetEditorError}</p>
+            ) : null}
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                className="button-safe min-h-[44px] flex-1 rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
+                onClick={() => setToneSetEditorOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button-safe min-h-[44px] flex flex-1 items-center justify-center rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
+                onClick={saveAndApplyCustomToneSet}
+                aria-label="Save custom tone set"
+                title="Save"
+              >
+                <Save size={18} />
+              </button>
+              <button
+                type="button"
+                className="button-safe min-h-[44px] flex flex-1 items-center justify-center rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
+                onClick={saveCustomToneSetFile}
+                aria-label="Export custom tone set JSON"
+                title="Export JSON"
+              >
+                <Upload size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {toneSetOptionsOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="tone-set-options-title"
+            className="w-full max-w-sm rounded-xl border border-white/15 bg-[#252332] p-4 shadow-2xl"
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 id="tone-set-options-title" className="text-sm font-semibold text-white">
+                  Tone set options
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="flex size-8 shrink-0 items-center justify-center rounded-md border border-white/10 text-white/70 transition hover:bg-white/10"
+                onClick={() => setToneSetOptionsOpen(false)}
+                aria-label="Close tone set options"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="space-y-2">
+              <button
+                type="button"
+                className="button-safe min-h-[44px] w-full rounded-lg border border-fuchsia-300/50 bg-fuchsia-300/15 px-4 py-2 text-left text-sm font-semibold text-white transition hover:bg-fuchsia-300/25"
+                onClick={() => {
+                  setDefaultToneSet()
+                  setToneSetOptionsOpen(false)
+                }}
+              >
+                Default (Eesti Torupill)
+              </button>
+              <label className="block">
+                <span className="mb-1 block text-xs uppercase tracking-[0.14em] text-white/55">Custom set</span>
+                <select
+                  className="w-full rounded-lg border border-white/15 bg-[#1b1827] px-3 py-2 text-sm text-white outline-none focus:border-fuchsia-300/50"
+                  value={selectedCustomToneSetName}
+                  onChange={(event) => {
+                    const nextName = event.target.value
+                    setSelectedCustomToneSetName(nextName)
+                    if (!nextName) {
+                      return
+                    }
+                    loadSavedToneSetFromBrowser(nextName)
+                    setToneSetOptionsOpen(false)
+                  }}
+                >
+                  {customToneSets.length === 0 ? (
+                    <option value="">No custom sets saved</option>
+                  ) : (
+                    customToneSets.map((setEntry) => (
+                      <option key={setEntry.name} value={setEntry.name}>
+                        {setEntry.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="button-safe min-h-[44px] w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-left text-sm font-semibold text-white/90 transition hover:bg-white/10"
+                onClick={loadCustomToneSet}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="button-safe min-h-[44px] w-full rounded-lg border border-red-300/40 bg-red-300/10 px-4 py-2 text-left text-sm font-semibold text-red-100 transition hover:bg-red-300/20"
+                onClick={deleteSavedToneSetFromBrowser}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {pendingOvertoneAnalysis && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4">
           <div

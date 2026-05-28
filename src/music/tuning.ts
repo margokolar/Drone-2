@@ -22,12 +22,16 @@ export const MAX_BASE_OCTAVE = 5;
 
 const NOTE_CLASS_BY_SEMITONE: Record<number, NoteClass> = {
   0: "c",
+  1: "cis",
   2: "d",
+  3: "dis",
   4: "e",
   5: "f",
   6: "fis",
   7: "g",
+  8: "gis",
   9: "a",
+  10: "b",
   11: "h",
 };
 

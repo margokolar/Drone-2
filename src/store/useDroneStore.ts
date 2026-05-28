@@ -236,7 +236,7 @@ function migrateTones(tones: ToneConfig[], fallbackPartials: PartialConfig[]): T
       {
         noteId,
         enabled: false,
-        gainDb: noteId.endsWith('1') ? -18 : -12,
+        gainDb: noteId.endsWith('1') || noteId.endsWith('2') ? -18 : -12,
         pan: 0,
         detuneCents: DEFAULT_TONE_DETUNE_CENTS,
       },
@@ -1004,7 +1004,7 @@ export const useDroneStore = create<DroneState>()(
     }),
     {
       name: 'bourdon-store-v1',
-      version: 7,
+      version: 8,
       migrate: (persistedState) => {
         const typed = persistedState as Partial<DroneState> | undefined
         if (!typed) {

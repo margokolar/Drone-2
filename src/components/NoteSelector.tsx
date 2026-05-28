@@ -2,8 +2,6 @@ import clsx from 'clsx'
 import { useRef } from 'react'
 import { ToneLabel } from './ToneLabel'
 import {
-  TONE_SELECTION_GRID_IDS,
-  TONE_SELECTION_SUB_OCTAVE_IDS,
   getTonePageLabel,
   type NoteId,
 } from '../music/notes'
@@ -11,6 +9,10 @@ import type { ToneConfig } from '../audio/types'
 
 type NoteSelectorProps = {
   tones: ToneConfig[]
+  toneSetName: string
+  subOctaveIds: NoteId[]
+  gridIds: NoteId[]
+  toneLabelOverrides?: Partial<Record<NoteId, string>>
   soloModeActive: boolean
   onTonePress: (noteId: NoteId) => void
   onToneLongPress: (noteId: NoteId) => void
@@ -23,12 +25,14 @@ const SOLO_LONG_PRESS_MS = 800
 function ToneButton({
   noteId,
   enabled,
+  toneLabelOverride,
   soloModeActive,
   onTonePress,
   onToneLongPress,
 }: {
   noteId: NoteId
   enabled: boolean
+  toneLabelOverride?: string
   soloModeActive: boolean
   onTonePress: (noteId: NoteId) => void
   onToneLongPress: (noteId: NoteId) => void
@@ -74,52 +78,100 @@ function ToneButton({
       )}
       aria-label={`Toggle ${getTonePageLabel(noteId)}. Long-press for solo mode.`}
     >
-      <ToneLabel noteId={noteId} />
+      <ToneLabel noteId={noteId} labelOverride={toneLabelOverride} />
     </button>
   )
 }
 
-export function NoteSelector({ tones, soloModeActive, onTonePress, onToneLongPress }: NoteSelectorProps) {
+export function NoteSelector({
+  tones,
+  toneSetName,
+  subOctaveIds,
+  gridIds,
+  toneLabelOverrides,
+  soloModeActive,
+  onTonePress,
+  onToneLongPress,
+}: NoteSelectorProps) {
   const toneState = new Map(tones.map((tone) => [tone.noteId, tone.enabled]))
-  const firstGridRowIds = TONE_SELECTION_GRID_IDS.slice(0, 8)
-  const secondGridRowIds = TONE_SELECTION_GRID_IDS.slice(8)
+  const firstGridRowIds = gridIds.slice(0, 8)
+  const remainingGridRows: NoteId[][] = []
+  for (let index = 8; index < gridIds.length; index += 8) {
+    remainingGridRows.push(gridIds.slice(index, index + 8))
+  }
+
+  const firstRowPitchClasses = firstGridRowIds.map((noteId) => noteId.replace(/[0-9]+$/, ''))
+  const subOctaveAlignedSlots: Array<NoteId | null> = Array.from({ length: 8 }, () => null)
+
+  subOctaveIds.forEach((noteId) => {
+    const pitchClass = noteId.replace(/[0-9]+$/, '')
+    const column = firstRowPitchClasses.findIndex((gridPitchClass) => gridPitchClass === pitchClass)
+    if (column >= 0 && subOctaveAlignedSlots[column] === null) {
+      subOctaveAlignedSlots[column] = noteId
+      return
+    }
+    const fallback = subOctaveAlignedSlots.findIndex((slot) => slot === null)
+    if (fallback >= 0) {
+      subOctaveAlignedSlots[fallback] = noteId
+    }
+  })
 
   return (
-    <div className="grid grid-cols-8 gap-1.5">
-      <div className="col-span-5 flex min-h-[36px] items-center text-xs uppercase tracking-[0.16em] text-white/60">
-        Tone selection {soloModeActive ? '· Solo' : ''}
+    <div className="space-y-1.5">
+      <div className="min-h-[18px] text-xs uppercase tracking-[0.16em] text-white/60">
+        Tone selection · {toneSetName} {soloModeActive ? '· Solo' : ''}
       </div>
-      {TONE_SELECTION_SUB_OCTAVE_IDS.map((noteId) => (
-        <ToneButton
-          key={noteId}
-          noteId={noteId}
-          enabled={Boolean(toneState.get(noteId))}
-          soloModeActive={soloModeActive}
-          onTonePress={onTonePress}
-          onToneLongPress={onToneLongPress}
-        />
-      ))}
-      <div aria-hidden className="min-h-[36px]" />
-      {firstGridRowIds.map((noteId) => (
-        <ToneButton
-          key={noteId}
-          noteId={noteId}
-          enabled={Boolean(toneState.get(noteId))}
-          soloModeActive={soloModeActive}
-          onTonePress={onTonePress}
-          onToneLongPress={onToneLongPress}
-        />
-      ))}
-      {secondGridRowIds.map((noteId) => (
-        <ToneButton
-          key={noteId}
-          noteId={noteId}
-          enabled={Boolean(toneState.get(noteId))}
-          soloModeActive={soloModeActive}
-          onTonePress={onTonePress}
-          onToneLongPress={onToneLongPress}
-        />
-      ))}
+      <div className="grid grid-cols-8 gap-1.5">
+        {subOctaveAlignedSlots.map((noteId, index) =>
+          noteId ? (
+            <ToneButton
+              key={noteId}
+              noteId={noteId}
+              enabled={Boolean(toneState.get(noteId))}
+              toneLabelOverride={toneLabelOverrides?.[noteId]}
+              soloModeActive={soloModeActive}
+              onTonePress={onTonePress}
+              onToneLongPress={onToneLongPress}
+            />
+          ) : (
+            <div key={`sub-slot-${index}`} aria-hidden className="min-h-[36px]" />
+          ),
+        )}
+        {firstGridRowIds.map((noteId, index) =>
+        noteId ? (
+          <ToneButton
+            key={noteId}
+            noteId={noteId}
+            enabled={Boolean(toneState.get(noteId))}
+            toneLabelOverride={toneLabelOverrides?.[noteId]}
+            soloModeActive={soloModeActive}
+            onTonePress={onTonePress}
+            onToneLongPress={onToneLongPress}
+          />
+        ) : (
+          <div key={`grid-slot-top-${index}`} aria-hidden className="min-h-[36px]" />
+        ),
+        )}
+        {remainingGridRows.flatMap((row, rowIndex) =>
+          Array.from({ length: 8 }, (_, columnIndex) => {
+            const noteId = row[columnIndex]
+            if (noteId) {
+              return (
+                <ToneButton
+                  key={`${rowIndex}-${noteId}`}
+                  noteId={noteId}
+                  enabled={Boolean(toneState.get(noteId))}
+                  toneLabelOverride={toneLabelOverrides?.[noteId]}
+                  soloModeActive={soloModeActive}
+                  onTonePress={onTonePress}
+                  onToneLongPress={onToneLongPress}
+                />
+              )
+            }
+            return <div key={`grid-slot-${rowIndex}-${columnIndex}`} aria-hidden className="min-h-[36px]" />
+          }),
+        )}
+      </div>
     </div>
   )
 }

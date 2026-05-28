@@ -3,45 +3,33 @@ import { getTonePageLabel, tonePageLabelUsesUppercase, type NoteId } from '../mu
 
 type ToneLabelProps = {
   noteId: NoteId
+  labelOverride?: string
   className?: string
 }
 
 const toneLabelBaseClass = 'text-base font-bold leading-none tracking-[0.03em]'
 const toneLabelOctaveClass = 'tone-label-octave'
 
-export function ToneLabel({ noteId, className }: ToneLabelProps) {
+export function ToneLabel({ noteId, labelOverride, className }: ToneLabelProps) {
   const uppercase = tonePageLabelUsesUppercase(noteId)
+  const rawLabel = labelOverride ?? getTonePageLabel(noteId)
+  const label = noteId.endsWith('0') ? rawLabel.replace(/0$/, '') : rawLabel
+  const octaveMatch = /^(.*?)([1-9])$/.exec(label)
+  const baseLabel = octaveMatch ? octaveMatch[1] : label
+  const octaveLabel = octaveMatch ? octaveMatch[2] : null
 
-  if (noteId === 'fis' || noteId === 'fis1') {
-    return (
-      <span
-        className={clsx(
-          'tone-label-with-accidental text-base leading-none tracking-[0.03em]',
-          className,
-          uppercase && 'uppercase',
-        )}
-      >
-        <span className="font-bold">f</span>
-        <span className="music-accidental" aria-hidden="true">
-          ♯
-        </span>
-        {noteId === 'fis1' ? <span className={clsx(toneLabelOctaveClass, 'font-bold')}>1</span> : null}
-      </span>
-    )
-  }
-
-  if (noteId.endsWith('1')) {
+  if (octaveLabel) {
     return (
       <span className={clsx(toneLabelBaseClass, className, uppercase && 'uppercase')}>
-        {getTonePageLabel(noteId).slice(0, -1)}
-        <span className={toneLabelOctaveClass}>1</span>
+        {baseLabel}
+        <span className={toneLabelOctaveClass}>{octaveLabel}</span>
       </span>
     )
   }
 
   return (
     <span className={clsx(toneLabelBaseClass, className, uppercase && 'uppercase')}>
-      {getTonePageLabel(noteId)}
+      {label}
     </span>
   )
 }
