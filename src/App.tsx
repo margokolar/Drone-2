@@ -2192,7 +2192,13 @@ function App() {
               />
             </SectionCard>
           </div>
-          <div className="space-y-4" role="tabpanel" id="panel-midi" aria-labelledby="tab-midi" hidden={activeTab !== 'midi'}>
+          <div
+            className="space-y-4 pt-16 landscape:space-y-2 max-h-[500px]:space-y-2 max-h-[500px]:pt-16"
+            role="tabpanel"
+            id="panel-midi"
+            aria-labelledby="tab-midi"
+            hidden={activeTab !== 'midi'}
+          >
             <OvertoneMidiPanel
               webMidiSupported={overtoneMidi.webMidiSupported}
               accessError={overtoneMidi.accessError}

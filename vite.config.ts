@@ -10,29 +10,31 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['vite.svg'],
+      includeAssets: ['apple-touch-icon.png', 'apple-touch-icon-180.png'],
       workbox: {
         cleanupOutdatedCaches: true,
         navigateFallback: '/index.html',
       },
       manifest: {
+        id: '/',
         name: 'Drone 2',
         short_name: 'Drone 2',
         description: 'Experimental drone reference tool',
         theme_color: '#141319',
         background_color: '#141319',
         display: 'standalone',
+        scope: '/',
         start_url: '/',
         icons: [
           {
-            src: 'vite.svg',
+            src: 'pwa-192.png',
             sizes: '192x192',
-            type: 'image/svg+xml',
+            type: 'image/png',
           },
           {
-            src: 'vite.svg',
+            src: 'pwa-512.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
+            type: 'image/png',
           },
         ],
       },
