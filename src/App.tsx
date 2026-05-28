@@ -145,6 +145,7 @@ function App() {
   const overtoneClipboardRef = useRef<PartialConfig[] | null>(null)
   const timbreMorphHistoryActiveRef = useRef(false)
   const [toneSoloRestore, setToneSoloRestore] = useState<Map<NoteId, boolean> | null>(null)
+  const [toneSelectionSoloMode, setToneSelectionSoloMode] = useState(false)
   const [allTonesCompareActive, setAllTonesCompareActive] = useState(false)
   const [, setOvertoneHistoryVersion] = useState(0)
   const [pendingOvertoneAnalysis, setPendingOvertoneAnalysis] = useState<PendingOvertoneAnalysis | null>(null)
@@ -862,6 +863,33 @@ function App() {
   const toggleSelectedOvertoneToneSolo = useCallback(() => {
     toggleToneSoloForNote(selectedOvertoneNoteId)
   }, [toggleToneSoloForNote, selectedOvertoneNoteId])
+  const handleToneSelectionPress = useCallback(
+    (noteId: NoteId) => {
+      if (toneSelectionSoloMode) {
+        enterToneSoloForNote(noteId)
+        return
+      }
+      toggleToneEnabled(noteId)
+    },
+    [enterToneSoloForNote, toneSelectionSoloMode, toggleToneEnabled],
+  )
+  const handleToneSelectionLongPress = useCallback(
+    (noteId: NoteId) => {
+      if (toneSelectionSoloMode) {
+        restoreToneSoloState()
+        setToneSelectionSoloMode(false)
+        return
+      }
+      enterToneSoloForNote(noteId)
+      setToneSelectionSoloMode(true)
+    },
+    [enterToneSoloForNote, restoreToneSoloState, toneSelectionSoloMode],
+  )
+  useEffect(() => {
+    if (!toneSoloRestore || allTonesCompareActive) {
+      setToneSelectionSoloMode(false)
+    }
+  }, [allTonesCompareActive, toneSoloRestore])
   const toggleAllTonesCompare = useCallback(() => {
     if (allTonesCompareActive) {
       restoreToneSoloState()
@@ -1467,7 +1495,12 @@ function App() {
                   onTuningSystemChange={setTuningSystemId}
                   onTonalCenterChange={setTonalCenter}
                 />
-                <NoteSelector tones={tones} onToggleTone={(noteId: NoteId) => toggleToneEnabled(noteId)} />
+                <NoteSelector
+                  tones={tones}
+                  soloModeActive={toneSelectionSoloMode}
+                  onTonePress={handleToneSelectionPress}
+                  onToneLongPress={handleToneSelectionLongPress}
+                />
                 <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                   <div className="mb-1 flex items-center justify-between">
                     <span className="text-xs uppercase tracking-[0.16em] text-white/60">Master gain</span>
