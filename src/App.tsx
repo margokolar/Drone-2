@@ -2102,15 +2102,20 @@ function App() {
             <SectionCard
               title="Overtones"
               titleAddon={
-                globalOvertoneEditEnabled ? (
-                  <span
-                    className="shrink-0 text-cyan-300"
-                    title="Global overtone edit"
-                    aria-label="Global overtone edit"
-                  >
-                    <Globe size={14} aria-hidden />
-                  </span>
-                ) : null
+                <button
+                  type="button"
+                  className={`button-safe flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition ${
+                    globalOvertoneEditEnabled
+                      ? 'border-cyan-300/60 bg-cyan-400/15 text-cyan-200 hover:bg-cyan-400/25'
+                      : 'border-white/15 bg-white/5 text-white/80 opacity-40 hover:bg-white/10'
+                  }`}
+                  onClick={toggleGlobalOvertoneEdit}
+                  title="Global overtone edit"
+                  aria-label="Toggle global overtone edit"
+                  aria-pressed={globalOvertoneEditEnabled}
+                >
+                  <Globe size={14} aria-hidden />
+                </button>
               }
               className="landscape:min-w-0 landscape:flex-1 landscape:p-2 landscape:[&>header]:hidden max-h-[500px]:min-w-0 max-h-[500px]:flex-1 max-h-[500px]:p-2 max-h-[500px]:[&>header]:hidden [&>header]:mb-2"
               rightSlot={
@@ -2526,30 +2531,6 @@ function App() {
               </button>
             </div>
             <div className="space-y-2">
-              <button
-                type="button"
-                aria-pressed={globalOvertoneEditEnabled}
-                className={`button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border px-4 py-3 text-left transition ${
-                  globalOvertoneEditEnabled
-                    ? 'border-cyan-300/60 bg-cyan-400/15 text-white hover:bg-cyan-400/25'
-                    : 'border-white/10 bg-white/5 text-white hover:bg-white/10'
-                }`}
-                onClick={toggleGlobalOvertoneEdit}
-              >
-                <Globe size={20} />
-                Global overtone edit
-              </button>
-              <button
-                type="button"
-                className="button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
-                onClick={() => {
-                  saveAsPreset()
-                  setMenuOpen(false)
-                }}
-              >
-                <Save size={20} />
-                Save as new preset
-              </button>
               <button
                 type="button"
                 className="button-safe flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
