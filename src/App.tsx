@@ -73,6 +73,7 @@ const DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS = 800
 const IPHONE_16_PRO_MAX_CSS_W = 440
 const IPHONE_16_PRO_MAX_CSS_H = 956
 const MAX_OVERTONE_HISTORY = 60
+const STORE_STORAGE_KEY = 'bourdon-store-v1'
 const TONE_SET_STORAGE_KEY = 'drone-tone-set-v1'
 const TONE_SET_COLLECTION_STORAGE_KEY = 'drone-tone-sets-v1'
 const SONG_MENU_TRIGGER_CLASS =
@@ -359,6 +360,8 @@ function App() {
   const droneTitleLongPressTimerRef = useRef<number | null>(null)
   const droneTitleLongPressFiredRef = useRef(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
+  const toneSetImportInputRef = useRef<HTMLInputElement | null>(null)
+  const globalImportInputRef = useRef<HTMLInputElement | null>(null)
   const overtoneAnalyzeInputRef = useRef<HTMLInputElement | null>(null)
   const sideMenuRef = useRef<HTMLElement | null>(null)
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
@@ -378,6 +381,8 @@ function App() {
   const [pendingOvertoneAnalysis, setPendingOvertoneAnalysis] = useState<PendingOvertoneAnalysis | null>(null)
   const [overtoneAnalysisError, setOvertoneAnalysisError] = useState<string | null>(null)
   const [toneSetOptionsOpen, setToneSetOptionsOpen] = useState(false)
+  const [menuExportOpen, setMenuExportOpen] = useState(false)
+  const [menuImportOpen, setMenuImportOpen] = useState(false)
   const [toneSetEditorOpen, setToneSetEditorOpen] = useState(false)
   const [toneSetEditorDraft, setToneSetEditorDraft] = useState('')
   const [toneSetQuickName, setToneSetQuickName] = useState('')
@@ -889,6 +894,58 @@ function App() {
     [importSong, importSongLibrary],
   )
 
+  const exportGlobalData = useCallback(() => {
+    const payload = {
+      kind: 'bourdon-global-backup',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      data: {
+        [STORE_STORAGE_KEY]: window.localStorage.getItem(STORE_STORAGE_KEY),
+        [TONE_SET_STORAGE_KEY]: window.localStorage.getItem(TONE_SET_STORAGE_KEY),
+        [TONE_SET_COLLECTION_STORAGE_KEY]: window.localStorage.getItem(TONE_SET_COLLECTION_STORAGE_KEY),
+      },
+    }
+    downloadJson(payload, `drone-global-backup-${new Date().toISOString().slice(0, 10)}.json`)
+  }, [downloadJson])
+
+  const importGlobalData = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0]
+      if (!file) {
+        return
+      }
+      try {
+        const content = await file.text()
+        const parsed = JSON.parse(content) as {
+          kind?: string
+          data?: Record<string, string | null>
+        }
+        if (parsed.kind !== 'bourdon-global-backup' || !parsed.data) {
+          window.alert('Invalid global backup file.')
+          return
+        }
+        const keys = [STORE_STORAGE_KEY, TONE_SET_STORAGE_KEY, TONE_SET_COLLECTION_STORAGE_KEY] as const
+        for (const key of keys) {
+          const value = parsed.data[key]
+          if (typeof value === 'string') {
+            window.localStorage.setItem(key, value)
+          } else if (value === null) {
+            window.localStorage.removeItem(key)
+          }
+        }
+        window.alert('Global backup imported. App will reload now.')
+        window.location.reload()
+      } catch {
+        window.alert('Could not import global backup.')
+      } finally {
+        if (globalImportInputRef.current) {
+          globalImportInputRef.current.value = ''
+        }
+      }
+    },
+    [],
+  )
+
   const buildResetOvertoneBalance = useCallback((source: PartialConfig[]): PartialConfig[] => {
     const defaults = createDefaultPartials()
     return source.map((partial, index) => {
@@ -1153,6 +1210,36 @@ function App() {
       setToneSetEditorError('Invalid JSON for custom tone set.')
     }
   }, [downloadJson, makeSafeFileName, toneSetEditorDraft])
+  const exportCurrentToneSet = useCallback(() => {
+    downloadJson(toneSetLayout, `${makeSafeFileName(toneSetLayout.name, 'tone-set')}.tone-set.json`)
+  }, [downloadJson, makeSafeFileName, toneSetLayout])
+  const importToneSetFromFile = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0]
+      if (!file) {
+        return
+      }
+      try {
+        const content = await file.text()
+        const parsed = JSON.parse(content) as unknown
+        const candidate = parseToneSetLayout(parsed)
+        if (!candidate) {
+          window.alert('Invalid tone set JSON.')
+          return
+        }
+        upsertCustomToneSet(candidate)
+        saveToneSetLayout(candidate)
+        window.alert('Tone set imported and applied.')
+      } catch {
+        window.alert('Could not import tone set JSON.')
+      } finally {
+        if (toneSetImportInputRef.current) {
+          toneSetImportInputRef.current.value = ''
+        }
+      }
+    },
+    [saveToneSetLayout, upsertCustomToneSet],
+  )
   const handleTogglePlay = useCallback(() => {
     const currentlyPlaying = useDroneStore.getState().playing
     if (currentlyPlaying) {
@@ -2422,37 +2509,115 @@ function App() {
               </button>
               <button
                 type="button"
-                className="button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
-                onClick={() => {
-                  importInputRef.current?.click()
-                  setMenuOpen(false)
-                }}
+                className="button-safe flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
+                onClick={() => setMenuExportOpen((current) => !current)}
+                aria-expanded={menuExportOpen}
+                aria-controls="menu-export-actions"
               >
-                <Download size={20} />
-                Import song / library
+                <span className="flex items-center gap-2">
+                  <Upload size={20} />
+                  Export
+                </span>
+                <ChevronDown size={16} className={menuExportOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
               </button>
+              {menuExportOpen ? (
+                <div id="menu-export-actions" className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-2">
+                  <button
+                    type="button"
+                    className="button-safe flex min-h-[40px] w-full items-center gap-2 rounded-lg border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-sm text-white/90 transition hover:bg-[#252332]"
+                    onClick={() => {
+                      exportCurrentSong()
+                      setMenuOpen(false)
+                    }}
+                  >
+                    <Upload size={16} />
+                    Export song JSON
+                  </button>
+                  <button
+                    type="button"
+                    className="button-safe flex min-h-[40px] w-full items-center gap-2 rounded-lg border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-sm text-white/90 transition hover:bg-[#252332]"
+                    onClick={() => {
+                      exportSongLibrary()
+                      setMenuOpen(false)
+                    }}
+                  >
+                    <Upload size={16} />
+                    Export song library JSON
+                  </button>
+                  <button
+                    type="button"
+                    className="button-safe flex min-h-[40px] w-full items-center gap-2 rounded-lg border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-sm text-white/90 transition hover:bg-[#252332]"
+                    onClick={() => {
+                      exportCurrentToneSet()
+                      setMenuOpen(false)
+                    }}
+                  >
+                    <Upload size={16} />
+                    Export tone set JSON
+                  </button>
+                  <button
+                    type="button"
+                    className="button-safe flex min-h-[40px] w-full items-center gap-2 rounded-lg border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-sm text-white/90 transition hover:bg-[#252332]"
+                    onClick={() => {
+                      exportGlobalData()
+                      setMenuOpen(false)
+                    }}
+                  >
+                    <Upload size={16} />
+                    Global export (all data)
+                  </button>
+                </div>
+              ) : null}
               <button
                 type="button"
-                className="button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
-                onClick={() => {
-                  exportSongLibrary()
-                  setMenuOpen(false)
-                }}
+                className="button-safe flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
+                onClick={() => setMenuImportOpen((current) => !current)}
+                aria-expanded={menuImportOpen}
+                aria-controls="menu-import-actions"
               >
-                <Upload size={20} />
-                Export song library
+                <span className="flex items-center gap-2">
+                  <Download size={20} />
+                  Import
+                </span>
+                <ChevronDown size={16} className={menuImportOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
               </button>
-              <button
-                type="button"
-                className="button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
-                onClick={() => {
-                  exportCurrentSong()
-                  setMenuOpen(false)
-                }}
-              >
-                <Upload size={20} />
-                Export song
-              </button>
+              {menuImportOpen ? (
+                <div id="menu-import-actions" className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-2">
+                  <button
+                    type="button"
+                    className="button-safe flex min-h-[40px] w-full items-center gap-2 rounded-lg border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-sm text-white/90 transition hover:bg-[#252332]"
+                    onClick={() => {
+                      importInputRef.current?.click()
+                      setMenuOpen(false)
+                    }}
+                  >
+                    <Download size={16} />
+                    Import song / library JSON
+                  </button>
+                  <button
+                    type="button"
+                    className="button-safe flex min-h-[40px] w-full items-center gap-2 rounded-lg border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-sm text-white/90 transition hover:bg-[#252332]"
+                    onClick={() => {
+                      toneSetImportInputRef.current?.click()
+                      setMenuOpen(false)
+                    }}
+                  >
+                    <Download size={16} />
+                    Import tone set JSON
+                  </button>
+                  <button
+                    type="button"
+                    className="button-safe flex min-h-[40px] w-full items-center gap-2 rounded-lg border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-sm text-white/90 transition hover:bg-[#252332]"
+                    onClick={() => {
+                      globalImportInputRef.current?.click()
+                      setMenuOpen(false)
+                    }}
+                  >
+                    <Download size={16} />
+                    Global import (all data)
+                  </button>
+                </div>
+              ) : null}
               <button
                 type="button"
                 className="button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
@@ -2500,6 +2665,24 @@ function App() {
         className="hidden"
         onChange={(event) => {
           void importSongs(event)
+        }}
+      />
+      <input
+        ref={toneSetImportInputRef}
+        type="file"
+        accept=".json,.tone-set.json,application/json"
+        className="hidden"
+        onChange={(event) => {
+          void importToneSetFromFile(event)
+        }}
+      />
+      <input
+        ref={globalImportInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={(event) => {
+          void importGlobalData(event)
         }}
       />
       <input
