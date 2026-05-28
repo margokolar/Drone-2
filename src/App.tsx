@@ -2545,8 +2545,7 @@ function App() {
                   placeholder="Tone set name"
                   className="w-full rounded-md border border-white/15 bg-[#1b1827] px-3 py-2 text-sm text-white outline-none focus:border-fuchsia-300/50"
                 />
-                <input
-                  type="text"
+                <textarea
                   value={toneSetQuickGrid}
                   onChange={(event) => {
                     const next = event.target.value
@@ -2554,7 +2553,8 @@ function App() {
                     syncDraftFromQuickEditor(toneSetQuickName, next)
                   }}
                   placeholder="All tones (e.g. g0, a0, c, d, e, f, fis...)"
-                  className="w-full rounded-md border border-white/15 bg-[#1b1827] px-3 py-2 text-sm text-white outline-none focus:border-fuchsia-300/50"
+                  rows={3}
+                  className="w-full resize-y rounded-md border border-white/15 bg-[#1b1827] px-3 py-2 text-sm text-white outline-none focus:border-fuchsia-300/50"
                 />
               </div>
             </div>
