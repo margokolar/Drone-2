@@ -361,6 +361,7 @@ function App() {
   const droneTitleLongPressFiredRef = useRef(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const toneSetImportInputRef = useRef<HTMLInputElement | null>(null)
+  const toneSetEditorImportInputRef = useRef<HTMLInputElement | null>(null)
   const globalImportInputRef = useRef<HTMLInputElement | null>(null)
   const overtoneAnalyzeInputRef = useRef<HTMLInputElement | null>(null)
   const sideMenuRef = useRef<HTMLElement | null>(null)
@@ -1239,6 +1240,35 @@ function App() {
       }
     },
     [saveToneSetLayout, upsertCustomToneSet],
+  )
+  const importToneSetIntoEditorFromFile = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0]
+      if (!file) {
+        return
+      }
+      try {
+        const content = await file.text()
+        const parsed = JSON.parse(content) as unknown
+        const candidate = parseToneSetLayout(parsed)
+        if (!candidate) {
+          setToneSetEditorError('Invalid tone set JSON.')
+          return
+        }
+        setToneSetQuickName(candidate.name)
+        setToneSetQuickGrid([...candidate.subOctaveIds, ...candidate.gridIds].join(', '))
+        setToneSetEditorDraft(JSON.stringify(candidate, null, 2))
+        setToneSetEditorError(null)
+        setToneSetJsonCollapsed(true)
+      } catch {
+        setToneSetEditorError('Could not import tone set JSON.')
+      } finally {
+        if (toneSetEditorImportInputRef.current) {
+          toneSetEditorImportInputRef.current.value = ''
+        }
+      }
+    },
+    [],
   )
   const handleTogglePlay = useCallback(() => {
     const currentlyPlaying = useDroneStore.getState().playing
@@ -2677,6 +2707,15 @@ function App() {
         }}
       />
       <input
+        ref={toneSetEditorImportInputRef}
+        type="file"
+        accept=".json,.tone-set.json,application/json"
+        className="hidden"
+        onChange={(event) => {
+          void importToneSetIntoEditorFromFile(event)
+        }}
+      />
+      <input
         ref={globalImportInputRef}
         type="file"
         accept=".json,application/json"
@@ -2804,6 +2843,15 @@ function App() {
                 title="Save"
               >
                 <Save size={18} />
+              </button>
+              <button
+                type="button"
+                className="button-safe min-h-[44px] flex flex-1 items-center justify-center rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
+                onClick={() => toneSetEditorImportInputRef.current?.click()}
+                aria-label="Import tone set JSON into editor"
+                title="Import JSON"
+              >
+                <Download size={18} />
               </button>
               <button
                 type="button"
