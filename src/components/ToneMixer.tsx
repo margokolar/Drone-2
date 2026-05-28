@@ -46,7 +46,7 @@ export function ToneMixer({
   const spatialLongPressTimerRef = useRef<number | null>(null)
   const spatialLongPressTriggeredRef = useRef(false)
 
-  const isSpatialExpanded = (noteId: NoteId): boolean => spatialExpandedByNote[noteId] ?? true
+  const isSpatialExpanded = (noteId: NoteId): boolean => spatialExpandedByNote[noteId] ?? false
 
   const clearSpatialLongPressTimer = () => {
     if (spatialLongPressTimerRef.current !== null) {
@@ -60,7 +60,7 @@ export function ToneMixer({
       return
     }
     setSpatialExpandedByNote((current) => {
-      const allExpanded = tones.every((tone) => current[tone.noteId] ?? true)
+      const allExpanded = tones.every((tone) => current[tone.noteId] ?? false)
       const next = { ...current }
       for (const tone of tones) {
         next[tone.noteId] = !allExpanded
