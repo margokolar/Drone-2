@@ -1,5 +1,5 @@
 import { dbToGain, partialTimbreWeights, normalizedBlend, waveformGainCompensation } from './audioMath'
-import type { DroneRuntimeConfig, PartialConfig, ToneConfig } from './types'
+import type { DroneRuntimeConfig, EntryGlideParams, PartialConfig, ToneConfig } from './types'
 import { getFrequency } from '../music/tuning'
 
 type OscBundle = {
@@ -22,11 +22,12 @@ const ATTACK_SECONDS = 0.025
 const RELEASE_SECONDS = 0.08
 const REBUILD_RELEASE_SECONDS = 0.03
 const PARAM_SMOOTH_SECONDS = 0.015
-const LOWEST_TONE_GLIDE_CENTS = 40
-const LOWEST_TONE_GLIDE_SECONDS = 2
-const HIGHEST_TONE_GLIDE_CENTS = 30
-const HIGHEST_TONE_GLIDE_SECONDS = 0.6
 const LIMITER_THRESHOLD_DB = -3
+
+const DEFAULT_ENTRY_GLIDE: EntryGlideParams = {
+  cents: 0,
+  seconds: 2,
+}
 
 export class DroneEngine {
   private context: AudioContext | null = null
@@ -298,20 +299,12 @@ export class DroneEngine {
   private getEntryGlideSpec(
     config: DroneRuntimeConfig,
     toneConfig: ToneConfig,
-  ): { cents: number; seconds: number; direction: 'up' | 'down' } | null {
+  ): EntryGlideParams | null {
     if (config.lowestToneGlideNoteId && config.lowestToneGlideNoteId === toneConfig.noteId) {
-      return {
-        cents: LOWEST_TONE_GLIDE_CENTS,
-        seconds: LOWEST_TONE_GLIDE_SECONDS,
-        direction: 'down',
-      }
+      return config.lowestToneGlide ?? DEFAULT_ENTRY_GLIDE
     }
     if (config.highestToneGlideNoteId && config.highestToneGlideNoteId === toneConfig.noteId) {
-      return {
-        cents: HIGHEST_TONE_GLIDE_CENTS,
-        seconds: HIGHEST_TONE_GLIDE_SECONDS,
-        direction: 'up',
-      }
+      return config.highestToneGlide ?? DEFAULT_ENTRY_GLIDE
     }
     return null
   }
@@ -325,11 +318,12 @@ export class DroneEngine {
   ): void {
     oscillator.frequency.cancelScheduledValues(now)
     const glide = this.getEntryGlideSpec(config, toneConfig)
-    if (glide) {
-      const centRatio = 2 ** (glide.cents / 1200)
+    if (glide && glide.cents !== 0 && glide.seconds > 0) {
+      const absCents = Math.abs(glide.cents)
+      const centRatio = 2 ** (absCents / 1200)
       const startFrequency = Math.max(
         1,
-        glide.direction === 'down' ? targetFrequency * centRatio : targetFrequency / centRatio,
+        glide.cents > 0 ? targetFrequency * centRatio : targetFrequency / centRatio,
       )
       oscillator.frequency.setValueAtTime(startFrequency, now)
       oscillator.frequency.exponentialRampToValueAtTime(
@@ -424,7 +418,8 @@ export class DroneEngine {
       outputGain,
       panner,
       oscillators,
-      entryGlideEndTime: entryGlide ? now + entryGlide.seconds : null,
+      entryGlideEndTime:
+        entryGlide && entryGlide.cents !== 0 && entryGlide.seconds > 0 ? now + entryGlide.seconds : null,
     }
   }
 

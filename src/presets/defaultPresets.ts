@@ -16,6 +16,11 @@ export const DEFAULT_TIMBRE_BLEND: TimbreBlend = {
   square: 0.1,
 }
 
+export const DEFAULT_ENTRY_GLIDE_LOWEST_CENTS = 0
+export const DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS = 2.5
+export const DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS = 0
+export const DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS = 1
+
 export function defaultPartialRatio(harmonicIndex: number): number {
   return harmonicIndex
 }

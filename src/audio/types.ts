@@ -24,6 +24,12 @@ export type ToneConfig = {
   timbreBlend?: TimbreBlend
 }
 
+export type EntryGlideParams = {
+  /** Signed cents: positive glides down from above, negative glides up from below. */
+  cents: number
+  seconds: number
+}
+
 export type DroneRuntimeConfig = {
   referenceA4Hz: number
   baseOctave: number
@@ -36,6 +42,8 @@ export type DroneRuntimeConfig = {
   partials: PartialConfig[]
   /** Enabled tone with the lowest pitch; gets an entry glide when its voice starts. */
   lowestToneGlideNoteId?: NoteId | null
-  /** Enabled tone with the highest pitch; rises into tune when its voice starts. */
+  /** Enabled tone with the highest pitch; glides into tune when its voice starts. */
   highestToneGlideNoteId?: NoteId | null
+  lowestToneGlide?: EntryGlideParams | null
+  highestToneGlide?: EntryGlideParams | null
 }

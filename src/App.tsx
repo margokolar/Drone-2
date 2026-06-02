@@ -56,10 +56,20 @@ import {
   type NoteId,
 } from './music/notes'
 import { getFrequency, findLowestEnabledToneNoteId, findHighestEnabledToneNoteId } from './music/tuning'
-import { createDefaultPartials, DEFAULT_MASTER_GAIN_DB, type Preset } from './presets/defaultPresets'
+import { createDefaultPartials, DEFAULT_MASTER_GAIN_DB, DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS, DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS, DEFAULT_ENTRY_GLIDE_LOWEST_CENTS, DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS, type Preset } from './presets/defaultPresets'
 import { useDroneStore } from './store/useDroneStore'
 
 type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi' | 'blank'
+
+function formatEntryGlideCents(cents: number): string {
+  if (cents > 0) {
+    return `+${cents}c`
+  }
+  if (cents < 0) {
+    return `${cents}c`
+  }
+  return '0c'
+}
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'tone', label: 'Tone' },
@@ -385,6 +395,7 @@ function App() {
   const [toneSetOptionsOpen, setToneSetOptionsOpen] = useState(false)
   const [menuExportOpen, setMenuExportOpen] = useState(false)
   const [menuImportOpen, setMenuImportOpen] = useState(false)
+  const [entryGlidePanelOpen, setEntryGlidePanelOpen] = useState(false)
   const [toneSetEditorOpen, setToneSetEditorOpen] = useState(false)
   const [toneSetEditorDraft, setToneSetEditorDraft] = useState('')
   const [toneSetQuickName, setToneSetQuickName] = useState('')
@@ -413,6 +424,10 @@ function App() {
   const timbreBlend = useDroneStore((state) => state.timbreBlend)
   const harmonicTimbreEnabled = useDroneStore((state) => state.harmonicTimbreEnabled)
   const entryGlideEnabled = useDroneStore((state) => state.entryGlideEnabled)
+  const entryGlideLowestCents = useDroneStore((state) => state.entryGlideLowestCents)
+  const entryGlideLowestSeconds = useDroneStore((state) => state.entryGlideLowestSeconds)
+  const entryGlideHighestCents = useDroneStore((state) => state.entryGlideHighestCents)
+  const entryGlideHighestSeconds = useDroneStore((state) => state.entryGlideHighestSeconds)
   const globalOvertoneEditEnabled = useDroneStore((state) => state.globalOvertoneEditEnabled)
   const masterGainDb = useDroneStore((state) => state.masterGainDb)
   const metronomeEnabled = useDroneStore((state) => state.metronomeEnabled)
@@ -440,6 +455,10 @@ function App() {
   const setToneTimbreBlend = useDroneStore((state) => state.setToneTimbreBlend)
   const toggleHarmonicTimbreEnabled = useDroneStore((state) => state.toggleHarmonicTimbreEnabled)
   const toggleEntryGlideEnabled = useDroneStore((state) => state.toggleEntryGlideEnabled)
+  const setEntryGlideLowestCents = useDroneStore((state) => state.setEntryGlideLowestCents)
+  const setEntryGlideLowestSeconds = useDroneStore((state) => state.setEntryGlideLowestSeconds)
+  const setEntryGlideHighestCents = useDroneStore((state) => state.setEntryGlideHighestCents)
+  const setEntryGlideHighestSeconds = useDroneStore((state) => state.setEntryGlideHighestSeconds)
   const setGlobalOvertoneEditEnabled = useDroneStore((state) => state.setGlobalOvertoneEditEnabled)
   const enableGlobalOvertoneEditFromTone = useDroneStore((state) => state.enableGlobalOvertoneEditFromTone)
   const applyPartialsGlobally = useDroneStore((state) => state.applyPartialsGlobally)
@@ -1572,6 +1591,18 @@ function App() {
       partials,
       lowestToneGlideNoteId: entryGlideEnabled ? lowestToneGlideNoteId : null,
       highestToneGlideNoteId: entryGlideEnabled ? highestToneGlideNoteId : null,
+      lowestToneGlide: entryGlideEnabled
+        ? {
+            cents: entryGlideLowestCents,
+            seconds: entryGlideLowestSeconds,
+          }
+        : null,
+      highestToneGlide: entryGlideEnabled
+        ? {
+            cents: entryGlideHighestCents,
+            seconds: entryGlideHighestSeconds,
+          }
+        : null,
     }),
     [
       referenceA4Hz,
@@ -1582,6 +1613,10 @@ function App() {
       timbreBlend,
       harmonicTimbreEnabled,
       entryGlideEnabled,
+      entryGlideLowestCents,
+      entryGlideLowestSeconds,
+      entryGlideHighestCents,
+      entryGlideHighestSeconds,
       tonesInToneSet,
       partials,
       lowestToneGlideNoteId,
@@ -2127,8 +2162,21 @@ function App() {
                   onToneLongPress={handleToneSelectionLongPress}
                 />
                 <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs uppercase tracking-[0.16em] text-white/60">Entry glide</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      className="button-safe flex min-w-0 flex-1 items-center gap-2 text-left"
+                      onClick={() => setEntryGlidePanelOpen((current) => !current)}
+                      aria-expanded={entryGlidePanelOpen}
+                      aria-controls="entry-glide-controls"
+                    >
+                      <ChevronDown
+                        size={16}
+                        className={`shrink-0 text-white/60 transition-transform ${entryGlidePanelOpen ? 'rotate-180' : ''}`}
+                        aria-hidden
+                      />
+                      <span className="text-xs uppercase tracking-[0.16em] text-white/60">Entry glide</span>
+                    </button>
                     <button
                       type="button"
                       className={`button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition ${
@@ -2144,6 +2192,91 @@ function App() {
                       <ArrowDownUp size={15} aria-hidden />
                     </button>
                   </div>
+                  {entryGlidePanelOpen ? (
+                    <div
+                      id="entry-glide-controls"
+                      className={`mt-3 space-y-3 border-t border-white/10 pt-3 ${entryGlideEnabled ? '' : 'opacity-50'}`}
+                    >
+                      <div className="space-y-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">
+                          Lowest tone
+                        </div>
+                        <div className="grid grid-cols-[1.25rem_1fr_3rem] items-center gap-2">
+                          <span className="text-xs text-white/55">C</span>
+                          <ResettableRangeInput
+                            min={-50}
+                            max={50}
+                            step={1}
+                            value={entryGlideLowestCents}
+                            disabled={!entryGlideEnabled}
+                            onChange={(event) => setEntryGlideLowestCents(Number(event.target.value))}
+                            onReset={() => setEntryGlideLowestCents(DEFAULT_ENTRY_GLIDE_LOWEST_CENTS)}
+                            aria-label="Lowest tone entry glide cents. Positive glides down from above, negative glides up from below."
+                            className="h-1.5 w-full accent-fuchsia-300"
+                          />
+                          <span className="text-right text-xs tabular-nums text-white/70">
+                            {formatEntryGlideCents(entryGlideLowestCents)}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-[1.25rem_1fr_2.75rem] items-center gap-2">
+                          <span className="text-xs text-white/55">S</span>
+                          <ResettableRangeInput
+                            min={0}
+                            max={4}
+                            step={0.1}
+                            value={entryGlideLowestSeconds}
+                            disabled={!entryGlideEnabled}
+                            onChange={(event) => setEntryGlideLowestSeconds(Number(event.target.value))}
+                            onReset={() => setEntryGlideLowestSeconds(DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS)}
+                            aria-label="Lowest tone entry glide seconds"
+                            className="h-1.5 w-full accent-fuchsia-300"
+                          />
+                          <span className="text-right text-xs tabular-nums text-white/70">
+                            {entryGlideLowestSeconds.toFixed(1)}s
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">
+                          Highest tone
+                        </div>
+                        <div className="grid grid-cols-[1.25rem_1fr_3rem] items-center gap-2">
+                          <span className="text-xs text-white/55">C</span>
+                          <ResettableRangeInput
+                            min={-50}
+                            max={50}
+                            step={1}
+                            value={entryGlideHighestCents}
+                            disabled={!entryGlideEnabled}
+                            onChange={(event) => setEntryGlideHighestCents(Number(event.target.value))}
+                            onReset={() => setEntryGlideHighestCents(DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS)}
+                            aria-label="Highest tone entry glide cents. Positive glides down from above, negative glides up from below."
+                            className="h-1.5 w-full accent-fuchsia-300"
+                          />
+                          <span className="text-right text-xs tabular-nums text-white/70">
+                            {formatEntryGlideCents(entryGlideHighestCents)}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-[1.25rem_1fr_2.75rem] items-center gap-2">
+                          <span className="text-xs text-white/55">S</span>
+                          <ResettableRangeInput
+                            min={0}
+                            max={4}
+                            step={0.1}
+                            value={entryGlideHighestSeconds}
+                            disabled={!entryGlideEnabled}
+                            onChange={(event) => setEntryGlideHighestSeconds(Number(event.target.value))}
+                            onReset={() => setEntryGlideHighestSeconds(DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS)}
+                            aria-label="Highest tone entry glide seconds"
+                            className="h-1.5 w-full accent-fuchsia-300"
+                          />
+                          <span className="text-right text-xs tabular-nums text-white/70">
+                            {entryGlideHighestSeconds.toFixed(1)}s
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                   <div className="mb-1 flex items-center justify-between">

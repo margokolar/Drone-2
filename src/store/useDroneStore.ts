@@ -10,6 +10,10 @@ import {
 } from '../music/tuning'
 import {
   createDefaultPartials,
+  DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS,
+  DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS,
+  DEFAULT_ENTRY_GLIDE_LOWEST_CENTS,
+  DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS,
   DEFAULT_PRESETS,
   DEFAULT_TIMBRE_BLEND,
   DEFAULT_TONE_DETUNE_CENTS,
@@ -43,6 +47,10 @@ type DroneState = {
   }
   harmonicTimbreEnabled: boolean
   entryGlideEnabled: boolean
+  entryGlideLowestCents: number
+  entryGlideLowestSeconds: number
+  entryGlideHighestCents: number
+  entryGlideHighestSeconds: number
   globalOvertoneEditEnabled: boolean
   tones: ToneConfig[]
   partials: PartialConfig[]
@@ -65,6 +73,10 @@ type DroneState = {
   toggleHarmonicTimbreEnabled: () => void
   setEntryGlideEnabled: (enabled: boolean) => void
   toggleEntryGlideEnabled: () => void
+  setEntryGlideLowestCents: (cents: number) => void
+  setEntryGlideLowestSeconds: (seconds: number) => void
+  setEntryGlideHighestCents: (cents: number) => void
+  setEntryGlideHighestSeconds: (seconds: number) => void
   setGlobalOvertoneEditEnabled: (enabled: boolean) => void
   enableGlobalOvertoneEditFromTone: (noteId: NoteId) => void
   applyPartialsGlobally: (partials: PartialConfig[]) => void
@@ -344,6 +356,10 @@ export const useDroneStore = create<DroneState>()(
       timbreBlend: { ...INITIAL_PRESET.timbreBlend },
       harmonicTimbreEnabled: true,
       entryGlideEnabled: true,
+      entryGlideLowestCents: DEFAULT_ENTRY_GLIDE_LOWEST_CENTS,
+      entryGlideLowestSeconds: DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS,
+      entryGlideHighestCents: DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS,
+      entryGlideHighestSeconds: DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS,
       globalOvertoneEditEnabled: false,
       tones: INITIAL_PRESET.tones.map((tone) => ({ ...tone })),
       partials: normalizePartials(INITIAL_PRESET.partials.map((partial) => ({ ...partial }))),
@@ -418,6 +434,14 @@ export const useDroneStore = create<DroneState>()(
       setEntryGlideEnabled: (enabled) => set({ entryGlideEnabled: enabled }),
       toggleEntryGlideEnabled: () =>
         set((state) => ({ entryGlideEnabled: !state.entryGlideEnabled })),
+      setEntryGlideLowestCents: (cents) =>
+        set({ entryGlideLowestCents: clamp(Math.round(cents), -50, 50) }),
+      setEntryGlideLowestSeconds: (seconds) =>
+        set({ entryGlideLowestSeconds: clamp(Math.round(seconds * 10) / 10, 0, 4) }),
+      setEntryGlideHighestCents: (cents) =>
+        set({ entryGlideHighestCents: clamp(Math.round(cents), -50, 50) }),
+      setEntryGlideHighestSeconds: (seconds) =>
+        set({ entryGlideHighestSeconds: clamp(Math.round(seconds * 10) / 10, 0, 4) }),
       setGlobalOvertoneEditEnabled: (enabled) => set({ globalOvertoneEditEnabled: enabled }),
       enableGlobalOvertoneEditFromTone: (noteId) =>
         set((state) => {
@@ -1094,7 +1118,7 @@ export const useDroneStore = create<DroneState>()(
     }),
     {
       name: 'bourdon-store-v1',
-      version: 10,
+      version: 13,
       migrate: (persistedState) => {
         const typed = persistedState as Partial<DroneState> | undefined
         if (!typed) {
@@ -1156,6 +1180,26 @@ export const useDroneStore = create<DroneState>()(
           metronomeVolumeDb: typed.metronomeVolumeDb ?? -15,
           harmonicTimbreEnabled: typed.harmonicTimbreEnabled ?? true,
           entryGlideEnabled: typed.entryGlideEnabled ?? true,
+          entryGlideLowestCents: clamp(
+            -(typed.entryGlideLowestCents ?? DEFAULT_ENTRY_GLIDE_LOWEST_CENTS),
+            -50,
+            50,
+          ),
+          entryGlideLowestSeconds: clamp(
+            typed.entryGlideLowestSeconds ?? DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS,
+            0,
+            4,
+          ),
+          entryGlideHighestCents: clamp(
+            -(typed.entryGlideHighestCents ?? DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS),
+            -50,
+            50,
+          ),
+          entryGlideHighestSeconds: clamp(
+            typed.entryGlideHighestSeconds ?? DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS,
+            0,
+            4,
+          ),
           globalOvertoneEditEnabled: typed.globalOvertoneEditEnabled ?? false,
         }
       },
@@ -1172,6 +1216,10 @@ export const useDroneStore = create<DroneState>()(
         timbreBlend: state.timbreBlend,
         harmonicTimbreEnabled: state.harmonicTimbreEnabled,
         entryGlideEnabled: state.entryGlideEnabled,
+        entryGlideLowestCents: state.entryGlideLowestCents,
+        entryGlideLowestSeconds: state.entryGlideLowestSeconds,
+        entryGlideHighestCents: state.entryGlideHighestCents,
+        entryGlideHighestSeconds: state.entryGlideHighestSeconds,
         globalOvertoneEditEnabled: state.globalOvertoneEditEnabled,
         tones: state.tones,
         partials: state.partials,
