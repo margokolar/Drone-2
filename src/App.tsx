@@ -2025,53 +2025,52 @@ function App() {
           activeTab === 'overtones' ? 'landscape:pt-0 max-h-[500px]:pt-0' : ''
         }`}
       >
-        <header className="fixed left-3 right-3 top-2 z-40 mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019]/90 px-3 py-2 backdrop-blur-sm landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem]">
-          {activeTab !== 'blank' && (
-            <button
-              type="button"
-              aria-label={menuLabel}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-white/80"
-              onClick={() => setMenuOpen(true)}
-            >
-              <Menu size={20} />
-            </button>
-          )}
-          <button
-            type="button"
-            className="select-none rounded-lg px-1 py-1 text-xl font-semibold tracking-wide text-white transition hover:bg-white/10"
-            onPointerDown={() => {
-              droneTitleLongPressFiredRef.current = false
-              clearDroneTitleLongPressTimer()
-              droneTitleLongPressTimerRef.current = window.setTimeout(() => {
-                droneTitleLongPressTimerRef.current = null
-                droneTitleLongPressFiredRef.current = true
-                setActiveTab('overtones')
-              }, DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS)
-            }}
-            onPointerUp={clearDroneTitleLongPressTimer}
-            onPointerLeave={clearDroneTitleLongPressTimer}
-            onPointerCancel={clearDroneTitleLongPressTimer}
-            onClick={() => {
-              if (droneTitleLongPressFiredRef.current) {
-                droneTitleLongPressFiredRef.current = false
-                return
-              }
-              setActiveTab('tone')
-            }}
-            aria-label="Open Tone home. Long-press to open Overtone balance."
-          >
-            Drone 2
-          </button>
-          <div className="ml-auto text-4xl font-extrabold leading-none text-fuchsia-100">{currentTime}</div>
-        </header>
-
-        <main
-          className={`landscape:pb-2 max-h-[500px]:pb-2 ${
-            activeTab === 'blank' ? 'pb-20' : activeTab === 'metronome' ? 'pb-32' : 'pb-44'
+        <div
+          className={`sticky top-0 z-40 -mx-3 bg-[#111019] px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))] ${
+            activeTab === 'tone' ? 'landscape:pt-3 max-h-[500px]:pt-3' : 'landscape:hidden max-h-[500px]:hidden'
           }`}
         >
-          <div className="space-y-3 pt-40 landscape:pt-24 max-h-[500px]:pt-24" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
-            <div className="fixed left-3 right-3 top-[76px] z-20 mx-auto grid max-w-[26.5rem] grid-cols-2 gap-3 landscape:top-3 max-h-[500px]:top-3 md:max-w-[62.5rem]">
+          <header className="mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem]">
+            {activeTab !== 'blank' && (
+              <button
+                type="button"
+                aria-label={menuLabel}
+                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-white/80"
+                onClick={() => setMenuOpen(true)}
+              >
+                <Menu size={20} />
+              </button>
+            )}
+            <button
+              type="button"
+              className="select-none rounded-lg px-1 py-1 text-xl font-semibold tracking-wide text-white transition hover:bg-white/10"
+              onPointerDown={() => {
+                droneTitleLongPressFiredRef.current = false
+                clearDroneTitleLongPressTimer()
+                droneTitleLongPressTimerRef.current = window.setTimeout(() => {
+                  droneTitleLongPressTimerRef.current = null
+                  droneTitleLongPressFiredRef.current = true
+                  setActiveTab('overtones')
+                }, DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS)
+              }}
+              onPointerUp={clearDroneTitleLongPressTimer}
+              onPointerLeave={clearDroneTitleLongPressTimer}
+              onPointerCancel={clearDroneTitleLongPressTimer}
+              onClick={() => {
+                if (droneTitleLongPressFiredRef.current) {
+                  droneTitleLongPressFiredRef.current = false
+                  return
+                }
+                setActiveTab('tone')
+              }}
+              aria-label="Open Tone home. Long-press to open Overtone balance."
+            >
+              Drone 2
+            </button>
+            <div className="ml-auto text-4xl font-extrabold leading-none text-fuchsia-100">{currentTime}</div>
+          </header>
+          {activeTab === 'tone' && (
+            <div className="mx-auto mt-3 grid max-w-[26.5rem] grid-cols-2 gap-3 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem]">
               <article className="relative min-w-0 overflow-hidden rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
                 <button
                   type="button"
@@ -2139,6 +2138,15 @@ function App() {
                 />
               </article>
             </div>
+          )}
+        </div>
+
+        <main
+          className={`landscape:pb-2 max-h-[500px]:pb-2 ${
+            activeTab === 'blank' ? 'pb-20' : activeTab === 'metronome' ? 'pb-32' : 'pb-44'
+          }`}
+        >
+          <div className="space-y-3" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
             <SectionCard title="Global controls" className="[&>header]:mb-2.5">
               <div className="space-y-3">
                 <TopControls
@@ -2313,7 +2321,7 @@ function App() {
             </SectionCard>
           </div>
           <div
-            className="space-y-4 portrait:pt-16 landscape:space-y-2 landscape:pt-0 max-h-[500px]:space-y-2 max-h-[500px]:pt-0"
+            className="space-y-4 landscape:space-y-2 landscape:pt-0 max-h-[500px]:space-y-2 max-h-[500px]:pt-0"
             role="tabpanel"
             id="panel-overtones"
             aria-labelledby="tab-overtones"
@@ -2495,7 +2503,7 @@ function App() {
             </SectionCard>
           </div>
           <div
-            className="space-y-4 pt-16 landscape:space-y-2 max-h-[500px]:space-y-2 max-h-[500px]:pt-16"
+            className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
             role="tabpanel"
             id="panel-metronome"
             aria-labelledby="tab-metronome"
@@ -2513,7 +2521,7 @@ function App() {
             </SectionCard>
           </div>
           <div
-            className="space-y-4 pt-16 landscape:space-y-2 max-h-[500px]:space-y-2 max-h-[500px]:pt-16"
+            className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
             role="tabpanel"
             id="panel-presets"
             aria-labelledby="tab-presets"
@@ -2549,7 +2557,7 @@ function App() {
             </SectionCard>
           </div>
           <div
-            className="space-y-4 pt-16 landscape:space-y-2 max-h-[500px]:space-y-2 max-h-[500px]:pt-16"
+            className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
             role="tabpanel"
             id="panel-midi"
             aria-labelledby="tab-midi"
