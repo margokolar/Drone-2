@@ -342,6 +342,66 @@ export function getFrequency(
   return getNaturalFrequency(noteId, tonalCenter, a4Hz, baseOctave);
 }
 
+export function findLowestEnabledToneNoteId(
+  tones: ReadonlyArray<{ noteId: NoteId; enabled: boolean }>,
+  tuningSystemId: TuningSystemId,
+  tonalCenter: TonalCenter,
+  a4Hz: number,
+  baseOctave: number,
+): NoteId | null {
+  let lowestNoteId: NoteId | null = null
+  let lowestFrequency = Number.POSITIVE_INFINITY
+
+  for (const tone of tones) {
+    if (!tone.enabled) {
+      continue
+    }
+    const frequency = getFrequency(
+      tone.noteId,
+      tuningSystemId,
+      tonalCenter,
+      a4Hz,
+      baseOctave,
+    )
+    if (frequency < lowestFrequency) {
+      lowestFrequency = frequency
+      lowestNoteId = tone.noteId
+    }
+  }
+
+  return lowestNoteId
+}
+
+export function findHighestEnabledToneNoteId(
+  tones: ReadonlyArray<{ noteId: NoteId; enabled: boolean }>,
+  tuningSystemId: TuningSystemId,
+  tonalCenter: TonalCenter,
+  a4Hz: number,
+  baseOctave: number,
+): NoteId | null {
+  let highestNoteId: NoteId | null = null
+  let highestFrequency = Number.NEGATIVE_INFINITY
+
+  for (const tone of tones) {
+    if (!tone.enabled) {
+      continue
+    }
+    const frequency = getFrequency(
+      tone.noteId,
+      tuningSystemId,
+      tonalCenter,
+      a4Hz,
+      baseOctave,
+    )
+    if (frequency > highestFrequency) {
+      highestFrequency = frequency
+      highestNoteId = tone.noteId
+    }
+  }
+
+  return highestNoteId
+}
+
 export function transposeNoteClass(
   noteClass: NoteClass,
   semitoneDelta: number

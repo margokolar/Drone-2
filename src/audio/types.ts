@@ -21,6 +21,7 @@ export type ToneConfig = {
   pan: number
   detuneCents: number
   partials?: PartialConfig[]
+  timbreBlend?: TimbreBlend
 }
 
 export type DroneRuntimeConfig = {
@@ -33,4 +34,8 @@ export type DroneRuntimeConfig = {
   harmonicTimbreEnabled: boolean
   tones: ToneConfig[]
   partials: PartialConfig[]
+  /** Enabled tone with the lowest pitch; gets an entry glide when its voice starts. */
+  lowestToneGlideNoteId?: NoteId | null
+  /** Enabled tone with the highest pitch; rises into tune when its voice starts. */
+  highestToneGlideNoteId?: NoteId | null
 }

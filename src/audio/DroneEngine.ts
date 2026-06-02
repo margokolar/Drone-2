@@ -14,12 +14,18 @@ type ToneVoice = {
   outputGain: GainNode
   panner: StereoPannerNode
   oscillators: OscBundle[]
+  /** AudioContext time after which entry pitch glide may be overridden by updates. */
+  entryGlideEndTime: number | null
 }
 
 const ATTACK_SECONDS = 0.025
 const RELEASE_SECONDS = 0.08
 const REBUILD_RELEASE_SECONDS = 0.03
 const PARAM_SMOOTH_SECONDS = 0.015
+const LOWEST_TONE_GLIDE_CENTS = 50
+const LOWEST_TONE_GLIDE_SECONDS = 1.5
+const HIGHEST_TONE_GLIDE_CENTS = 30
+const HIGHEST_TONE_GLIDE_SECONDS = 0.6
 const LIMITER_THRESHOLD_DB = -3
 
 export class DroneEngine {
@@ -198,7 +204,12 @@ export class DroneEngine {
     if (!this.context || !this.masterGain) {
       return
     }
-    this.forceMute(this.context.currentTime)
+    const now = this.context.currentTime
+    this.forceMute(now)
+    for (const [noteId, voice] of this.voiceMap.entries()) {
+      this.fadeAndStopVoice(voice, RELEASE_SECONDS)
+      this.voiceMap.delete(noteId)
+    }
   }
 
   syncConfig(config: DroneRuntimeConfig, forceRebuild = false): void {
@@ -284,6 +295,52 @@ export class DroneEngine {
     return activeOscCount !== voice.oscillators.length
   }
 
+  private getEntryGlideSpec(
+    config: DroneRuntimeConfig,
+    toneConfig: ToneConfig,
+  ): { cents: number; seconds: number; direction: 'up' | 'down' } | null {
+    if (config.lowestToneGlideNoteId && config.lowestToneGlideNoteId === toneConfig.noteId) {
+      return {
+        cents: LOWEST_TONE_GLIDE_CENTS,
+        seconds: LOWEST_TONE_GLIDE_SECONDS,
+        direction: 'down',
+      }
+    }
+    if (config.highestToneGlideNoteId && config.highestToneGlideNoteId === toneConfig.noteId) {
+      return {
+        cents: HIGHEST_TONE_GLIDE_CENTS,
+        seconds: HIGHEST_TONE_GLIDE_SECONDS,
+        direction: 'up',
+      }
+    }
+    return null
+  }
+
+  private scheduleEntryGlideFrequency(
+    oscillator: OscillatorNode,
+    targetFrequency: number,
+    config: DroneRuntimeConfig,
+    toneConfig: ToneConfig,
+    now: number,
+  ): void {
+    oscillator.frequency.cancelScheduledValues(now)
+    const glide = this.getEntryGlideSpec(config, toneConfig)
+    if (glide) {
+      const centRatio = 2 ** (glide.cents / 1200)
+      const startFrequency = Math.max(
+        1,
+        glide.direction === 'down' ? targetFrequency * centRatio : targetFrequency / centRatio,
+      )
+      oscillator.frequency.setValueAtTime(startFrequency, now)
+      oscillator.frequency.exponentialRampToValueAtTime(
+        Math.max(1, targetFrequency),
+        now + glide.seconds,
+      )
+      return
+    }
+    oscillator.frequency.setValueAtTime(Math.max(1, targetFrequency), now)
+  }
+
   private createVoice(
     config: DroneRuntimeConfig,
     toneConfig: ToneConfig,
@@ -299,7 +356,7 @@ export class DroneEngine {
     outputGain.connect(panner)
     panner.connect(this.masterGain)
 
-    const blend = normalizedBlend(config.timbreBlend)
+    const blend = normalizedBlend(toneConfig.timbreBlend ?? config.timbreBlend)
     const toneGain = dbToGain(toneConfig.gainDb)
     const toneFrequency = getFrequency(
       toneConfig.noteId,
@@ -308,6 +365,7 @@ export class DroneEngine {
       config.referenceA4Hz,
       config.baseOctave,
     )
+    const entryGlide = this.getEntryGlideSpec(config, toneConfig)
     const oscillators: OscBundle[] = []
     const activePartials = (toneConfig.partials ?? config.partials).filter((partial) => partial.enabled)
     for (let partialIndex = 0; partialIndex < activePartials.length; partialIndex += 1) {
@@ -325,12 +383,14 @@ export class DroneEngine {
         const oscillator = this.context.createOscillator()
         const gainNode = this.context.createGain()
         oscillator.type = waveGain.type
-        oscillator.frequency.value = toneFrequency * ratio
+        const targetFrequency = toneFrequency * ratio
+        oscillator.frequency.value = targetFrequency
         oscillator.detune.value = toneConfig.detuneCents
         gainNode.gain.value = 0.0001
         oscillator.connect(gainNode)
         gainNode.connect(outputGain)
         oscillator.start()
+        this.scheduleEntryGlideFrequency(oscillator, targetFrequency, config, toneConfig, now)
         oscillators.push({
           oscillator,
           gainNode,
@@ -364,6 +424,7 @@ export class DroneEngine {
       outputGain,
       panner,
       oscillators,
+      entryGlideEndTime: entryGlide ? now + entryGlide.seconds : null,
     }
   }
 
@@ -388,14 +449,18 @@ export class DroneEngine {
     voice.panner.pan.setValueAtTime(voice.panner.pan.value, now)
     voice.panner.pan.linearRampToValueAtTime(toneConfig.pan, now + PARAM_SMOOTH_SECONDS)
 
-    const detuneTarget = toneConfig.detuneCents
-    for (const bundle of voice.oscillators) {
-      bundle.oscillator.detune.cancelScheduledValues(now)
-      bundle.oscillator.detune.setValueAtTime(bundle.oscillator.detune.value, now)
-      bundle.oscillator.detune.linearRampToValueAtTime(detuneTarget, now + PARAM_SMOOTH_SECONDS)
+    const entryGlideActive =
+      voice.entryGlideEndTime !== null && now < voice.entryGlideEndTime
+
+    if (!entryGlideActive) {
+      for (const bundle of voice.oscillators) {
+        bundle.oscillator.detune.cancelScheduledValues(now)
+        bundle.oscillator.detune.setValueAtTime(bundle.oscillator.detune.value, now)
+        bundle.oscillator.detune.linearRampToValueAtTime(toneConfig.detuneCents, now + PARAM_SMOOTH_SECONDS)
+      }
     }
 
-    const blend = normalizedBlend(config.timbreBlend)
+    const blend = normalizedBlend(toneConfig.timbreBlend ?? config.timbreBlend)
     const activePartials = (toneConfig.partials ?? config.partials).filter((partial) => partial.enabled)
     let index = 0
     for (let partialIndex = 0; partialIndex < activePartials.length; partialIndex += 1) {
@@ -422,12 +487,14 @@ export class DroneEngine {
             : 0.0001
         bundle.ratio = ratio
         bundle.waveGain = nextWaveGain
-        bundle.oscillator.frequency.cancelScheduledValues(now)
-        bundle.oscillator.frequency.setValueAtTime(bundle.oscillator.frequency.value, now)
-        bundle.oscillator.frequency.exponentialRampToValueAtTime(
-          Math.max(1, frequency * ratio),
-          now + PARAM_SMOOTH_SECONDS,
-        )
+        if (!entryGlideActive) {
+          bundle.oscillator.frequency.cancelScheduledValues(now)
+          bundle.oscillator.frequency.setValueAtTime(bundle.oscillator.frequency.value, now)
+          bundle.oscillator.frequency.exponentialRampToValueAtTime(
+            Math.max(1, frequency * ratio),
+            now + PARAM_SMOOTH_SECONDS,
+          )
+        }
         bundle.gainNode.gain.cancelScheduledValues(now)
         bundle.gainNode.gain.setValueAtTime(bundle.gainNode.gain.value, now)
         bundle.gainNode.gain.exponentialRampToValueAtTime(

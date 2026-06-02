@@ -1,4 +1,5 @@
 import {
+  ArrowDownUp,
   AudioWaveform,
   BatteryMedium,
   ChevronDown,
@@ -54,7 +55,7 @@ import {
   NOTE_IDS,
   type NoteId,
 } from './music/notes'
-import { getFrequency } from './music/tuning'
+import { getFrequency, findLowestEnabledToneNoteId, findHighestEnabledToneNoteId } from './music/tuning'
 import { createDefaultPartials, DEFAULT_MASTER_GAIN_DB, type Preset } from './presets/defaultPresets'
 import { useDroneStore } from './store/useDroneStore'
 
@@ -411,6 +412,7 @@ function App() {
   const baseOctave = useDroneStore((state) => state.baseOctave)
   const timbreBlend = useDroneStore((state) => state.timbreBlend)
   const harmonicTimbreEnabled = useDroneStore((state) => state.harmonicTimbreEnabled)
+  const entryGlideEnabled = useDroneStore((state) => state.entryGlideEnabled)
   const globalOvertoneEditEnabled = useDroneStore((state) => state.globalOvertoneEditEnabled)
   const masterGainDb = useDroneStore((state) => state.masterGainDb)
   const metronomeEnabled = useDroneStore((state) => state.metronomeEnabled)
@@ -434,7 +436,10 @@ function App() {
   const addTonePartial = useDroneStore((state) => state.addTonePartial)
   const removeTonePartial = useDroneStore((state) => state.removeTonePartial)
   const setTimbreValue = useDroneStore((state) => state.setTimbreValue)
+  const setToneTimbreValue = useDroneStore((state) => state.setToneTimbreValue)
+  const setToneTimbreBlend = useDroneStore((state) => state.setToneTimbreBlend)
   const toggleHarmonicTimbreEnabled = useDroneStore((state) => state.toggleHarmonicTimbreEnabled)
+  const toggleEntryGlideEnabled = useDroneStore((state) => state.toggleEntryGlideEnabled)
   const setGlobalOvertoneEditEnabled = useDroneStore((state) => state.setGlobalOvertoneEditEnabled)
   const enableGlobalOvertoneEditFromTone = useDroneStore((state) => state.enableGlobalOvertoneEditFromTone)
   const applyPartialsGlobally = useDroneStore((state) => state.applyPartialsGlobally)
@@ -475,6 +480,13 @@ function App() {
         ? partials
         : (selectedOvertoneTone?.partials ?? partials),
     [globalOvertoneEditEnabled, partials, selectedOvertoneTone],
+  )
+  const selectedOvertoneTimbreBlend = useMemo(
+    () =>
+      globalOvertoneEditEnabled
+        ? timbreBlend
+        : (selectedOvertoneTone?.timbreBlend ?? timbreBlend),
+    [globalOvertoneEditEnabled, selectedOvertoneTone, timbreBlend],
   )
   const setSelectedOvertonePartials = useCallback(
     (nextPartials: PartialConfig[]) => {
@@ -533,6 +545,28 @@ function App() {
     },
     [globalOvertoneEditEnabled, removePartialGlobally, removeTonePartial, selectedOvertoneNoteId],
   )
+  const setSelectedOvertoneTimbreValue = useCallback(
+    (key: 'sine' | 'saw' | 'square', value: number) => {
+      if (globalOvertoneEditEnabled) {
+        setTimbreValue(key, value)
+        return
+      }
+      setToneTimbreValue(selectedOvertoneNoteId, key, value)
+    },
+    [globalOvertoneEditEnabled, selectedOvertoneNoteId, setTimbreValue, setToneTimbreValue],
+  )
+  const setSelectedOvertoneTimbreBlend = useCallback(
+    (nextTimbreBlend: TimbreBlend) => {
+      if (globalOvertoneEditEnabled) {
+        setTimbreValue('sine', nextTimbreBlend.sine)
+        setTimbreValue('saw', nextTimbreBlend.saw)
+        setTimbreValue('square', nextTimbreBlend.square)
+        return
+      }
+      setToneTimbreBlend(selectedOvertoneNoteId, nextTimbreBlend)
+    },
+    [globalOvertoneEditEnabled, selectedOvertoneNoteId, setTimbreValue, setToneTimbreBlend],
+  )
 
   const toggleGlobalOvertoneEdit = useCallback(() => {
     if (globalOvertoneEditEnabled) {
@@ -589,24 +623,32 @@ function App() {
 
   const getCurrentOvertoneSnapshot = useCallback((): OvertoneSnapshot => {
     const state = useDroneStore.getState()
+    const selectedTone = state.tones.find((tone) => tone.noteId === selectedOvertoneNoteId)
     const sourcePartials = globalOvertoneEditEnabled
       ? state.partials
-      : (state.tones.find((tone) => tone.noteId === selectedOvertoneNoteId)?.partials ??
-        selectedOvertonePartials)
+      : (selectedTone?.partials ?? selectedOvertonePartials)
+    const sourceTimbre = globalOvertoneEditEnabled
+      ? state.timbreBlend
+      : (selectedTone?.timbreBlend ?? selectedOvertoneTimbreBlend)
     return {
       partials: clonePartials(sourcePartials),
-      timbreBlend: cloneTimbreBlend(state.timbreBlend),
+      timbreBlend: cloneTimbreBlend(sourceTimbre),
     }
-  }, [clonePartials, cloneTimbreBlend, globalOvertoneEditEnabled, selectedOvertoneNoteId, selectedOvertonePartials])
+  }, [
+    clonePartials,
+    cloneTimbreBlend,
+    globalOvertoneEditEnabled,
+    selectedOvertoneNoteId,
+    selectedOvertonePartials,
+    selectedOvertoneTimbreBlend,
+  ])
 
   const applyOvertoneSnapshot = useCallback(
     (snapshot: OvertoneSnapshot) => {
       setSelectedOvertonePartials(clonePartials(snapshot.partials))
-      setTimbreValue('sine', snapshot.timbreBlend.sine)
-      setTimbreValue('saw', snapshot.timbreBlend.saw)
-      setTimbreValue('square', snapshot.timbreBlend.square)
+      setSelectedOvertoneTimbreBlend(cloneTimbreBlend(snapshot.timbreBlend))
     },
-    [clonePartials, setSelectedOvertonePartials, setTimbreValue],
+    [clonePartials, cloneTimbreBlend, setSelectedOvertonePartials, setSelectedOvertoneTimbreBlend],
   )
 
   const getOvertoneHistoryStack = useCallback(
@@ -1495,6 +1537,28 @@ function App() {
       baseOctave,
     )
   }, [activeTones, baseOctave, referenceA4Hz, selectedOvertoneTone, tonalCenter, tones, tuningSystemId])
+  const lowestToneGlideNoteId = useMemo(
+    () =>
+      findLowestEnabledToneNoteId(
+        tonesInToneSet,
+        tuningSystemId,
+        tonalCenter,
+        referenceA4Hz,
+        baseOctave,
+      ),
+    [baseOctave, referenceA4Hz, tonalCenter, tonesInToneSet, tuningSystemId],
+  )
+  const highestToneGlideNoteId = useMemo(
+    () =>
+      findHighestEnabledToneNoteId(
+        tonesInToneSet,
+        tuningSystemId,
+        tonalCenter,
+        referenceA4Hz,
+        baseOctave,
+      ),
+    [baseOctave, referenceA4Hz, tonalCenter, tonesInToneSet, tuningSystemId],
+  )
   const runtimeConfig = useMemo<DroneRuntimeConfig>(
     () => ({
       referenceA4Hz,
@@ -1506,6 +1570,8 @@ function App() {
       harmonicTimbreEnabled,
       tones: tonesInToneSet,
       partials,
+      lowestToneGlideNoteId: entryGlideEnabled ? lowestToneGlideNoteId : null,
+      highestToneGlideNoteId: entryGlideEnabled ? highestToneGlideNoteId : null,
     }),
     [
       referenceA4Hz,
@@ -1515,8 +1581,11 @@ function App() {
       masterGainDb,
       timbreBlend,
       harmonicTimbreEnabled,
+      entryGlideEnabled,
       tonesInToneSet,
       partials,
+      lowestToneGlideNoteId,
+      highestToneGlideNoteId,
     ],
   )
 
@@ -2058,6 +2127,25 @@ function App() {
                   onToneLongPress={handleToneSelectionLongPress}
                 />
                 <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs uppercase tracking-[0.16em] text-white/60">Entry glide</span>
+                    <button
+                      type="button"
+                      className={`button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition ${
+                        entryGlideEnabled
+                          ? 'border-fuchsia-300/60 bg-fuchsia-300/20 text-fuchsia-100 hover:bg-fuchsia-300/30'
+                          : 'border-white/15 bg-white/5 text-white/80 opacity-40 hover:bg-white/10'
+                      }`}
+                      onClick={toggleEntryGlideEnabled}
+                      aria-label="Toggle entry glide for lowest and highest tones"
+                      aria-pressed={entryGlideEnabled}
+                      title="Entry glide"
+                    >
+                      <ArrowDownUp size={15} aria-hidden />
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                   <div className="mb-1 flex items-center justify-between">
                     <span className="text-xs uppercase tracking-[0.16em] text-white/60">Master gain</span>
                     <span className="text-xs tabular-nums text-white/70">{masterGainDb.toFixed(1)} dB</span>
@@ -2193,7 +2281,7 @@ function App() {
             >
               <OvertoneBars
                 partials={selectedOvertonePartials}
-                timbreBlend={timbreBlend}
+                timbreBlend={selectedOvertoneTimbreBlend}
                 harmonicTimbreEnabled={harmonicTimbreEnabled}
                 onGainChange={overtoneMidi.onPartialGainFromUi}
                 onGainDragStart={rememberOvertoneState}
@@ -2250,8 +2338,8 @@ function App() {
             <div className="hidden shrink-0 landscape:block max-h-[500px]:block">
               <TimbreMorphSlider
                 orientation="vertical"
-                timbreBlend={timbreBlend}
-                onSetTimbreValue={setTimbreValue}
+                timbreBlend={selectedOvertoneTimbreBlend}
+                onSetTimbreValue={setSelectedOvertoneTimbreValue}
                 onTimbreChangeStart={beginTimbreMorphChange}
                 onTimbreChangeEnd={endTimbreMorphChange}
               />
@@ -2261,13 +2349,13 @@ function App() {
               <PartialEditor
                 partials={selectedOvertonePartials}
                 referenceFrequencyHz={partialReferenceFrequencyHz}
-                timbreBlend={timbreBlend}
+                timbreBlend={selectedOvertoneTimbreBlend}
                 onSetPartialEnabled={overtoneMidi.onPartialEnabledFromUi}
                 onSetPartialRatio={setSelectedOvertoneRatio}
                 onSetPartialGain={overtoneMidi.onPartialGainFromUi}
                 onAddPartial={addSelectedOvertonePartial}
                 onRemovePartial={removeSelectedOvertonePartial}
-                onSetTimbreValue={setTimbreValue}
+                onSetTimbreValue={setSelectedOvertoneTimbreValue}
                 onTimbreChangeStart={beginTimbreMorphChange}
                 onTimbreChangeEnd={endTimbreMorphChange}
               />

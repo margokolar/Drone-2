@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { PartialConfig, ToneConfig } from '../audio/types'
+import type { PartialConfig, TimbreBlend, ToneConfig } from '../audio/types'
 import { TONAL_CENTERS, migrateLegacyNoteId, NOTE_IDS, type NoteId, type TonalCenter } from '../music/notes'
 import {
   MAX_BASE_OCTAVE,
@@ -11,6 +11,7 @@ import {
 import {
   createDefaultPartials,
   DEFAULT_PRESETS,
+  DEFAULT_TIMBRE_BLEND,
   DEFAULT_TONE_DETUNE_CENTS,
   MAX_TONE_DETUNE_CENTS,
   MIN_TONE_DETUNE_CENTS,
@@ -41,6 +42,7 @@ type DroneState = {
     square: number
   }
   harmonicTimbreEnabled: boolean
+  entryGlideEnabled: boolean
   globalOvertoneEditEnabled: boolean
   tones: ToneConfig[]
   partials: PartialConfig[]
@@ -57,8 +59,12 @@ type DroneState = {
   setTonalCenter: (center: TonalCenter) => void
   setMasterGainDb: (db: number) => void
   setTimbreValue: (key: 'sine' | 'saw' | 'square', value: number) => void
+  setToneTimbreValue: (noteId: NoteId, key: 'sine' | 'saw' | 'square', value: number) => void
+  setToneTimbreBlend: (noteId: NoteId, timbreBlend: TimbreBlend) => void
   setHarmonicTimbreEnabled: (enabled: boolean) => void
   toggleHarmonicTimbreEnabled: () => void
+  setEntryGlideEnabled: (enabled: boolean) => void
+  toggleEntryGlideEnabled: () => void
   setGlobalOvertoneEditEnabled: (enabled: boolean) => void
   enableGlobalOvertoneEditFromTone: (noteId: NoteId) => void
   applyPartialsGlobally: (partials: PartialConfig[]) => void
@@ -120,11 +126,12 @@ function clamp(value: number, min: number, max: number): number {
 
 function duplicatePresetData(preset: Preset): Preset {
   const partials = normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial })))
+  const timbreBlend = normalizeTimbreBlend(preset.timbreBlend ?? DEFAULT_TIMBRE_BLEND)
   return {
     ...preset,
-    tones: migrateTones(preset.tones, partials),
+    tones: migrateTones(preset.tones, partials, timbreBlend),
     partials,
-    timbreBlend: { ...preset.timbreBlend },
+    timbreBlend,
   }
 }
 
@@ -145,9 +152,13 @@ function applyPresetState(preset: Preset): Pick<
     tonalCenter: preset.tonalCenter,
     baseOctave: clamp(preset.baseOctave, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
     masterGainDb: preset.masterGainDb,
-    timbreBlend: { ...preset.timbreBlend },
-    tones: migrateTones(preset.tones, preset.partials ?? DEFAULT_PARTIALS),
+    tones: migrateTones(
+      preset.tones,
+      preset.partials ?? DEFAULT_PARTIALS,
+      normalizeTimbreBlend(preset.timbreBlend ?? DEFAULT_TIMBRE_BLEND),
+    ),
     partials: normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial }))),
+    timbreBlend: normalizeTimbreBlend(preset.timbreBlend ?? DEFAULT_TIMBRE_BLEND),
   }
 }
 
@@ -167,7 +178,7 @@ function snapshotPresetFromState(
     baseOctave: state.baseOctave,
     masterGainDb: state.masterGainDb,
     timbreBlend: { ...state.timbreBlend },
-    tones: state.tones.map((tone) => normalizeTonePartials(tone, state.partials)),
+    tones: state.tones.map((tone) => normalizeTone(tone, state.partials, state.timbreBlend)),
     partials: normalizePartials(state.partials.map((partial) => ({ ...partial }))),
   }
 }
@@ -186,12 +197,35 @@ function normalizePartials(partials: PartialConfig[]): PartialConfig[] {
   }))
 }
 
+function normalizeTimbreBlend(timbreBlend: TimbreBlend): TimbreBlend {
+  return {
+    sine: clamp(timbreBlend.sine, 0, 1),
+    saw: clamp(timbreBlend.saw, 0, 1),
+    square: clamp(timbreBlend.square, 0, 1),
+  }
+}
+
 function normalizeTonePartials(tone: ToneConfig, fallbackPartials: PartialConfig[]): ToneConfig {
   return {
     ...tone,
     detuneCents: clamp(tone.detuneCents ?? DEFAULT_TONE_DETUNE_CENTS, MIN_TONE_DETUNE_CENTS, MAX_TONE_DETUNE_CENTS),
     partials: normalizePartials((tone.partials ?? fallbackPartials).map((partial) => ({ ...partial }))),
   }
+}
+
+function normalizeToneTimbre(tone: ToneConfig, fallbackTimbre: TimbreBlend): ToneConfig {
+  return {
+    ...tone,
+    timbreBlend: normalizeTimbreBlend(tone.timbreBlend ?? fallbackTimbre),
+  }
+}
+
+function normalizeTone(
+  tone: ToneConfig,
+  fallbackPartials: PartialConfig[],
+  fallbackTimbre: TimbreBlend,
+): ToneConfig {
+  return normalizeToneTimbre(normalizeTonePartials(tone, fallbackPartials), fallbackTimbre)
 }
 
 function syncAllTonesWithPartials(
@@ -208,7 +242,25 @@ function syncAllTonesWithPartials(
   }
 }
 
-function migrateTones(tones: ToneConfig[], fallbackPartials: PartialConfig[]): ToneConfig[] {
+function syncAllTonesWithTimbre(
+  state: Pick<DroneState, 'tones' | 'timbreBlend'>,
+  timbreBlend: TimbreBlend,
+): Pick<DroneState, 'timbreBlend' | 'tones'> {
+  const normalized = normalizeTimbreBlend(timbreBlend)
+  return {
+    timbreBlend: normalized,
+    tones: state.tones.map((tone) => ({
+      ...tone,
+      timbreBlend: { ...normalized },
+    })),
+  }
+}
+
+function migrateTones(
+  tones: ToneConfig[],
+  fallbackPartials: PartialConfig[],
+  fallbackTimbre: TimbreBlend = DEFAULT_TIMBRE_BLEND,
+): ToneConfig[] {
   const migratedById = new Map<NoteId, ToneConfig>()
 
   for (const tone of tones) {
@@ -230,9 +282,9 @@ function migrateTones(tones: ToneConfig[], fallbackPartials: PartialConfig[]): T
   return NOTE_IDS.map((noteId) => {
     const tone = migratedById.get(noteId)
     if (tone) {
-      return normalizeTonePartials(tone, fallbackPartials)
+      return normalizeTone(tone, fallbackPartials, fallbackTimbre)
     }
-    return normalizeTonePartials(
+    return normalizeTone(
       {
         noteId,
         enabled: false,
@@ -241,6 +293,7 @@ function migrateTones(tones: ToneConfig[], fallbackPartials: PartialConfig[]): T
         detuneCents: DEFAULT_TONE_DETUNE_CENTS,
       },
       fallbackPartials,
+      fallbackTimbre,
     )
   })
 }
@@ -290,6 +343,7 @@ export const useDroneStore = create<DroneState>()(
       masterGainDb: INITIAL_PRESET.masterGainDb,
       timbreBlend: { ...INITIAL_PRESET.timbreBlend },
       harmonicTimbreEnabled: true,
+      entryGlideEnabled: true,
       globalOvertoneEditEnabled: false,
       tones: INITIAL_PRESET.tones.map((tone) => ({ ...tone })),
       partials: normalizePartials(INITIAL_PRESET.partials.map((partial) => ({ ...partial }))),
@@ -325,23 +379,59 @@ export const useDroneStore = create<DroneState>()(
       },
       setMasterGainDb: (db) => set({ masterGainDb: clamp(db, -30, 0) }),
       setTimbreValue: (key, value) =>
-        set((state) => ({
-          timbreBlend: {
+        set((state) =>
+          syncAllTonesWithTimbre(state, {
             ...state.timbreBlend,
             [key]: clamp(value, 0, 1),
-          },
+          }),
+        ),
+      setToneTimbreValue: (noteId, key, value) =>
+        set((state) => ({
+          tones: state.tones.map((tone) => {
+            if (tone.noteId !== noteId) {
+              return tone
+            }
+            const source = tone.timbreBlend ?? state.timbreBlend
+            return {
+              ...tone,
+              timbreBlend: normalizeTimbreBlend({
+                ...source,
+                [key]: clamp(value, 0, 1),
+              }),
+            }
+          }),
+        })),
+      setToneTimbreBlend: (noteId, timbreBlend) =>
+        set((state) => ({
+          tones: state.tones.map((tone) =>
+            tone.noteId === noteId
+              ? {
+                  ...tone,
+                  timbreBlend: normalizeTimbreBlend(timbreBlend),
+                }
+              : tone,
+          ),
         })),
       setHarmonicTimbreEnabled: (enabled) => set({ harmonicTimbreEnabled: enabled }),
       toggleHarmonicTimbreEnabled: () =>
         set((state) => ({ harmonicTimbreEnabled: !state.harmonicTimbreEnabled })),
+      setEntryGlideEnabled: (enabled) => set({ entryGlideEnabled: enabled }),
+      toggleEntryGlideEnabled: () =>
+        set((state) => ({ entryGlideEnabled: !state.entryGlideEnabled })),
       setGlobalOvertoneEditEnabled: (enabled) => set({ globalOvertoneEditEnabled: enabled }),
       enableGlobalOvertoneEditFromTone: (noteId) =>
         set((state) => {
           const tone = state.tones.find((entry) => entry.noteId === noteId)
-          const source = tone?.partials ?? state.partials
+          const partialSource = tone?.partials ?? state.partials
+          const timbreSource = tone?.timbreBlend ?? state.timbreBlend
+          const partialSync = syncAllTonesWithPartials(state, partialSource)
           return {
             globalOvertoneEditEnabled: true,
-            ...syncAllTonesWithPartials(state, source),
+            ...partialSync,
+            ...syncAllTonesWithTimbre(
+              { tones: partialSync.tones, timbreBlend: state.timbreBlend },
+              timbreSource,
+            ),
           }
         }),
       applyPartialsGlobally: (partials) =>
@@ -681,7 +771,7 @@ export const useDroneStore = create<DroneState>()(
             baseOctave: state.baseOctave,
             masterGainDb: state.masterGainDb,
             timbreBlend: { ...state.timbreBlend },
-            tones: state.tones.map((tone) => normalizeTonePartials(tone, state.partials)),
+            tones: state.tones.map((tone) => normalizeTone(tone, state.partials, state.timbreBlend)),
             partials: normalizePartials(state.partials.map((partial) => ({ ...partial }))),
           }
           return {
@@ -1004,13 +1094,14 @@ export const useDroneStore = create<DroneState>()(
     }),
     {
       name: 'bourdon-store-v1',
-      version: 8,
+      version: 10,
       migrate: (persistedState) => {
         const typed = persistedState as Partial<DroneState> | undefined
         if (!typed) {
           return persistedState
         }
         const incomingPartials = normalizePartials(typed.partials ?? [])
+        const incomingTimbre = normalizeTimbreBlend(typed.timbreBlend ?? DEFAULT_TIMBRE_BLEND)
         const migratedPresets = (typed.presets ?? []).map((preset) =>
           duplicatePresetData({
             ...preset,
@@ -1020,19 +1111,29 @@ export const useDroneStore = create<DroneState>()(
               MAX_BASE_OCTAVE,
             ),
             partials: normalizePartials(preset.partials ?? incomingPartials),
-            tones: migrateTones(preset.tones ?? [], preset.partials ?? incomingPartials),
+            timbreBlend: normalizeTimbreBlend(preset.timbreBlend ?? incomingTimbre),
+            tones: migrateTones(
+              preset.tones ?? [],
+              preset.partials ?? incomingPartials,
+              normalizeTimbreBlend(preset.timbreBlend ?? incomingTimbre),
+            ),
           }),
         )
         const resolvedActivePresetId = resolveActivePresetId(
           migratedPresets.length ? migratedPresets : DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset)),
           typed.activePresetId,
         )
-        const migratedTones = migrateTones(typed.tones ?? INITIAL_PRESET.tones, incomingPartials)
+        const migratedTones = migrateTones(
+          typed.tones ?? INITIAL_PRESET.tones,
+          incomingPartials,
+          incomingTimbre,
+        )
         return {
           ...typed,
           presets: migratedPresets,
           activePresetId: resolvedActivePresetId,
           partials: incomingPartials,
+          timbreBlend: incomingTimbre,
           tones: migratedTones,
           baseOctave: clamp(typed.baseOctave ?? 3, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
           songName: typed.songName ?? 'My Song',
@@ -1054,6 +1155,7 @@ export const useDroneStore = create<DroneState>()(
           metronomeBpm: typed.metronomeBpm ?? 72,
           metronomeVolumeDb: typed.metronomeVolumeDb ?? -15,
           harmonicTimbreEnabled: typed.harmonicTimbreEnabled ?? true,
+          entryGlideEnabled: typed.entryGlideEnabled ?? true,
           globalOvertoneEditEnabled: typed.globalOvertoneEditEnabled ?? false,
         }
       },
@@ -1069,6 +1171,7 @@ export const useDroneStore = create<DroneState>()(
         masterGainDb: state.masterGainDb,
         timbreBlend: state.timbreBlend,
         harmonicTimbreEnabled: state.harmonicTimbreEnabled,
+        entryGlideEnabled: state.entryGlideEnabled,
         globalOvertoneEditEnabled: state.globalOvertoneEditEnabled,
         tones: state.tones,
         partials: state.partials,
