@@ -2021,13 +2021,13 @@ function App() {
       } bg-[#111019] text-[#f2f2f7] ${activeTab === 'metronome' ? 'h-screen overflow-hidden' : ''}`}
     >
       <div
-        className={`mx-auto w-full max-w-md px-3 py-5 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
+        className={`mx-auto w-full max-w-md px-3 pb-5 pt-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
           activeTab === 'overtones' ? 'landscape:pt-0 max-h-[500px]:pt-0' : ''
         }`}
       >
         <div
-          className={`sticky top-0 z-40 -mx-3 bg-[#111019] px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))] ${
-            activeTab === 'tone' ? 'landscape:pt-3 max-h-[500px]:pt-3' : 'landscape:hidden max-h-[500px]:hidden'
+          className={`sticky top-0 z-40 -mx-3 bg-[#111019] px-3 pb-2 pt-[env(safe-area-inset-top,0px)] ${
+            activeTab === 'tone' ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}
         >
           <header className="mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem]">
