@@ -58,6 +58,7 @@ import { SongLibraryMenu } from './components/SongLibraryMenu'
 import { ToneMixer } from './components/ToneMixer'
 import { TopControls } from './components/TopControls'
 import { useAudioEngine } from './hooks/useAudioEngine'
+import { useMainTabSwipe, type MainTabSwipeId } from './hooks/useMainTabSwipe'
 import { useMetronome } from './hooks/useMetronome'
 import { useOvertoneMidi } from './hooks/useOvertoneMidi'
 import {
@@ -2030,6 +2031,14 @@ function App() {
       new URLSearchParams(window.location.search).get('device') === 'iphone16pm',
     [],
   )
+  const setActiveTabFromSwipe = useCallback((tab: MainTabSwipeId) => {
+    setActiveTab(tab)
+  }, [])
+  const mainTabSwipe = useMainTabSwipe({
+    activeTab,
+    setActiveTab: setActiveTabFromSwipe,
+    enabled: !controlsLocked && !menuOpen,
+  })
   const appShell = (
     <div
       className={`relative ${
@@ -2209,9 +2218,12 @@ function App() {
         </div>
 
         <main
-          className={`landscape:pb-2 max-h-[500px]:pb-2 ${
+          className={`touch-pan-y landscape:pb-2 max-h-[500px]:pb-2 ${
             activeTab === 'metronome' ? 'pb-28' : 'pb-40'
           }`}
+          onPointerDown={mainTabSwipe.onPointerDown}
+          onPointerUp={mainTabSwipe.onPointerUp}
+          onPointerCancel={mainTabSwipe.onPointerCancel}
         >
           <div className="space-y-3" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
             <SectionCard title="Global controls" className="[&>header]:mb-2.5">
