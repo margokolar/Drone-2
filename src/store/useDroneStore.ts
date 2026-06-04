@@ -57,6 +57,7 @@ type DroneState = {
   metronomeEnabled: boolean
   metronomeBpm: number
   metronomeVolumeDb: number
+  controlsLocked: boolean
   setPlaying: (playing: boolean) => void
   togglePlaying: () => void
   setReferenceA4Hz: (frequency: number) => void
@@ -105,6 +106,8 @@ type DroneState = {
   setMetronomeEnabled: (enabled: boolean) => void
   setMetronomeBpm: (bpm: number) => void
   setMetronomeVolumeDb: (db: number) => void
+  setControlsLocked: (locked: boolean) => void
+  toggleControlsLocked: () => void
   saveActivePreset: () => void
   savePreset: (presetId: string) => void
   saveAsPreset: () => void
@@ -366,6 +369,7 @@ export const useDroneStore = create<DroneState>()(
       metronomeEnabled: false,
       metronomeBpm: 72,
       metronomeVolumeDb: -15,
+      controlsLocked: false,
       setPlaying: (playing) => set({ playing }),
       togglePlaying: () => set((state) => ({ playing: !state.playing })),
       setReferenceA4Hz: (frequency) => set({ referenceA4Hz: clamp(frequency, 400, 480) }),
@@ -767,6 +771,8 @@ export const useDroneStore = create<DroneState>()(
       setMetronomeEnabled: (enabled) => set({ metronomeEnabled: enabled }),
       setMetronomeBpm: (bpm) => set({ metronomeBpm: clamp(bpm, 30, 220) }),
       setMetronomeVolumeDb: (db) => set({ metronomeVolumeDb: clamp(db, -40, 0) }),
+      setControlsLocked: (locked) => set({ controlsLocked: locked }),
+      toggleControlsLocked: () => set((state) => ({ controlsLocked: !state.controlsLocked })),
       saveActivePreset: () => {
         const { activePresetId } = get()
         get().savePreset(activePresetId)
@@ -1118,7 +1124,7 @@ export const useDroneStore = create<DroneState>()(
     }),
     {
       name: 'bourdon-store-v1',
-      version: 13,
+      version: 14,
       migrate: (persistedState) => {
         const typed = persistedState as Partial<DroneState> | undefined
         if (!typed) {
@@ -1201,6 +1207,7 @@ export const useDroneStore = create<DroneState>()(
             4,
           ),
           globalOvertoneEditEnabled: typed.globalOvertoneEditEnabled ?? false,
+          controlsLocked: typed.controlsLocked ?? false,
         }
       },
       partialize: (state) => ({
@@ -1226,6 +1233,7 @@ export const useDroneStore = create<DroneState>()(
         metronomeEnabled: state.metronomeEnabled,
         metronomeBpm: state.metronomeBpm,
         metronomeVolumeDb: state.metronomeVolumeDb,
+        controlsLocked: state.controlsLocked,
       }),
     },
   ),

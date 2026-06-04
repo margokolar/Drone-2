@@ -8,6 +8,8 @@ import {
   Download,
   Globe,
   Info,
+  Lock,
+  LockOpen,
   Menu,
   Pause,
   Play,
@@ -451,6 +453,7 @@ function App() {
   const metronomeEnabled = useDroneStore((state) => state.metronomeEnabled)
   const metronomeBpm = useDroneStore((state) => state.metronomeBpm)
   const metronomeVolumeDb = useDroneStore((state) => state.metronomeVolumeDb)
+  const controlsLocked = useDroneStore((state) => state.controlsLocked)
 
   const nudgeReferenceA4Hz = useDroneStore((state) => state.nudgeReferenceA4Hz)
   const nudgeBaseOctave = useDroneStore((state) => state.nudgeBaseOctave)
@@ -472,6 +475,7 @@ function App() {
   const setToneTimbreBlend = useDroneStore((state) => state.setToneTimbreBlend)
   const toggleHarmonicTimbreEnabled = useDroneStore((state) => state.toggleHarmonicTimbreEnabled)
   const toggleEntryGlideEnabled = useDroneStore((state) => state.toggleEntryGlideEnabled)
+  const toggleControlsLocked = useDroneStore((state) => state.toggleControlsLocked)
   const setEntryGlideLowestCents = useDroneStore((state) => state.setEntryGlideLowestCents)
   const setEntryGlideLowestSeconds = useDroneStore((state) => state.setEntryGlideLowestSeconds)
   const setEntryGlideHighestCents = useDroneStore((state) => state.setEntryGlideHighestCents)
@@ -2004,13 +2008,22 @@ function App() {
         aria-hidden="true"
         className="fixed size-0 overflow-hidden opacity-0"
       />
+      {controlsLocked && (
+        <div
+          className="fixed inset-0 z-40 touch-none"
+          aria-hidden="true"
+          onPointerDown={(event) => {
+            event.preventDefault()
+          }}
+        />
+      )}
       <div
         className={`mx-auto w-full max-w-md px-3 pb-5 pt-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
           activeTab === 'overtones' ? 'landscape:pt-0 max-h-[500px]:pt-0' : ''
         }`}
       >
         <div
-          className={`sticky top-0 z-40 -mx-3 bg-[#111019] px-3 pb-2 pt-[env(safe-area-inset-top,0px)] ${
+          className={`sticky top-0 z-50 -mx-3 bg-[#111019] px-3 pb-2 pt-[env(safe-area-inset-top,0px)] ${
             activeTab === 'tone' ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}
         >
@@ -2049,10 +2062,29 @@ function App() {
               }}
               aria-label="Open Tone home. Long-press to open Overtone balance."
             >
-              Drone 2
+            Drone 2
+          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              className={`relative z-50 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border p-2 transition ${
+                controlsLocked
+                  ? 'border-amber-300/50 bg-amber-300/15 text-amber-100'
+                  : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
+              }`}
+              onClick={toggleControlsLocked}
+              aria-label={
+                controlsLocked
+                  ? 'Unlock screen — BlueTurn and media remote keep working'
+                  : 'Lock screen touches for pocket use — BlueTurn and media remote keep working'
+              }
+              aria-pressed={controlsLocked}
+            >
+              {controlsLocked ? <Lock size={20} /> : <LockOpen size={20} />}
             </button>
-            <div className="ml-auto text-4xl font-extrabold leading-none text-fuchsia-100">{currentTime}</div>
-          </header>
+            <div className="text-4xl font-extrabold leading-none text-fuchsia-100">{currentTime}</div>
+          </div>
+        </header>
           {activeTab === 'tone' && (
             <div className="mx-auto mt-3 grid max-w-[26.5rem] grid-cols-2 gap-3 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem]">
               <article className="relative min-w-0 overflow-hidden rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
@@ -2744,6 +2776,24 @@ function App() {
               </button>
             </div>
             <div className="space-y-2">
+              <button
+                type="button"
+                className={`button-safe flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border px-4 py-3 text-left transition ${
+                  controlsLocked
+                    ? 'border-amber-300/45 bg-amber-300/10 text-amber-50 hover:bg-amber-300/15'
+                    : 'border-white/10 bg-white/5 text-white hover:bg-white/10'
+                }`}
+                onClick={toggleControlsLocked}
+                aria-pressed={controlsLocked}
+              >
+                <span className="flex items-center gap-2">
+                  {controlsLocked ? <Lock size={20} /> : <LockOpen size={20} />}
+                  {controlsLocked ? 'Touch locked' : 'Lock touch'}
+                </span>
+              </button>
+              <p className="px-1 text-[11px] leading-relaxed text-white/45">
+                Blocks accidental screen taps only. BlueTurn and media remote keep working.
+              </p>
               <button
                 type="button"
                 className="button-safe flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
