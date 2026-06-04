@@ -1,4 +1,6 @@
-import { Pause, Play } from 'lucide-react'
+import { Pause, Play, Volume2, VolumeX } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { metronomeEngine } from '../audio/MetronomeEngine'
 import { DEFAULT_METRONOME_BPM, DEFAULT_METRONOME_VOLUME_DB } from '../presets/defaultPresets'
 import { NumericValueField } from './NumericValueField'
 import { ResettableRangeInput } from './ResettableRangeInput'
@@ -9,29 +11,61 @@ type MetronomeControlsProps = {
   enabled: boolean
   bpm: number
   volumeDb: number
+  muted: boolean
   onEnabledChange: (enabled: boolean) => void
   onBpmChange: (bpm: number) => void
   onVolumeChange: (db: number) => void
+  onMutedChange: (muted: boolean) => void
 }
 
 export function MetronomeControls({
   enabled,
   bpm,
   volumeDb,
+  muted,
   onEnabledChange,
   onBpmChange,
   onVolumeChange,
+  onMutedChange,
 }: MetronomeControlsProps) {
+  const [beatFlash, setBeatFlash] = useState(false)
+  const beatFlashTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!enabled) {
+      setBeatFlash(false)
+      if (beatFlashTimeoutRef.current !== null) {
+        window.clearTimeout(beatFlashTimeoutRef.current)
+        beatFlashTimeoutRef.current = null
+      }
+      return
+    }
+    return metronomeEngine.onBeat(() => {
+      setBeatFlash(true)
+      if (beatFlashTimeoutRef.current !== null) {
+        window.clearTimeout(beatFlashTimeoutRef.current)
+      }
+      beatFlashTimeoutRef.current = window.setTimeout(() => {
+        beatFlashTimeoutRef.current = null
+        setBeatFlash(false)
+      }, 90)
+    })
+  }, [enabled])
+
   let powerButtonClass =
-    'flex h-16 w-16 shrink-0 items-center justify-center rounded-full border text-white shadow-sm transition'
+    'flex h-16 w-16 shrink-0 items-center justify-center rounded-full border text-white shadow-sm'
   let ToneIcon = Play
   if (enabled) {
     powerButtonClass +=
       ' border-fuchsia-300/80 bg-fuchsia-300/30 text-fuchsia-50 shadow-[0_0_0_1px_rgba(245,158,255,0.35)]'
+    if (beatFlash) {
+      powerButtonClass +=
+        ' scale-110 border-fuchsia-100 bg-fuchsia-300/55 shadow-[0_0_22px_rgba(245,158,255,0.55)]'
+    }
     ToneIcon = Pause
   }
   if (!enabled) {
-    powerButtonClass += ' border-white/25 bg-white/10 text-white/90 hover:bg-white/15'
+    powerButtonClass += ' border-white/25 bg-white/10 text-white/90 transition hover:bg-white/15'
     ToneIcon = Play
   }
 
@@ -41,7 +75,7 @@ export function MetronomeControls({
       <div className="flex justify-center pb-9">
         <button
           type="button"
-          className={powerButtonClass}
+          className={`${powerButtonClass} transition-[transform,background-color,box-shadow,border-color] duration-75`}
           onClick={() => onEnabledChange(!enabled)}
           aria-label={enabled ? 'Stop metronome' : 'Start metronome'}
         >
@@ -125,17 +159,41 @@ export function MetronomeControls({
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
             <span className="text-white/70">Click volume</span>
-            <span className="tabular-nums text-white/85">{volumeDb.toFixed(1)} dB</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition ${
+                  muted
+                    ? 'border-fuchsia-300/70 bg-fuchsia-300/20 text-fuchsia-50'
+                    : 'border-white/15 bg-white/10 text-white/80 hover:bg-white/15'
+                }`}
+                onClick={() => onMutedChange(!muted)}
+                aria-pressed={muted}
+                aria-label={muted ? 'Unmute click sound' : 'Mute click sound (visual metronome only)'}
+              >
+                {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                {muted ? 'Muted' : 'Mute'}
+              </button>
+              <span className={`tabular-nums ${muted ? 'text-white/40' : 'text-white/85'}`}>
+                {volumeDb.toFixed(1)} dB
+              </span>
+            </div>
           </div>
+          {muted ? (
+            <p className="mb-2 text-[11px] leading-relaxed text-white/45">
+              Visual metronome only — play button flashes to tempo with no click sound.
+            </p>
+          ) : null}
           <ResettableRangeInput
             min={-40}
             max={0}
             step={0.1}
             value={volumeDb}
+            disabled={muted}
             onChange={(event) => onVolumeChange(Number(event.target.value))}
             onReset={() => onVolumeChange(DEFAULT_METRONOME_VOLUME_DB)}
             aria-label="Click volume. Double-click or double-tap to reset to default."
-            className="h-2 w-full accent-fuchsia-300"
+            className={`h-2 w-full accent-fuchsia-300 ${muted ? 'cursor-not-allowed opacity-40' : ''}`}
           />
         </div>
       </div>

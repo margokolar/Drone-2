@@ -7,16 +7,19 @@ type MetronomeConfig = {
   enabled: boolean
   bpm: number
   volumeDb: number
+  muted: boolean
 }
 
 export class MetronomeEngine {
   private context: AudioContext | null = null
   private nextTickAt = 0
   private schedulerTimer: number | null = null
+  private beatListeners = new Set<() => void>()
   private config: MetronomeConfig = {
     enabled: false,
     bpm: 72,
     volumeDb: -15,
+    muted: false,
   }
 
   private ensureContext(): AudioContext {
@@ -34,6 +37,14 @@ export class MetronomeEngine {
       void context.resume().catch(() => {
         // iOS can reject resume() outside a gesture; the toggle click may retry.
       })
+    }
+  }
+
+  /** Fires once per scheduled click, aligned to audio playback time. */
+  onBeat(listener: () => void): () => void {
+    this.beatListeners.add(listener)
+    return () => {
+      this.beatListeners.delete(listener)
     }
   }
 
@@ -85,22 +96,38 @@ export class MetronomeEngine {
     if (!this.context) {
       return
     }
-    const oscillator = this.context.createOscillator()
-    const gainNode = this.context.createGain()
-    const clickPitch = 980
-    const attack = 0.001
-    const release = 0.06
-    const peakGain = dbToGain(this.config.volumeDb)
+    if (!this.config.muted) {
+      const oscillator = this.context.createOscillator()
+      const gainNode = this.context.createGain()
+      const clickPitch = 980
+      const attack = 0.001
+      const release = 0.06
+      const peakGain = dbToGain(this.config.volumeDb)
 
-    oscillator.type = 'triangle'
-    oscillator.frequency.setValueAtTime(clickPitch, when)
-    oscillator.connect(gainNode)
-    gainNode.connect(this.context.destination)
-    gainNode.gain.setValueAtTime(0.0001, when)
-    gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakGain), when + attack)
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, when + release)
-    oscillator.start(when)
-    oscillator.stop(when + release + 0.02)
+      oscillator.type = 'triangle'
+      oscillator.frequency.setValueAtTime(clickPitch, when)
+      oscillator.connect(gainNode)
+      gainNode.connect(this.context.destination)
+      gainNode.gain.setValueAtTime(0.0001, when)
+      gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakGain), when + attack)
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, when + release)
+      oscillator.start(when)
+      oscillator.stop(when + release + 0.02)
+    }
+    this.notifyBeatAt(when)
+  }
+
+  private notifyBeatAt(when: number): void {
+    if (!this.context || this.beatListeners.size === 0) {
+      return
+    }
+    const delayMs = Math.max(0, (when - this.context.currentTime) * 1000)
+    window.setTimeout(() => {
+      if (!this.config.enabled) {
+        return
+      }
+      this.beatListeners.forEach((listener) => listener())
+    }, delayMs)
   }
 }
 

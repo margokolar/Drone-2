@@ -455,6 +455,7 @@ function App() {
   const metronomeEnabled = useDroneStore((state) => state.metronomeEnabled)
   const metronomeBpm = useDroneStore((state) => state.metronomeBpm)
   const metronomeVolumeDb = useDroneStore((state) => state.metronomeVolumeDb)
+  const metronomeMuted = useDroneStore((state) => state.metronomeMuted)
   const controlsLocked = useDroneStore((state) => state.controlsLocked)
 
   const nudgeReferenceA4Hz = useDroneStore((state) => state.nudgeReferenceA4Hz)
@@ -493,6 +494,7 @@ function App() {
   const setMetronomeEnabled = useDroneStore((state) => state.setMetronomeEnabled)
   const setMetronomeBpm = useDroneStore((state) => state.setMetronomeBpm)
   const setMetronomeVolumeDb = useDroneStore((state) => state.setMetronomeVolumeDb)
+  const setMetronomeMuted = useDroneStore((state) => state.setMetronomeMuted)
   const saveActivePreset = useDroneStore((state) => state.saveActivePreset)
   const saveAsPreset = useDroneStore((state) => state.saveAsPreset)
   const loadPreset = useDroneStore((state) => state.loadPreset)
@@ -1688,6 +1690,7 @@ function App() {
     enabled: metronomeEnabled,
     bpm: metronomeBpm,
     volumeDb: metronomeVolumeDb,
+    muted: metronomeMuted,
   })
 
   useEffect(() => {
@@ -2578,9 +2581,11 @@ function App() {
                 enabled={metronomeEnabled}
                 bpm={metronomeBpm}
                 volumeDb={metronomeVolumeDb}
+                muted={metronomeMuted}
                 onEnabledChange={handleMetronomeEnabledChange}
                 onBpmChange={setMetronomeBpm}
                 onVolumeChange={setMetronomeVolumeDb}
+                onMutedChange={setMetronomeMuted}
               />
             </SectionCard>
           </div>

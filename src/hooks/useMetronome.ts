@@ -5,6 +5,7 @@ type MetronomeConfig = {
   enabled: boolean
   bpm: number
   volumeDb: number
+  muted: boolean
 }
 
 export function useMetronome(config: MetronomeConfig): void {
