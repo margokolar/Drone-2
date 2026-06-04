@@ -2057,11 +2057,11 @@ function App() {
         }`}
       >
         <div
-          className={`sticky top-0 z-50 -mx-3 bg-[#111019] px-3 pb-1 pt-[max(0.25rem,calc(env(safe-area-inset-top,0px)-10px))] ${
+          className={`sticky top-0 z-50 -mx-3 bg-[#111019] px-3 pb-1 pt-[env(safe-area-inset-top,0px)] ${
             activeTab === 'tone' ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}
         >
-          <header className={`mx-auto flex max-w-[26.5rem] items-center gap-2 rounded-xl border border-white/10 bg-[#111019] px-2.5 py-1 landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem] ${
+          <header className={`mx-auto flex max-w-[26.5rem] items-center gap-2 rounded-xl border border-white/10 bg-[#111019] px-2.5 py-1.5 landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem] ${
             controlsLocked ? 'pointer-events-none' : ''
           }`}>
             <button
@@ -2134,7 +2134,7 @@ function App() {
         </header>
           {activeTab === 'tone' && (
             <div
-              className={`mx-auto mt-1 grid max-w-[26.5rem] grid-cols-2 gap-2 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem] ${
+              className={`mx-auto mt-2 grid max-w-[26.5rem] grid-cols-2 gap-2 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem] ${
                 controlsLocked ? 'pointer-events-none' : ''
               }`}
             >
