@@ -48,7 +48,6 @@ import { SongLibraryMenu } from './components/SongLibraryMenu'
 import { ToneMixer } from './components/ToneMixer'
 import { TopControls } from './components/TopControls'
 import { useAudioEngine } from './hooks/useAudioEngine'
-import { useMediaSessionBridge } from './hooks/useMediaSessionBridge'
 import { useMetronome } from './hooks/useMetronome'
 import { useOvertoneMidi } from './hooks/useOvertoneMidi'
 import {
@@ -386,6 +385,7 @@ function App() {
   const globalImportInputRef = useRef<HTMLInputElement | null>(null)
   const overtoneAnalyzeInputRef = useRef<HTMLInputElement | null>(null)
   const sideMenuRef = useRef<HTMLElement | null>(null)
+  const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const overtoneSelectionPinnedRef = useRef(false)
   const previousTabRef = useRef<TabId>('tone')
@@ -1682,10 +1682,56 @@ function App() {
     volumeDb: metronomeVolumeDb,
   })
 
-  useMediaSessionBridge({
-    playing,
-    getRuntimeConfig: () => latestRuntimeConfigRef.current,
-  })
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) {
+      return
+    }
+
+    const setActionHandler = (
+      action: MediaSessionAction,
+      handler: MediaSessionActionHandler | null,
+    ) => {
+      try {
+        navigator.mediaSession.setActionHandler(action, handler)
+      } catch {
+        // iOS Safari can reject unsupported handlers; keep play/pause working.
+      }
+    }
+
+    setActionHandler('play', () => {
+      droneEngine.setPlaybackIntent(true)
+      droneEngine.ensureRunning(latestRuntimeConfigRef.current)
+      useDroneStore.getState().setPlaying(true)
+    })
+    setActionHandler('pause', () => {
+      droneEngine.stop()
+      useDroneStore.getState().setPlaying(false)
+    })
+    setActionHandler('nexttrack', () => {
+      useDroneStore.getState().selectNextPreset()
+    })
+    setActionHandler('previoustrack', () => {
+      useDroneStore.getState().selectPreviousPreset()
+    })
+
+    return () => {
+      setActionHandler('play', null)
+      setActionHandler('pause', null)
+      setActionHandler('nexttrack', null)
+      setActionHandler('previoustrack', null)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) {
+      return
+    }
+    try {
+      navigator.mediaSession.playbackState = playing ? 'playing' : 'paused'
+    } catch {
+      // Ignore browsers that reject the write.
+    }
+  }, [playing])
 
   // Show the currently selected preset name on the iOS lock screen.
   useEffect(() => {
@@ -1704,6 +1750,92 @@ function App() {
       // Some browsers reject MediaMetadata before user gesture; ignore.
     }
   }, [activePresetId, presets, songName])
+
+  // iOS PWA needs an actively playing media element for the OS to route
+  // Bluetooth controls to our MediaSession handlers. We keep a silent
+  // looping <audio> primed and play it in lock-step with the synth so iOS
+  // sees an accurate playing/paused state and dispatches the right action
+  // (play vs. pause) when a Bluetooth button is pressed.
+  useEffect(() => {
+    const sampleRate = 8000
+    const numSamples = sampleRate
+    const buffer = new ArrayBuffer(44 + numSamples * 2)
+    const view = new DataView(buffer)
+    const writeString = (offset: number, str: string) => {
+      for (let i = 0; i < str.length; i += 1) {
+        view.setUint8(offset + i, str.charCodeAt(i))
+      }
+    }
+    writeString(0, 'RIFF')
+    view.setUint32(4, 36 + numSamples * 2, true)
+    writeString(8, 'WAVE')
+    writeString(12, 'fmt ')
+    view.setUint32(16, 16, true)
+    view.setUint16(20, 1, true)
+    view.setUint16(22, 1, true)
+    view.setUint32(24, sampleRate, true)
+    view.setUint32(28, sampleRate * 2, true)
+    view.setUint16(32, 2, true)
+    view.setUint16(34, 16, true)
+    writeString(36, 'data')
+    view.setUint32(40, numSamples * 2, true)
+
+    const silentBlob = new Blob([buffer], { type: 'audio/wav' })
+    const silentUrl = URL.createObjectURL(silentBlob)
+
+    const anchor = document.createElement('audio')
+    anchor.src = silentUrl
+    anchor.loop = true
+    anchor.preload = 'auto'
+    anchor.setAttribute('playsinline', '')
+    anchor.setAttribute('webkit-playsinline', '')
+    anchor.muted = false
+    anchor.volume = 1
+    mediaAnchorRef.current = anchor
+
+    const primeAnchor = () => {
+      // Touch the element on a user gesture so iOS unlocks future play()
+      // calls, but only keep it actively playing when the synth is too.
+      if (!useDroneStore.getState().playing) {
+        void anchor.play().then(() => anchor.pause()).catch(() => {
+          // iOS can reject before a user gesture; later gestures retry.
+        })
+      }
+    }
+
+    window.addEventListener('pointerdown', primeAnchor, { passive: true })
+    window.addEventListener('keydown', primeAnchor)
+    window.addEventListener('touchend', primeAnchor, { passive: true })
+
+    return () => {
+      window.removeEventListener('pointerdown', primeAnchor)
+      window.removeEventListener('keydown', primeAnchor)
+      window.removeEventListener('touchend', primeAnchor)
+      anchor.pause()
+      anchor.removeAttribute('src')
+      anchor.load()
+      URL.revokeObjectURL(silentUrl)
+      mediaAnchorRef.current = null
+    }
+  }, [])
+
+  // Mirror the Drone playing state onto the silent anchor so iOS reports
+  // the correct playbackState to the lock-screen and Bluetooth controllers.
+  useEffect(() => {
+    const anchor = mediaAnchorRef.current
+    if (!anchor) {
+      return
+    }
+    if (playing) {
+      if (anchor.paused) {
+        void anchor.play().catch(() => {
+          // iOS sometimes rejects play() outside a gesture; not fatal.
+        })
+      }
+    } else if (!anchor.paused) {
+      anchor.pause()
+    }
+  }, [playing])
 
   useEffect(() => {
     const navigatorWithAudioSession = navigator as Navigator & {
