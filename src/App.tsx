@@ -58,6 +58,15 @@ import {
 import { getFrequency, findLowestEnabledToneNoteId, findHighestEnabledToneNoteId } from './music/tuning'
 import { createDefaultPartials, DEFAULT_MASTER_GAIN_DB, DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS, DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS, DEFAULT_ENTRY_GLIDE_LOWEST_CENTS, DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS, type Preset } from './presets/defaultPresets'
 import { useDroneStore } from './store/useDroneStore'
+import {
+  FOOT_PEDAL_PLAY_KEYS,
+  FOOT_PEDAL_PRESET_KEYS,
+  isTextEditingTarget,
+  matchesFootPedalKey,
+  MEDIA_PAUSE_KEYS,
+  MEDIA_PLAY_KEYS,
+  MEDIA_PLAY_PAUSE_KEYS,
+} from './utils/footPedalKeys'
 
 type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi' | 'blank'
 
@@ -1854,39 +1863,24 @@ function App() {
   }, [])
 
   useEffect(() => {
-    const TURN_DOWN_KEYS = new Set([
-      'ArrowDown',
-      'NumpadSubtract',
-      'Minus',
-      'PageDown',
-      'AudioVolumeDown',
-      'VolumeDown',
-      'MediaTrackPrevious',
-    ])
-    const TURN_UP_KEYS = new Set([
-      'ArrowUp',
-      'NumpadAdd',
-      'Equal',
-      'PageUp',
-      'AudioVolumeUp',
-      'VolumeUp',
-      'MediaTrackNext',
-    ])
     const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null
-      const isTypingTarget =
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target?.isContentEditable
-      if (isTypingTarget) {
+      if (isTextEditingTarget(event.target)) {
         return
       }
-      const mediaKey = event.key || event.code
-      const isTurnDownKey = TURN_DOWN_KEYS.has(mediaKey)
-      const isTurnUpKey = TURN_UP_KEYS.has(mediaKey)
 
-      if (isTurnDownKey) {
+      const isPlayPedal = matchesFootPedalKey(event, FOOT_PEDAL_PLAY_KEYS)
+      const isPresetPedal = matchesFootPedalKey(event, FOOT_PEDAL_PRESET_KEYS)
+
+      if (isPlayPedal || isPresetPedal) {
+        if (event.repeat) {
+          event.preventDefault()
+          return
+        }
         event.preventDefault()
+        event.stopPropagation()
+      }
+
+      if (isPlayPedal) {
         const wasPlaying = useDroneStore.getState().playing
         if (wasPlaying) {
           droneEngine.stop()
@@ -1899,8 +1893,7 @@ function App() {
         return
       }
 
-      if (isTurnUpKey) {
-        event.preventDefault()
+      if (isPresetPedal) {
         if (upPressTimeoutRef.current !== null) {
           window.clearTimeout(upPressTimeoutRef.current)
           upPressTimeoutRef.current = null
@@ -1919,31 +1912,31 @@ function App() {
         handleTogglePlay()
         return
       }
-      if (mediaKey === 'MediaPlayPause') {
+      if (matchesFootPedalKey(event, MEDIA_PLAY_PAUSE_KEYS)) {
         event.preventDefault()
         handleTogglePlay()
         return
       }
-      if (mediaKey === 'MediaPlay') {
+      if (matchesFootPedalKey(event, MEDIA_PLAY_KEYS)) {
         event.preventDefault()
         droneEngine.setPlaybackIntent(true)
         droneEngine.fastResume(latestRuntimeConfigRef.current)
         setPlaying(true)
         return
       }
-      if (mediaKey === 'MediaPause') {
+      if (matchesFootPedalKey(event, MEDIA_PAUSE_KEYS)) {
         event.preventDefault()
         droneEngine.stop()
         setPlaying(false)
       }
     }
-    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keydown', onKeyDown, true)
     return () => {
       if (upPressTimeoutRef.current !== null) {
         window.clearTimeout(upPressTimeoutRef.current)
         upPressTimeoutRef.current = null
       }
-      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keydown', onKeyDown, true)
     }
   }, [handleTogglePlay, selectNextPreset, selectPreviousPreset, setPlaying])
 

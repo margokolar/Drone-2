@@ -1,0 +1,56 @@
+/** iRig BlueTurn (HID keyboard) — parem pedaal play/pause, vasak preset next/prev. */
+export const FOOT_PEDAL_PLAY_KEYS = new Set([
+  'ArrowDown',
+  'ArrowRight',
+  'PageDown',
+  'NumpadSubtract',
+  'Minus',
+  'AudioVolumeDown',
+  'VolumeDown',
+  'MediaTrackPrevious',
+])
+
+export const MEDIA_PLAY_PAUSE_KEYS = new Set(['MediaPlayPause'])
+export const MEDIA_PLAY_KEYS = new Set(['MediaPlay'])
+export const MEDIA_PAUSE_KEYS = new Set(['MediaPause'])
+
+export const FOOT_PEDAL_PRESET_KEYS = new Set([
+  'ArrowUp',
+  'ArrowLeft',
+  'PageUp',
+  'NumpadAdd',
+  'Equal',
+  'AudioVolumeUp',
+  'VolumeUp',
+  'MediaTrackNext',
+])
+
+const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'password', 'number', 'tel', 'url'])
+
+export function isTextEditingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+  if (target.isContentEditable) {
+    return true
+  }
+  if (target instanceof HTMLTextAreaElement) {
+    return true
+  }
+  if (target instanceof HTMLInputElement) {
+    return TEXT_INPUT_TYPES.has(target.type)
+  }
+  return false
+}
+
+/** Match by physical code first; iOS BT pedals often send key "Unidentified". */
+export function matchesFootPedalKey(event: KeyboardEvent, keys: Set<string>): boolean {
+  if (keys.has(event.code)) {
+    return true
+  }
+  const key = event.key
+  if (!key || key === 'Unidentified') {
+    return false
+  }
+  return keys.has(key)
+}
