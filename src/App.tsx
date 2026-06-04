@@ -75,6 +75,7 @@ import {
   MEDIA_PLAY_KEYS,
   MEDIA_PLAY_PAUSE_KEYS,
 } from './utils/footPedalKeys'
+import { BLE_KEYBOARD_FOCUS_ROOT_ID, runMediaSessionAction } from './utils/restoreBleKeyboardFocus'
 
 type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi' | 'blank'
 
@@ -1700,11 +1701,19 @@ function App() {
     }
 
     setActionHandler('play', () => {
-      transportPlay(latestRuntimeConfigRef.current)
+      runMediaSessionAction(() => {
+        transportPlay(latestRuntimeConfigRef.current)
+      })
     })
-    setActionHandler('pause', transportPause)
-    setActionHandler('nexttrack', transportNextPreset)
-    setActionHandler('previoustrack', transportPreviousPreset)
+    setActionHandler('pause', () => {
+      runMediaSessionAction(transportPause)
+    })
+    setActionHandler('nexttrack', () => {
+      runMediaSessionAction(transportNextPreset)
+    })
+    setActionHandler('previoustrack', () => {
+      runMediaSessionAction(transportPreviousPreset)
+    })
 
     return () => {
       setActionHandler('play', null)
@@ -1783,6 +1792,9 @@ function App() {
     anchor.setAttribute('webkit-playsinline', '')
     anchor.muted = false
     anchor.volume = 1
+    anchor.setAttribute('aria-hidden', 'true')
+    anchor.style.cssText = 'position:fixed;width:0;height:0;opacity:0;pointer-events:none'
+    document.body.appendChild(anchor)
     mediaAnchorRef.current = anchor
 
     const primeAnchor = () => {
@@ -1806,6 +1818,7 @@ function App() {
       anchor.pause()
       anchor.removeAttribute('src')
       anchor.load()
+      anchor.remove()
       URL.revokeObjectURL(silentUrl)
       mediaAnchorRef.current = null
     }
@@ -1985,6 +1998,12 @@ function App() {
         iphone16ProMaxPreview ? 'min-h-full min-w-0' : 'min-h-screen'
       } bg-[#111019] text-[#f2f2f7] ${activeTab === 'metronome' ? 'h-screen overflow-hidden' : ''}`}
     >
+      <div
+        id={BLE_KEYBOARD_FOCUS_ROOT_ID}
+        tabIndex={-1}
+        aria-hidden="true"
+        className="fixed size-0 overflow-hidden opacity-0"
+      />
       <div
         className={`mx-auto w-full max-w-md px-3 pb-5 pt-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
           activeTab === 'overtones' ? 'landscape:pt-0 max-h-[500px]:pt-0' : ''

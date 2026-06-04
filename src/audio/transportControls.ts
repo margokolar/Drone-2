@@ -4,15 +4,32 @@ import { useDroneStore } from '../store/useDroneStore'
 
 /** Shared play/pause/preset actions for UI, BlueTurn keyboard, and Media Session. */
 
+function syncMediaSessionPlaybackState(playing: boolean): void {
+  if (!('mediaSession' in navigator)) {
+    return
+  }
+  try {
+    navigator.mediaSession.playbackState = playing ? 'playing' : 'paused'
+  } catch {
+    // Ignore browsers that reject the write.
+  }
+}
+
 export function transportPlay(config: DroneRuntimeConfig): void {
   droneEngine.setPlaybackIntent(true)
-  droneEngine.ensureRunning(config)
+  if (droneEngine.canFastResume()) {
+    droneEngine.fastResume(config)
+  } else {
+    droneEngine.ensureRunning(config)
+  }
   useDroneStore.getState().setPlaying(true)
+  syncMediaSessionPlaybackState(true)
 }
 
 export function transportPause(): void {
-  droneEngine.stop()
+  droneEngine.pause()
   useDroneStore.getState().setPlaying(false)
+  syncMediaSessionPlaybackState(false)
 }
 
 export function transportTogglePlay(config: DroneRuntimeConfig): void {
@@ -27,6 +44,7 @@ export function transportResume(config: DroneRuntimeConfig): void {
   droneEngine.setPlaybackIntent(true)
   droneEngine.fastResume(config)
   useDroneStore.getState().setPlaying(true)
+  syncMediaSessionPlaybackState(true)
 }
 
 export function transportNextPreset(): void {

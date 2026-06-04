@@ -213,6 +213,22 @@ export class DroneEngine {
     }
   }
 
+  /** Mute quickly but keep voices alive for low-latency resume (BT media remotes). */
+  pause(): void {
+    this.shouldPlay = false
+    if (!this.context || !this.masterGain) {
+      return
+    }
+    const now = this.context.currentTime
+    this.masterGain.gain.cancelScheduledValues(now)
+    this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now)
+    this.masterGain.gain.linearRampToValueAtTime(0.0001, now + PARAM_SMOOTH_SECONDS)
+  }
+
+  canFastResume(): boolean {
+    return this.started && this.voiceMap.size > 0 && this.context !== null
+  }
+
   syncConfig(config: DroneRuntimeConfig, forceRebuild = false): void {
     if (!this.context || !this.masterGain) {
       return

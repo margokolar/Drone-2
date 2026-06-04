@@ -9,7 +9,7 @@ export function useAudioEngine(config: DroneRuntimeConfig, playing: boolean): vo
     droneEngine.setPlaybackIntent(playing)
     latestConfigRef.current = config
     if (!playing) {
-      droneEngine.stop()
+      droneEngine.pause()
       return
     }
     droneEngine.syncConfig(config, false)
