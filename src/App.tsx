@@ -1966,6 +1966,15 @@ function App() {
   }, [activeTab, resetTabScroll])
 
   useEffect(() => {
+    if (!controlsLocked) {
+      return
+    }
+    setMenuOpen(false)
+    setMenuExportOpen(false)
+    setMenuImportOpen(false)
+  }, [controlsLocked])
+
+  useEffect(() => {
     if (!menuOpen) {
       return
     }
@@ -2052,9 +2061,18 @@ function App() {
           <header className="mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem]">
             <button
               type="button"
-              aria-label={menuLabel}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-white/80"
-              onClick={() => setMenuOpen(true)}
+              aria-label={controlsLocked ? 'Menu locked while touch lock is on' : menuLabel}
+              aria-disabled={controlsLocked}
+              disabled={controlsLocked}
+              className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 ${
+                controlsLocked ? 'cursor-not-allowed opacity-40' : ''
+              }`}
+              onClick={() => {
+                if (controlsLocked) {
+                  return
+                }
+                setMenuOpen(true)
+              }}
             >
               <Menu size={20} />
             </button>
@@ -2797,33 +2815,6 @@ function App() {
               </button>
             </div>
             <div className="space-y-2">
-              <button
-                type="button"
-                className={`button-safe flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border px-4 py-3 text-left transition ${
-                  controlsLocked
-                    ? 'border-amber-300/45 bg-amber-300/10 text-amber-50 hover:bg-amber-300/15'
-                    : 'border-white/10 bg-white/5 text-white hover:bg-white/10'
-                }`}
-                onPointerDown={handleTouchLockPointerDown}
-                onPointerUp={clearTouchLockLongPressTimer}
-                onPointerLeave={clearTouchLockLongPressTimer}
-                onPointerCancel={clearTouchLockLongPressTimer}
-                onClick={handleTouchLockClick}
-                aria-pressed={controlsLocked}
-                aria-label={
-                  controlsLocked
-                    ? 'Long-press to unlock screen touches'
-                    : 'Long-press to lock screen touches'
-                }
-              >
-                <span className="flex items-center gap-2">
-                  {controlsLocked ? <Lock size={20} /> : <LockOpen size={20} />}
-                  {controlsLocked ? 'Touch locked' : 'Lock touch'}
-                </span>
-              </button>
-              <p className="px-1 text-[11px] leading-relaxed text-white/45">
-                Hold to lock or unlock. Blocks accidental screen taps only; BlueTurn and media remote keep working.
-              </p>
               <button
                 type="button"
                 className="button-safe flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
