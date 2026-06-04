@@ -93,7 +93,7 @@ function formatEntryGlideCents(cents: number): string {
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'tone', label: 'Tone' },
-  { id: 'overtones', label: 'Overtones' },
+  { id: 'overtones', label: 'Timbre' },
   { id: 'presets', label: 'Presets' },
   { id: 'metronome', label: 'Click' },
 ]
@@ -2654,7 +2654,7 @@ function App() {
             className="overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm"
             aria-label="App sections"
           >
-            <div className="flex min-w-max items-center gap-1">
+            <div className="flex w-full items-center justify-center gap-1">
               {TABS.map(({ id, label }) => (
                 <button
                   key={id}
