@@ -2057,11 +2057,11 @@ function App() {
         }`}
       >
         <div
-          className={`sticky top-0 z-50 -mx-3 bg-[#111019] px-3 pb-2 pt-[env(safe-area-inset-top,0px)] ${
+          className={`sticky top-0 z-50 -mx-3 bg-[#111019] px-3 pb-1 pt-[env(safe-area-inset-top,0px)] ${
             activeTab === 'tone' ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}
         >
-          <header className={`mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem] ${
+          <header className={`mx-auto flex max-w-[26.5rem] items-center gap-2 rounded-xl border border-white/10 bg-[#111019] px-2.5 py-1.5 landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem] ${
             controlsLocked ? 'pointer-events-none' : ''
           }`}>
             <button
@@ -2134,7 +2134,7 @@ function App() {
         </header>
           {activeTab === 'tone' && (
             <div
-              className={`mx-auto mt-3 grid max-w-[26.5rem] grid-cols-2 gap-3 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem] ${
+              className={`mx-auto mt-2 grid max-w-[26.5rem] grid-cols-2 gap-2 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem] ${
                 controlsLocked ? 'pointer-events-none' : ''
               }`}
             >
@@ -2210,7 +2210,7 @@ function App() {
 
         <main
           className={`landscape:pb-2 max-h-[500px]:pb-2 ${
-            activeTab === 'metronome' ? 'pb-32' : 'pb-44'
+            activeTab === 'metronome' ? 'pb-28' : 'pb-40'
           }`}
         >
           <div className="space-y-3" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
@@ -2648,10 +2648,10 @@ function App() {
           </div>
         </main>
       </div>
-      <div className="fixed bottom-0 left-0 right-0 z-30 px-3 pb-2">
+      <div className="fixed bottom-0 left-0 right-0 z-30 px-3 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]">
         <div className="mx-auto w-full max-w-[26.5rem] space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-[62.5rem]">
           <nav
-            className="overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm"
+            className="overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-0.5 backdrop-blur-sm"
             aria-label="App sections"
           >
             <div className="flex w-full items-center justify-center gap-1">
@@ -2760,7 +2760,7 @@ function App() {
               )}
             </div>
           </nav>
-          <div className="rounded-xl border border-white/10 bg-[#111019]/95 p-2 backdrop-blur-sm">
+          <div className="rounded-xl border border-white/10 bg-[#111019]/95 p-1.5 backdrop-blur-sm">
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
