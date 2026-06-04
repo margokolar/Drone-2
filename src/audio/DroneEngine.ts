@@ -120,8 +120,40 @@ export class DroneEngine {
       return
     }
     const now = this.context.currentTime
+    this.reapplyEntryGlides(config, now)
     this.masterGain.gain.cancelScheduledValues(now)
     this.masterGain.gain.setValueAtTime(dbToGain(config.masterGainDb), now)
+  }
+
+  /** Re-run entry glide after pause; glides finish silently while muted during pause. */
+  private reapplyEntryGlides(config: DroneRuntimeConfig, now: number): void {
+    for (const [noteId, voice] of this.voiceMap.entries()) {
+      const toneConfig = config.tones.find((tone) => tone.noteId === noteId && tone.enabled)
+      if (!toneConfig) {
+        continue
+      }
+      const entryGlide = this.getEntryGlideSpec(config, toneConfig)
+      if (!entryGlide || entryGlide.cents === 0 || entryGlide.seconds <= 0) {
+        continue
+      }
+      const toneFrequency = getFrequency(
+        toneConfig.noteId,
+        config.tuningSystemId,
+        config.tonalCenter,
+        config.referenceA4Hz,
+        config.baseOctave,
+      )
+      for (const bundle of voice.oscillators) {
+        this.scheduleEntryGlideFrequency(
+          bundle.oscillator,
+          toneFrequency * bundle.ratio,
+          config,
+          toneConfig,
+          now,
+        )
+      }
+      voice.entryGlideEndTime = now + entryGlide.seconds
+    }
   }
 
   /**
@@ -220,6 +252,9 @@ export class DroneEngine {
       return
     }
     const now = this.context.currentTime
+    for (const voice of this.voiceMap.values()) {
+      voice.entryGlideEndTime = null
+    }
     this.masterGain.gain.cancelScheduledValues(now)
     this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now)
     this.masterGain.gain.linearRampToValueAtTime(0.0001, now + PARAM_SMOOTH_SECONDS)
