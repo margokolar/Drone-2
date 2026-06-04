@@ -79,7 +79,7 @@ import {
 } from './utils/footPedalKeys'
 import { BLE_KEYBOARD_FOCUS_ROOT_ID, runMediaSessionAction } from './utils/restoreBleKeyboardFocus'
 
-type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi' | 'blank'
+type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi'
 
 function formatEntryGlideCents(cents: number): string {
   if (cents > 0) {
@@ -96,7 +96,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'overtones', label: 'Overtones' },
   { id: 'presets', label: 'Presets' },
   { id: 'metronome', label: 'Click' },
-  { id: 'blank', label: 'Blank' },
 ]
 const APP_VERSION = '2.1'
 const DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS = 800
@@ -2028,16 +2027,14 @@ function App() {
           }`}
         >
           <header className="mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem]">
-            {activeTab !== 'blank' && (
-              <button
-                type="button"
-                aria-label={menuLabel}
-                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-white/80"
-                onClick={() => setMenuOpen(true)}
-              >
-                <Menu size={20} />
-              </button>
-            )}
+            <button
+              type="button"
+              aria-label={menuLabel}
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-white/80"
+              onClick={() => setMenuOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
             <button
               type="button"
               className="select-none rounded-lg px-1 py-1 text-xl font-semibold tracking-wide text-white transition hover:bg-white/10"
@@ -2062,8 +2059,8 @@ function App() {
               }}
               aria-label="Open Tone home. Long-press to open Overtone balance."
             >
-            Drone 2
-          </button>
+              Drone
+            </button>
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
@@ -2159,7 +2156,7 @@ function App() {
 
         <main
           className={`landscape:pb-2 max-h-[500px]:pb-2 ${
-            activeTab === 'blank' ? 'pb-20' : activeTab === 'metronome' ? 'pb-32' : 'pb-44'
+            activeTab === 'metronome' ? 'pb-32' : 'pb-44'
           }`}
         >
           <div className="space-y-3" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
@@ -2593,7 +2590,6 @@ function App() {
               outputOptions={overtoneMidi.outputOptions}
             />
           </div>
-          <div className="space-y-4" role="tabpanel" id="panel-blank" aria-labelledby="tab-blank" hidden={activeTab !== 'blank'} />
         </main>
       </div>
       <div className="fixed bottom-0 left-0 right-0 z-30 px-3 pb-2">
@@ -2708,8 +2704,7 @@ function App() {
               )}
             </div>
           </nav>
-          {activeTab !== 'blank' && (
-            <div className="rounded-xl border border-white/10 bg-[#111019]/95 p-2 backdrop-blur-sm">
+          <div className="rounded-xl border border-white/10 bg-[#111019]/95 p-2 backdrop-blur-sm">
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
@@ -2740,7 +2735,6 @@ function App() {
                 </button>
               </div>
             </div>
-          )}
         </div>
       </div>
       {(menuOpen) && (
