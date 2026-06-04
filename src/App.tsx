@@ -30,8 +30,16 @@ import {
   useState,
   type ChangeEvent,
 } from 'react'
-import { droneEngine } from './audio/DroneEngine'
 import { metronomeEngine } from './audio/MetronomeEngine'
+import {
+  transportPause,
+  transportPlay,
+  transportPresetPedalPress,
+  transportResume,
+  transportTogglePlay,
+  transportNextPreset,
+  transportPreviousPreset,
+} from './audio/transportControls'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
 import { MetronomeControls } from './components/MetronomeControls'
@@ -443,7 +451,6 @@ function App() {
   const metronomeBpm = useDroneStore((state) => state.metronomeBpm)
   const metronomeVolumeDb = useDroneStore((state) => state.metronomeVolumeDb)
 
-  const setPlaying = useDroneStore((state) => state.setPlaying)
   const nudgeReferenceA4Hz = useDroneStore((state) => state.nudgeReferenceA4Hz)
   const nudgeBaseOctave = useDroneStore((state) => state.nudgeBaseOctave)
   const setTuningSystemId = useDroneStore((state) => state.setTuningSystemId)
@@ -1348,20 +1355,6 @@ function App() {
     },
     [],
   )
-  const handleTogglePlay = useCallback(() => {
-    const currentlyPlaying = useDroneStore.getState().playing
-    if (currentlyPlaying) {
-      droneEngine.stop()
-      setPlaying(false)
-      return
-    }
-    // Must run synchronously inside the user-gesture call stack so Safari
-    // honours AudioContext.resume().
-    droneEngine.setPlaybackIntent(true)
-    droneEngine.ensureRunning(latestRuntimeConfigRef.current)
-    setPlaying(true)
-  }, [setPlaying])
-
   const handleMetronomeEnabledChange = useCallback(
     (enabled: boolean) => {
       if (enabled) {
@@ -1638,6 +1631,14 @@ function App() {
     latestRuntimeConfigRef.current = runtimeConfig
   }, [runtimeConfig])
 
+  const handleTogglePlay = useCallback(() => {
+    transportTogglePlay(latestRuntimeConfigRef.current)
+  }, [])
+
+  const handlePresetPedalPress = useCallback(() => {
+    transportPresetPedalPress(upPressTimeoutRef)
+  }, [])
+
   useEffect(() => {
     useDroneStore.setState((state) => ({
       tones: state.tones.map((tone) => (toneSetNoteIds.has(tone.noteId) ? tone : { ...tone, enabled: false })),
@@ -1699,20 +1700,11 @@ function App() {
     }
 
     setActionHandler('play', () => {
-      droneEngine.setPlaybackIntent(true)
-      droneEngine.ensureRunning(latestRuntimeConfigRef.current)
-      useDroneStore.getState().setPlaying(true)
+      transportPlay(latestRuntimeConfigRef.current)
     })
-    setActionHandler('pause', () => {
-      droneEngine.stop()
-      useDroneStore.getState().setPlaying(false)
-    })
-    setActionHandler('nexttrack', () => {
-      useDroneStore.getState().selectNextPreset()
-    })
-    setActionHandler('previoustrack', () => {
-      useDroneStore.getState().selectPreviousPreset()
-    })
+    setActionHandler('pause', transportPause)
+    setActionHandler('nexttrack', transportNextPreset)
+    setActionHandler('previoustrack', transportPreviousPreset)
 
     return () => {
       setActionHandler('play', null)
@@ -1881,29 +1873,12 @@ function App() {
       }
 
       if (isPlayPedal) {
-        const wasPlaying = useDroneStore.getState().playing
-        if (wasPlaying) {
-          droneEngine.stop()
-          setPlaying(false)
-        } else {
-          droneEngine.setPlaybackIntent(true)
-          droneEngine.ensureRunning(latestRuntimeConfigRef.current)
-          setPlaying(true)
-        }
+        handleTogglePlay()
         return
       }
 
       if (isPresetPedal) {
-        if (upPressTimeoutRef.current !== null) {
-          window.clearTimeout(upPressTimeoutRef.current)
-          upPressTimeoutRef.current = null
-          selectPreviousPreset()
-          return
-        }
-        upPressTimeoutRef.current = window.setTimeout(() => {
-          selectNextPreset()
-          upPressTimeoutRef.current = null
-        }, 260)
+        handlePresetPedalPress()
         return
       }
 
@@ -1919,15 +1894,12 @@ function App() {
       }
       if (matchesFootPedalKey(event, MEDIA_PLAY_KEYS)) {
         event.preventDefault()
-        droneEngine.setPlaybackIntent(true)
-        droneEngine.fastResume(latestRuntimeConfigRef.current)
-        setPlaying(true)
+        transportResume(latestRuntimeConfigRef.current)
         return
       }
       if (matchesFootPedalKey(event, MEDIA_PAUSE_KEYS)) {
         event.preventDefault()
-        droneEngine.stop()
-        setPlaying(false)
+        transportPause()
       }
     }
     window.addEventListener('keydown', onKeyDown, true)
@@ -1938,7 +1910,7 @@ function App() {
       }
       window.removeEventListener('keydown', onKeyDown, true)
     }
-  }, [handleTogglePlay, selectNextPreset, selectPreviousPreset, setPlaying])
+  }, [handleTogglePlay, handlePresetPedalPress])
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
