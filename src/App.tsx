@@ -2058,7 +2058,9 @@ function App() {
             activeTab === 'tone' ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}
         >
-          <header className="mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem]">
+          <header className={`mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem] ${
+            controlsLocked ? 'pointer-events-none' : ''
+          }`}>
             <button
               type="button"
               aria-label={controlsLocked ? 'Menu locked while touch lock is on' : menuLabel}
@@ -2107,7 +2109,7 @@ function App() {
               type="button"
               className={`relative z-50 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border p-2 transition ${
                 controlsLocked
-                  ? 'border-amber-300/50 bg-amber-300/15 text-amber-100'
+                  ? 'pointer-events-auto border-amber-300/50 bg-amber-300/15 text-amber-100'
                   : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
               }`}
               onPointerDown={handleTouchLockPointerDown}
@@ -2128,7 +2130,11 @@ function App() {
           </div>
         </header>
           {activeTab === 'tone' && (
-            <div className="mx-auto mt-3 grid max-w-[26.5rem] grid-cols-2 gap-3 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem]">
+            <div
+              className={`mx-auto mt-3 grid max-w-[26.5rem] grid-cols-2 gap-3 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem] ${
+                controlsLocked ? 'pointer-events-none' : ''
+              }`}
+            >
               <article className="relative min-w-0 overflow-hidden rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
                 <button
                   type="button"
