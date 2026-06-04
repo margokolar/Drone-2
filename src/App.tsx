@@ -99,6 +99,7 @@ const TABS: { id: TabId; label: string }[] = [
 ]
 const APP_VERSION = '2.1'
 const DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS = 800
+const TOUCH_LOCK_LONG_PRESS_MS = 800
 /** ~Safari viewport, loogilised CSS px (mitte dünaamiline Dynamic Island / toolbar). */
 const IPHONE_16_PRO_MAX_CSS_W = 440
 const IPHONE_16_PRO_MAX_CSS_H = 956
@@ -389,6 +390,8 @@ function App() {
   const upPressTimeoutRef = useRef<number | null>(null)
   const droneTitleLongPressTimerRef = useRef<number | null>(null)
   const droneTitleLongPressFiredRef = useRef(false)
+  const touchLockLongPressTimerRef = useRef<number | null>(null)
+  const touchLockLongPressFiredRef = useRef(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const toneSetImportInputRef = useRef<HTMLInputElement | null>(null)
   const toneSetEditorImportInputRef = useRef<HTMLInputElement | null>(null)
@@ -1989,6 +1992,26 @@ function App() {
       droneTitleLongPressTimerRef.current = null
     }
   }, [])
+  const clearTouchLockLongPressTimer = useCallback(() => {
+    if (touchLockLongPressTimerRef.current !== null) {
+      window.clearTimeout(touchLockLongPressTimerRef.current)
+      touchLockLongPressTimerRef.current = null
+    }
+  }, [])
+  const handleTouchLockPointerDown = useCallback(() => {
+    touchLockLongPressFiredRef.current = false
+    clearTouchLockLongPressTimer()
+    touchLockLongPressTimerRef.current = window.setTimeout(() => {
+      touchLockLongPressTimerRef.current = null
+      touchLockLongPressFiredRef.current = true
+      toggleControlsLocked()
+    }, TOUCH_LOCK_LONG_PRESS_MS)
+  }, [clearTouchLockLongPressTimer, toggleControlsLocked])
+  const handleTouchLockClick = useCallback(() => {
+    if (touchLockLongPressFiredRef.current) {
+      touchLockLongPressFiredRef.current = false
+    }
+  }, [])
   const iphone16ProMaxPreview = useMemo(
     () =>
       typeof window !== 'undefined' &&
@@ -2069,11 +2092,15 @@ function App() {
                   ? 'border-amber-300/50 bg-amber-300/15 text-amber-100'
                   : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
               }`}
-              onClick={toggleControlsLocked}
+              onPointerDown={handleTouchLockPointerDown}
+              onPointerUp={clearTouchLockLongPressTimer}
+              onPointerLeave={clearTouchLockLongPressTimer}
+              onPointerCancel={clearTouchLockLongPressTimer}
+              onClick={handleTouchLockClick}
               aria-label={
                 controlsLocked
-                  ? 'Unlock screen — BlueTurn and media remote keep working'
-                  : 'Lock screen touches for pocket use — BlueTurn and media remote keep working'
+                  ? 'Long-press to unlock screen touches. BlueTurn and media remote keep working.'
+                  : 'Long-press to lock screen touches for pocket use. BlueTurn and media remote keep working.'
               }
               aria-pressed={controlsLocked}
             >
@@ -2777,8 +2804,17 @@ function App() {
                     ? 'border-amber-300/45 bg-amber-300/10 text-amber-50 hover:bg-amber-300/15'
                     : 'border-white/10 bg-white/5 text-white hover:bg-white/10'
                 }`}
-                onClick={toggleControlsLocked}
+                onPointerDown={handleTouchLockPointerDown}
+                onPointerUp={clearTouchLockLongPressTimer}
+                onPointerLeave={clearTouchLockLongPressTimer}
+                onPointerCancel={clearTouchLockLongPressTimer}
+                onClick={handleTouchLockClick}
                 aria-pressed={controlsLocked}
+                aria-label={
+                  controlsLocked
+                    ? 'Long-press to unlock screen touches'
+                    : 'Long-press to lock screen touches'
+                }
               >
                 <span className="flex items-center gap-2">
                   {controlsLocked ? <Lock size={20} /> : <LockOpen size={20} />}
@@ -2786,7 +2822,7 @@ function App() {
                 </span>
               </button>
               <p className="px-1 text-[11px] leading-relaxed text-white/45">
-                Blocks accidental screen taps only. BlueTurn and media remote keep working.
+                Hold to lock or unlock. Blocks accidental screen taps only; BlueTurn and media remote keep working.
               </p>
               <button
                 type="button"
