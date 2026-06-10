@@ -25,6 +25,7 @@ export function TopControls({
 }: TopControlsProps) {
   const selectBaseClass =
     'min-h-[36px] w-full appearance-none rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 pr-10 text-sm leading-none text-white outline-none transition focus:border-fuchsia-300/60'
+  const showTonalCenter = tuningSystemId !== 'equal'
 
   return (
     <div className="grid grid-cols-2 gap-3">
@@ -48,26 +49,30 @@ export function TopControls({
           />
         </div>
       </label>
-      <label className="block">
-        <span className="mb-2 block text-xs uppercase tracking-[0.16em] text-white/60">Tonal center</span>
-        <div className="relative">
-          <select
-            value={tonalCenter}
-            onChange={(event) => onTonalCenterChange(event.target.value as TonalCenter)}
-            className={`${selectBaseClass} uppercase`}
-          >
-            {TONAL_CENTERS.map((center) => (
-              <option key={center} value={center} className="bg-[#1d1b2a]">
-                {center}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            size={18}
-            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/70"
-          />
-        </div>
-      </label>
+      {showTonalCenter ? (
+        <label className="block">
+          <span className="mb-2 block text-xs uppercase tracking-[0.16em] text-white/60">Tonal center</span>
+          <div className="relative">
+            <select
+              value={tonalCenter}
+              onChange={(event) => onTonalCenterChange(event.target.value as TonalCenter)}
+              className={`${selectBaseClass} uppercase`}
+            >
+              {TONAL_CENTERS.map((center) => (
+                <option key={center} value={center} className="bg-[#1d1b2a]">
+                  {center}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={18}
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/70"
+            />
+          </div>
+        </label>
+      ) : (
+        <div aria-hidden="true" />
+      )}
       <div className="rounded-xl border border-white/10 bg-white/5 p-3">
         <div className="mb-2 text-xs uppercase tracking-[0.16em] text-white/60">A4 reference</div>
         <div className="flex items-center gap-1.5">

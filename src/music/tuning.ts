@@ -228,26 +228,6 @@ function getBohlenPierceFrequencyFromParts(
   return centerFrequency * getBohlenPierceRatio(noteClass, center) * 3 ** octaveOffset;
 }
 
-function getA4ScaleFactor(
-  tuningSystemId: Exclude<TuningSystemId, "equal">,
-  center: TonalCenter,
-  a4Hz: number,
-  baseOctave: number
-): number {
-  const a4OctaveOffset = 4 - Math.min(MAX_BASE_OCTAVE, Math.max(MIN_BASE_OCTAVE, baseOctave));
-  let rawA4 = getNaturalFrequencyFromParts("a", a4OctaveOffset, center, a4Hz, baseOctave);
-  if (tuningSystemId === "pythagorean") {
-    rawA4 = getPythagoreanFrequencyFromParts("a", a4OctaveOffset, center, a4Hz, baseOctave);
-  }
-  if (tuningSystemId === "meantone-sixth") {
-    rawA4 = getMeantoneSixthFrequencyFromParts("a", a4OctaveOffset, center, a4Hz, baseOctave);
-  }
-  if (tuningSystemId === "bohlen-pierce") {
-    rawA4 = getBohlenPierceFrequencyFromParts("a", a4OctaveOffset, center, a4Hz, baseOctave);
-  }
-  return a4Hz / rawA4;
-}
-
 export function getEqualTemperamentFrequency(
   noteId: NoteId,
   a4Hz: number,
@@ -263,9 +243,13 @@ export function getNaturalFrequency(
   baseOctave: number
 ): number {
   const { noteClass, octaveOffset } = splitNoteId(noteId);
-  const tunedFrequency =
-    getNaturalFrequencyFromParts(noteClass, octaveOffset, center, a4Hz, baseOctave) *
-    getA4ScaleFactor("just", center, a4Hz, baseOctave);
+  const tunedFrequency = getNaturalFrequencyFromParts(
+    noteClass,
+    octaveOffset,
+    center,
+    a4Hz,
+    baseOctave,
+  );
   return normalizeFrequencyNearReference(
     tunedFrequency,
     getEqualTemperamentFrequency(noteId, a4Hz, baseOctave)
@@ -279,9 +263,13 @@ export function getPythagoreanFrequency(
   baseOctave: number
 ): number {
   const { noteClass, octaveOffset } = splitNoteId(noteId);
-  const tunedFrequency =
-    getPythagoreanFrequencyFromParts(noteClass, octaveOffset, center, a4Hz, baseOctave) *
-    getA4ScaleFactor("pythagorean", center, a4Hz, baseOctave);
+  const tunedFrequency = getPythagoreanFrequencyFromParts(
+    noteClass,
+    octaveOffset,
+    center,
+    a4Hz,
+    baseOctave,
+  );
   return normalizeFrequencyNearReference(
     tunedFrequency,
     getEqualTemperamentFrequency(noteId, a4Hz, baseOctave)
@@ -295,9 +283,13 @@ export function getMeantoneSixthFrequency(
   baseOctave: number
 ): number {
   const { noteClass, octaveOffset } = splitNoteId(noteId);
-  const tunedFrequency =
-    getMeantoneSixthFrequencyFromParts(noteClass, octaveOffset, center, a4Hz, baseOctave) *
-    getA4ScaleFactor("meantone-sixth", center, a4Hz, baseOctave);
+  const tunedFrequency = getMeantoneSixthFrequencyFromParts(
+    noteClass,
+    octaveOffset,
+    center,
+    a4Hz,
+    baseOctave,
+  );
   return normalizeFrequencyNearReference(
     tunedFrequency,
     getEqualTemperamentFrequency(noteId, a4Hz, baseOctave)
@@ -311,9 +303,13 @@ export function getBohlenPierceFrequency(
   baseOctave: number
 ): number {
   const { noteClass, octaveOffset } = splitNoteId(noteId);
-  const tunedFrequency =
-    getBohlenPierceFrequencyFromParts(noteClass, octaveOffset, center, a4Hz, baseOctave) *
-    getA4ScaleFactor("bohlen-pierce", center, a4Hz, baseOctave);
+  const tunedFrequency = getBohlenPierceFrequencyFromParts(
+    noteClass,
+    octaveOffset,
+    center,
+    a4Hz,
+    baseOctave,
+  );
   return normalizeFrequencyNearReference(
     tunedFrequency,
     getEqualTemperamentFrequency(noteId, a4Hz, baseOctave)

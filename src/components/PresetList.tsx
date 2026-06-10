@@ -175,8 +175,12 @@ export function PresetList({
                       </div>
                       <div className="shrink-0 text-right text-xs text-white/60">
                         <span className="uppercase">{preset.tuningSystemId}</span>
-                        <span className="mx-1 text-white/35">•</span>
-                        <span>Center {preset.tonalCenter.toUpperCase()}</span>
+                        {preset.tuningSystemId !== 'equal' ? (
+                          <>
+                            <span className="mx-1 text-white/35">•</span>
+                            <span>Center {preset.tonalCenter.toUpperCase()}</span>
+                          </>
+                        ) : null}
                       </div>
                     </div>
                   )}
