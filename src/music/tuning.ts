@@ -1,4 +1,5 @@
 import {
+  NOTE_IDS,
   SEMITONES_FROM_C,
   splitNoteId,
   type NoteClass,
@@ -19,6 +20,9 @@ export type TuningSystemId = (typeof TUNING_SYSTEMS)[number]["id"];
 
 export const MIN_BASE_OCTAVE = 1;
 export const MAX_BASE_OCTAVE = 5;
+
+/** MIDI note number for A4 in equal temperament (A4 reference anchor). */
+const A4_MIDI = 69;
 
 const NOTE_CLASS_BY_SEMITONE: Record<number, NoteClass> = {
   0: "c",
@@ -175,13 +179,42 @@ function getBohlenPierceRatio(noteClass: NoteClass, center: TonalCenter): number
   return 3 ** (bpStep / 13);
 }
 
+/** Equal-grid note for this tonal center nearest A4 (from A4 reference + base octave). */
+export function resolveTonalCenterNoteId(
+  center: TonalCenter,
+  baseOctave: number,
+): NoteId {
+  let bestNoteId = center as NoteId;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const noteId of NOTE_IDS) {
+    if (splitNoteId(noteId).noteClass !== center) {
+      continue;
+    }
+    const distance = Math.abs(midiFromNoteId(noteId, baseOctave) - A4_MIDI);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestNoteId = noteId;
+    }
+  }
+  return bestNoteId;
+}
+
+function relativeOctaveOffsetFromCenter(
+  noteOctaveOffset: number,
+  center: TonalCenter,
+  baseOctave: number,
+): number {
+  const centerOctaveOffset = splitNoteId(resolveTonalCenterNoteId(center, baseOctave)).octaveOffset;
+  return noteOctaveOffset - centerOctaveOffset;
+}
+
 function getTonalCenterFrequency(
   center: TonalCenter,
   a4Hz: number,
   baseOctave: number
 ): number {
-  const centerMidi = noteClassToMidiInReferenceOctave(center, baseOctave);
-  return frequencyFromMidi(centerMidi, a4Hz);
+  const centerNoteId = resolveTonalCenterNoteId(center, baseOctave);
+  return frequencyFromMidi(midiFromNoteId(centerNoteId, baseOctave), a4Hz);
 }
 
 function getNaturalFrequencyFromParts(
@@ -192,7 +225,8 @@ function getNaturalFrequencyFromParts(
   baseOctave: number
 ): number {
   const centerFrequency = getTonalCenterFrequency(center, a4Hz, baseOctave);
-  return centerFrequency * getJustRatio(noteClass, center) * 2 ** octaveOffset;
+  const relativeOctave = relativeOctaveOffsetFromCenter(octaveOffset, center, baseOctave);
+  return centerFrequency * getJustRatio(noteClass, center) * 2 ** relativeOctave;
 }
 
 function getPythagoreanFrequencyFromParts(
@@ -203,7 +237,8 @@ function getPythagoreanFrequencyFromParts(
   baseOctave: number
 ): number {
   const centerFrequency = getTonalCenterFrequency(center, a4Hz, baseOctave);
-  return centerFrequency * getPythagoreanRatio(noteClass, center) * 2 ** octaveOffset;
+  const relativeOctave = relativeOctaveOffsetFromCenter(octaveOffset, center, baseOctave);
+  return centerFrequency * getPythagoreanRatio(noteClass, center) * 2 ** relativeOctave;
 }
 
 function getMeantoneSixthFrequencyFromParts(
@@ -214,7 +249,8 @@ function getMeantoneSixthFrequencyFromParts(
   baseOctave: number
 ): number {
   const centerFrequency = getTonalCenterFrequency(center, a4Hz, baseOctave);
-  return centerFrequency * getMeantoneSixthRatio(noteClass, center) * 2 ** octaveOffset;
+  const relativeOctave = relativeOctaveOffsetFromCenter(octaveOffset, center, baseOctave);
+  return centerFrequency * getMeantoneSixthRatio(noteClass, center) * 2 ** relativeOctave;
 }
 
 function getBohlenPierceFrequencyFromParts(
@@ -225,7 +261,8 @@ function getBohlenPierceFrequencyFromParts(
   baseOctave: number
 ): number {
   const centerFrequency = getTonalCenterFrequency(center, a4Hz, baseOctave);
-  return centerFrequency * getBohlenPierceRatio(noteClass, center) * 3 ** octaveOffset;
+  const relativeOctave = relativeOctaveOffsetFromCenter(octaveOffset, center, baseOctave);
+  return centerFrequency * getBohlenPierceRatio(noteClass, center) * 3 ** relativeOctave;
 }
 
 export function getEqualTemperamentFrequency(
