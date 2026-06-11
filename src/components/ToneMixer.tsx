@@ -179,11 +179,9 @@ export function ToneMixer({
                 >
                   <ToneLabel noteId={tone.noteId} />
                 </button>
-                {spatialExpanded ? (
-                  <span className="shrink-0 tabular-nums text-xs text-white/70">
-                    {formatToneFrequencyHz(toneFrequencyHz)}
-                  </span>
-                ) : null}
+                <span className="shrink-0 tabular-nums text-xs text-white/70">
+                  {formatToneFrequencyHz(toneFrequencyHz)}
+                </span>
               </div>
               <button
                 type="button"
