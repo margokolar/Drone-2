@@ -144,7 +144,7 @@ export function PartialEditor({
                   min={0.125}
                   max={16}
                   decimals={3}
-                  className="w-20 rounded-md border border-white/20 bg-white/5 px-2 py-1 text-right tabular-nums text-white"
+                  className="w-[4.5rem] rounded-md border border-white/20 bg-white/5 px-1.5 py-1 text-right text-sm tabular-nums text-white"
                   ariaLabel="Partial ratio value"
                 />
                 <div className="flex items-center gap-1">
@@ -159,7 +159,7 @@ export function PartialEditor({
                     min={referenceFrequencyHz === null || referenceFrequencyHz <= 0 ? 0 : referenceFrequencyHz * 0.125}
                     max={referenceFrequencyHz === null || referenceFrequencyHz <= 0 ? 0 : referenceFrequencyHz * 16}
                     decimals={1}
-                    className="w-24 rounded-md border border-white/10 bg-white/3 px-2 py-1 text-right tabular-nums text-white"
+                    className="w-[4.5rem] rounded-md border border-white/10 bg-white/3 px-1.5 py-1 text-right text-sm tabular-nums text-white"
                     ariaLabel="Partial frequency value in hertz"
                   />
                   <span className="text-xs text-white/60">Hz</span>
@@ -185,7 +185,7 @@ export function PartialEditor({
                 min={-48}
                 max={0}
                 decimals={1}
-                className="w-24 rounded-md border border-white/20 bg-white/5 px-2 py-1 text-right tabular-nums text-white"
+                className="w-[4.5rem] rounded-md border border-white/20 bg-white/5 px-1.5 py-1 text-right text-sm tabular-nums text-white"
                 ariaLabel="Partial gain value in decibels"
               />
               <ResettableRangeInput

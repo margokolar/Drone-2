@@ -1,8 +1,9 @@
 import clsx from 'clsx'
-import { AudioWaveform, ChevronDown } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { useRef, useState } from 'react'
 import type { ToneConfig } from '../audio/types'
-import { getTonePageLabel, type NoteId } from '../music/notes'
+import { getTonePageLabel, type NoteId, type TonalCenter } from '../music/notes'
+import { getFrequency, type TuningSystemId } from '../music/tuning'
 import {
   DEFAULT_TONE_DETUNE_CENTS,
   DEFAULT_TONE_PAN,
@@ -10,10 +11,30 @@ import {
   MIN_TONE_DETUNE_CENTS,
   defaultToneGainDb,
 } from '../presets/defaultPresets'
+import { PanFluteIcon } from './PanFluteIcon'
 import { ResettableRangeInput } from './ResettableRangeInput'
 import { ToneLabel } from './ToneLabel'
 
 const SPATIAL_LONG_PRESS_MS = 800
+
+function formatToneFrequencyHz(hz: number): string {
+  if (hz >= 100) {
+    return `${hz.toFixed(1)} Hz`
+  }
+  return `${hz.toFixed(2)} Hz`
+}
+
+function getToneFrequencyHz(
+  noteId: NoteId,
+  detuneCents: number,
+  tuningSystemId: TuningSystemId,
+  tonalCenter: TonalCenter,
+  referenceA4Hz: number,
+  baseOctave: number,
+): number {
+  const baseHz = getFrequency(noteId, tuningSystemId, tonalCenter, referenceA4Hz, baseOctave)
+  return baseHz * 2 ** (detuneCents / 1200)
+}
 
 function isToneStrictSolo(tones: ToneConfig[], noteId: NoteId): boolean {
   const selected = tones.find((tone) => tone.noteId === noteId)
@@ -26,6 +47,10 @@ function isToneStrictSolo(tones: ToneConfig[], noteId: NoteId): boolean {
 type ToneMixerProps = {
   tones: ToneConfig[]
   allTones: ToneConfig[]
+  referenceA4Hz: number
+  baseOctave: number
+  tuningSystemId: TuningSystemId
+  tonalCenter: TonalCenter
   onToneGain: (noteId: NoteId, gainDb: number) => void
   onTonePan: (noteId: NoteId, pan: number) => void
   onToneDetune: (noteId: NoteId, detuneCents: number) => void
@@ -36,6 +61,10 @@ type ToneMixerProps = {
 export function ToneMixer({
   tones,
   allTones,
+  referenceA4Hz,
+  baseOctave,
+  tuningSystemId,
+  tonalCenter,
   onToneGain,
   onTonePan,
   onToneDetune,
@@ -82,6 +111,14 @@ export function ToneMixer({
         const strictSolo = isToneStrictSolo(allTones, tone.noteId)
         const spatialExpanded = isSpatialExpanded(tone.noteId)
         const detuneLabel = `${tone.detuneCents > 0 ? '+' : ''}${tone.detuneCents.toFixed(1)} c`
+        const toneFrequencyHz = getToneFrequencyHz(
+          tone.noteId,
+          tone.detuneCents,
+          tuningSystemId,
+          tonalCenter,
+          referenceA4Hz,
+          baseOctave,
+        )
         return (
           <article
             key={tone.noteId}
@@ -91,33 +128,15 @@ export function ToneMixer({
                 : 'border-white/10 bg-white/5'
             }`}
           >
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
-                  Tone
-                </span>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
                 <button
                   type="button"
                   className={clsx(
-                    'button-safe min-w-0 shrink rounded-lg border px-2.5 py-1 tracking-[0.12em] transition',
-                    strictSolo
-                      ? 'border-amber-300/70 bg-amber-300/30 text-amber-50 shadow-[0_0_18px_rgba(251,191,36,0.28)] hover:bg-amber-300/40'
-                      : 'border-fuchsia-300/50 bg-fuchsia-300/20 text-fuchsia-50 shadow-[0_0_18px_rgba(240,171,252,0.16)] hover:bg-fuchsia-300/30',
-                  )}
-                  onClick={() => onToggleToneSolo(tone.noteId)}
-                  aria-label={`Lülita tooni solo: ${getTonePageLabel(tone.noteId)}`}
-                >
-                  <ToneLabel noteId={tone.noteId} />
-                </button>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  className={clsx(
-                    'button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition',
+                    'button-safe flex shrink-0 items-center gap-0.5 rounded-lg border px-1.5 py-1 transition',
                     spatialExpanded
                       ? 'border-white/20 bg-white/10 text-white/85 hover:bg-white/15'
-                      : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10',
+                      : 'border-transparent bg-transparent text-white/60 hover:bg-white/5 hover:text-white/75',
                   )}
                   onPointerDown={() => {
                     spatialLongPressTriggeredRef.current = false
@@ -142,22 +161,41 @@ export function ToneMixer({
                   aria-label={`${spatialExpanded ? 'Peida' : 'Näita'} detune ja pan: ${getTonePageLabel(tone.noteId)}. Pikalt vajuta, et avada või sulgeda kõigi toonide detune ja pan.`}
                   title="Detune & Pan. Long-press to expand or collapse all tones."
                 >
+                  <span className="text-xs uppercase tracking-[0.16em]">Tone</span>
                   <ChevronDown
-                    size={16}
-                    className={clsx('transition-transform', spatialExpanded && 'rotate-180')}
+                    size={14}
+                    className={clsx('shrink-0 transition-transform', spatialExpanded && 'rotate-180')}
                     aria-hidden
                   />
                 </button>
                 <button
                   type="button"
-                  className="button-safe flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs font-semibold text-white/80 transition hover:bg-white/10"
-                  onClick={() => onEditOvertones(tone.noteId)}
-                  aria-label={`Edit ${getTonePageLabel(tone.noteId)} overtones`}
+                  className={clsx(
+                    'button-safe flex h-9 min-w-9 shrink-0 items-center justify-center rounded-lg border px-2.5 tracking-[0.12em] transition',
+                    strictSolo
+                      ? 'border-amber-300/70 bg-amber-300/30 text-amber-50 shadow-[0_0_18px_rgba(251,191,36,0.28)] hover:bg-amber-300/40'
+                      : 'border-fuchsia-300/50 bg-fuchsia-300/20 text-fuchsia-50 shadow-[0_0_18px_rgba(240,171,252,0.16)] hover:bg-fuchsia-300/30',
+                  )}
+                  onClick={() => onToggleToneSolo(tone.noteId)}
+                  aria-label={`Lülita tooni solo: ${getTonePageLabel(tone.noteId)}`}
                 >
-                  <AudioWaveform size={14} />
-                  OT
+                  <ToneLabel noteId={tone.noteId} />
                 </button>
+                {spatialExpanded ? (
+                  <span className="shrink-0 tabular-nums text-xs text-white/70">
+                    {formatToneFrequencyHz(toneFrequencyHz)}
+                  </span>
+                ) : null}
               </div>
+              <button
+                type="button"
+                className="button-safe flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10"
+                onClick={() => onEditOvertones(tone.noteId)}
+                aria-label={`Edit ${getTonePageLabel(tone.noteId)} timbre`}
+                title="Timbre"
+              >
+                <PanFluteIcon size={18} />
+              </button>
             </div>
             <div className="grid grid-cols-[1fr_auto] items-center gap-2 text-sm">
               <span className="text-white/60">Gain</span>

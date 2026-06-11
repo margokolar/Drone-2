@@ -2240,17 +2240,17 @@ function App() {
                   <div className="flex items-center justify-between gap-2">
                     <button
                       type="button"
-                      className="button-safe flex min-w-0 flex-1 items-center gap-2 text-left"
+                      className="button-safe flex min-w-0 shrink-0 items-center gap-0.5 text-left"
                       onClick={() => setEntryGlidePanelOpen((current) => !current)}
                       aria-expanded={entryGlidePanelOpen}
                       aria-controls="entry-glide-controls"
                     >
+                      <span className="text-xs uppercase tracking-[0.16em] text-white/60">Entry glide</span>
                       <ChevronDown
-                        size={16}
+                        size={14}
                         className={`shrink-0 text-white/60 transition-transform ${entryGlidePanelOpen ? 'rotate-180' : ''}`}
                         aria-hidden
                       />
-                      <span className="text-xs uppercase tracking-[0.16em] text-white/60">Entry glide</span>
                     </button>
                     <button
                       type="button"
@@ -2375,6 +2375,10 @@ function App() {
               <ToneMixer
                 tones={toneMixerTones}
                 allTones={tonesInToneSet}
+                referenceA4Hz={referenceA4Hz}
+                baseOctave={baseOctave}
+                tuningSystemId={tuningSystemId}
+                tonalCenter={tonalCenter}
                 onToneGain={setToneGain}
                 onTonePan={setTonePan}
                 onToneDetune={setToneDetune}
