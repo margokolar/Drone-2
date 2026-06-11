@@ -128,16 +128,11 @@ export function ToneMixer({
                 : 'border-white/10 bg-white/5'
             }`}
           >
-            <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="mb-1 flex items-center justify-between gap-2">
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <button
                   type="button"
-                  className={clsx(
-                    'button-safe flex shrink-0 items-center gap-0.5 rounded-lg border px-1.5 py-1 transition',
-                    spatialExpanded
-                      ? 'border-white/20 bg-white/10 text-white/85 hover:bg-white/15'
-                      : 'border-transparent bg-transparent text-white/60 hover:bg-white/5 hover:text-white/75',
-                  )}
+                  className="button-safe flex min-w-0 shrink-0 items-center gap-0.5 text-left"
                   onPointerDown={() => {
                     spatialLongPressTriggeredRef.current = false
                     clearSpatialLongPressTimer()
@@ -161,10 +156,13 @@ export function ToneMixer({
                   aria-label={`${spatialExpanded ? 'Peida' : 'Näita'} detune ja pan: ${getTonePageLabel(tone.noteId)}. Pikalt vajuta, et avada või sulgeda kõigi toonide detune ja pan.`}
                   title="Detune & Pan. Long-press to expand or collapse all tones."
                 >
-                  <span className="text-xs uppercase tracking-[0.16em]">Tone</span>
+                  <span className="text-xs uppercase tracking-[0.16em] text-white/60">Tone</span>
                   <ChevronDown
                     size={14}
-                    className={clsx('shrink-0 transition-transform', spatialExpanded && 'rotate-180')}
+                    className={clsx(
+                      'shrink-0 text-white/60 transition-transform',
+                      spatialExpanded && 'rotate-180',
+                    )}
                     aria-hidden
                   />
                 </button>
