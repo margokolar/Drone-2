@@ -258,6 +258,13 @@ export class DroneEngine {
     this.masterGain.gain.cancelScheduledValues(now)
     this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now)
     this.masterGain.gain.linearRampToValueAtTime(0.0001, now + PARAM_SMOOTH_SECONDS)
+    // iOS can leave the AudioContext reporting "running" while its sample clock
+    // is stalled after an idle/background spell (the documented WebKit bug).
+    // A gain ramp scheduled against that frozen clock never renders, so the
+    // drone keeps sounding even though the user pressed pause. Play already
+    // un-stalls the context via prepareContext(); pause must do the same so the
+    // mute actually takes effect after idle.
+    void this.recoverIfStalled()
   }
 
   canFastResume(): boolean {
