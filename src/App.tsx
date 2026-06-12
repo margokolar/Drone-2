@@ -42,6 +42,7 @@ import {
   transportNextPreset,
   transportPreviousPreset,
 } from './audio/transportControls'
+import { droneEngine } from './audio/DroneEngine'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
 import { MetronomeControls } from './components/MetronomeControls'
@@ -1923,6 +1924,11 @@ function App() {
       return
     }
     const keepSessionPlaying = () => {
+      // iOS can leave the AudioContext "running" with a frozen sample clock
+      // after an idle/lock spell, which silently breaks pause and preset
+      // changes (their scheduled changes never render). Un-stall it here so the
+      // foreground interval and return-to-foreground both keep it healthy.
+      void droneEngine.recoverIfStalled()
       const anchor = mediaAnchorRef.current
       if (anchor && anchor.paused) {
         void anchor.play().catch(() => {})
@@ -1982,6 +1988,13 @@ function App() {
 
       const isPlayPedal = matchesFootPedalKey(event, FOOT_PEDAL_PLAY_KEYS)
       const isPresetPedal = matchesFootPedalKey(event, FOOT_PEDAL_PRESET_KEYS)
+
+      // A pedal press is a user gesture, so this is the most reliable moment to
+      // un-stall an idle-frozen AudioContext before we mute (pause) or rebuild
+      // voices (preset change) — otherwise those scheduled changes never render.
+      if (isPlayPedal || isPresetPedal) {
+        void droneEngine.recoverIfStalled()
+      }
 
       if (isPlayPedal || isPresetPedal) {
         if (event.repeat) {
