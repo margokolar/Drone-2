@@ -60,6 +60,7 @@ import { TopControls } from './components/TopControls'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useMetronome } from './hooks/useMetronome'
 import { useOvertoneMidi } from './hooks/useOvertoneMidi'
+import { useTextPrompt } from './hooks/useTextPrompt'
 import {
   getTonePageLabel,
   NOTE_IDS,
@@ -78,6 +79,7 @@ import {
   MEDIA_PLAY_PAUSE_KEYS,
 } from './utils/footPedalKeys'
 import { BLE_KEYBOARD_FOCUS_ROOT_ID, runMediaSessionAction } from './utils/restoreBleKeyboardFocus'
+import { dismissVirtualKeyboard, installIosKeyboardGuard } from './utils/iosKeyboardGuard'
 
 type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi'
 
@@ -392,6 +394,7 @@ function App() {
   const droneTitleLongPressFiredRef = useRef(false)
   const touchLockLongPressTimerRef = useRef<number | null>(null)
   const touchLockLongPressFiredRef = useRef(false)
+  const { requestText, modal: textPromptModal } = useTextPrompt()
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const toneSetImportInputRef = useRef<HTMLInputElement | null>(null)
   const toneSetEditorImportInputRef = useRef<HTMLInputElement | null>(null)
@@ -873,8 +876,11 @@ function App() {
     )
   }, [])
 
-  const exportCurrentSong = useCallback(() => {
-    const inputName = window.prompt('Song name', songName) ?? ''
+  const exportCurrentSong = useCallback(async () => {
+    const inputName = await requestText('Song name', songName)
+    if (inputName === null) {
+      return
+    }
     const resolvedName = inputName.trim() || songName || 'My Song'
     const activePreset = presets.find((preset) => preset.id === activePresetId)
     const payload = {
@@ -888,10 +894,13 @@ function App() {
       exportedAt: new Date().toISOString(),
     }
     downloadJson(payload, `${makeSafeFileName(resolvedName, 'song')}.song.json`)
-  }, [activePresetId, downloadJson, makeSafeFileName, presets, songName])
+  }, [activePresetId, downloadJson, makeSafeFileName, presets, requestText, songName])
 
-  const exportSongLibrary = useCallback(() => {
-    const inputName = window.prompt('Song library name', songName) ?? ''
+  const exportSongLibrary = useCallback(async () => {
+    const inputName = await requestText('Song library name', songName)
+    if (inputName === null) {
+      return
+    }
     const libraryName = inputName.trim() || songName || 'My Song'
     const currentSongName = songName.trim() || 'Song 1'
     const activePreset = presets.find((preset) => preset.id === activePresetId)
@@ -933,7 +942,7 @@ function App() {
       exportedAt: new Date().toISOString(),
     }
     downloadJson(payload, `${makeSafeFileName(libraryName, 'song-library')}.song-library.json`)
-  }, [activePresetId, downloadJson, makeSafeFileName, presets, songLibrary, songName])
+  }, [activePresetId, downloadJson, makeSafeFileName, presets, requestText, songLibrary, songName])
 
   const importSongs = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
@@ -1136,8 +1145,8 @@ function App() {
     // Best effort deep-link. Works only if JBL registers this URL scheme.
     window.location.href = 'jblportable://'
   }, [])
-  const saveAsSong = useCallback(() => {
-    const inputName = window.prompt('Song name', `${songName} copy`)
+  const saveAsSong = useCallback(async () => {
+    const inputName = await requestText('Song name', `${songName} copy`)
     if (inputName === null) {
       return
     }
@@ -1146,7 +1155,7 @@ function App() {
       return
     }
     saveCurrentSongToLibrary(trimmedName)
-  }, [saveCurrentSongToLibrary, songName])
+  }, [requestText, saveCurrentSongToLibrary, songName])
   const saveToneSetLayout = useCallback((layout: ToneSetLayout) => {
     setToneSetLayout(layout)
     try {
@@ -1972,10 +1981,13 @@ function App() {
     if (!controlsLocked) {
       return
     }
+    dismissVirtualKeyboard()
     setMenuOpen(false)
     setMenuExportOpen(false)
     setMenuImportOpen(false)
   }, [controlsLocked])
+
+  useEffect(() => installIosKeyboardGuard(), [])
 
   useEffect(() => {
     if (!menuOpen) {
@@ -3311,6 +3323,7 @@ function App() {
           </div>
         </div>
       )}
+      {textPromptModal}
     </div>
   )
 

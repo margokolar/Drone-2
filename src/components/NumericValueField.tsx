@@ -145,10 +145,6 @@ export function NumericValueField({
           event.preventDefault()
           openEditor()
         }}
-        onTouchEnd={(event) => {
-          event.preventDefault()
-          openEditor()
-        }}
         style={{ touchAction: 'manipulation' }}
       >
         {formatValue(value, decimals)}

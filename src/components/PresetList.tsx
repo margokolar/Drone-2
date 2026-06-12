@@ -3,6 +3,9 @@ import { ArrowDown, ArrowUp, Check, Copy, Pencil, Save, Trash2 } from 'lucide-re
 import { useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { Preset } from '../presets/defaultPresets'
+import { dismissVirtualKeyboard } from '../utils/iosKeyboardGuard'
+import { isIosDevice } from '../utils/platform'
+import { TextPromptModal } from './TextPromptModal'
 
 type PresetListProps = {
   presets: Preset[]
@@ -27,6 +30,7 @@ export function PresetList({
 }: PresetListProps) {
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
+  const [renamePrompt, setRenamePrompt] = useState<{ presetId: string; name: string } | null>(null)
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const renameBlurTimeoutRef = useRef<number | null>(null)
   const renameIgnoreBlurRef = useRef(false)
@@ -62,6 +66,10 @@ export function PresetList({
   }
 
   const startEditing = (preset: Preset) => {
+    if (isIosDevice()) {
+      setRenamePrompt({ presetId: preset.id, name: preset.name })
+      return
+    }
     clearRenameBlurTimeout()
     renameIgnoreBlurRef.current = true
     flushSync(() => {
@@ -280,6 +288,26 @@ export function PresetList({
           )
         })}
       </div>
+      {renamePrompt ? (
+        <TextPromptModal
+          open
+          title="Preset title"
+          defaultValue={renamePrompt.name}
+          confirmLabel="Save"
+          onConfirm={(value) => {
+            const trimmed = value.replace(/\s+/g, ' ').trim()
+            if (trimmed) {
+              onRenamePreset(renamePrompt.presetId, trimmed)
+            }
+            dismissVirtualKeyboard()
+            setRenamePrompt(null)
+          }}
+          onCancel={() => {
+            dismissVirtualKeyboard()
+            setRenamePrompt(null)
+          }}
+        />
+      ) : null}
     </div>
   )
 }

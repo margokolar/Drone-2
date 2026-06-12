@@ -1,3 +1,6 @@
+import { isTextEditingTarget } from './footPedalKeys'
+import { dismissVirtualKeyboard } from './iosKeyboardGuard'
+
 export const BLE_KEYBOARD_FOCUS_ROOT_ID = 'ble-keyboard-focus-root'
 
 /** After iOS handles a Now Playing / media-remote action, route BLE keyboard back to the page. */
@@ -7,7 +10,9 @@ export function restoreBleKeyboardFocus(): void {
   }
 
   const active = document.activeElement
-  if (
+  if (isTextEditingTarget(active)) {
+    dismissVirtualKeyboard()
+  } else if (
     active instanceof HTMLInputElement ||
     active instanceof HTMLTextAreaElement ||
     (active instanceof HTMLElement && active.isContentEditable)
