@@ -79,7 +79,7 @@ import {
   MEDIA_PLAY_PAUSE_KEYS,
 } from './utils/footPedalKeys'
 import { BLE_KEYBOARD_FOCUS_ROOT_ID, runMediaSessionAction } from './utils/restoreBleKeyboardFocus'
-import { dismissVirtualKeyboard, installIosKeyboardGuard } from './utils/iosKeyboardGuard'
+import { installIosKeyboardGuard, releaseKeyboardFocus } from './utils/iosKeyboardGuard'
 
 type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi'
 
@@ -1981,7 +1981,7 @@ function App() {
     if (!controlsLocked) {
       return
     }
-    dismissVirtualKeyboard()
+    releaseKeyboardFocus()
     setMenuOpen(false)
     setMenuExportOpen(false)
     setMenuImportOpen(false)

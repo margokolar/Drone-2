@@ -1,5 +1,6 @@
 import { isTextEditingTarget } from './footPedalKeys'
 import { dismissVirtualKeyboard } from './iosKeyboardGuard'
+import { isIosDevice } from './platform'
 
 export const BLE_KEYBOARD_FOCUS_ROOT_ID = 'ble-keyboard-focus-root'
 
@@ -18,6 +19,14 @@ export function restoreBleKeyboardFocus(): void {
     (active instanceof HTMLElement && active.isContentEditable)
   ) {
     active.blur()
+  }
+
+  // iOS: never hold focus on the hidden root. If a Bluetooth keyboard (BlueTurn)
+  // disconnects while a hidden element is focused, the iOS software keyboard can
+  // freeze system-wide until the device restarts. BlueTurn keys still reach the
+  // window keydown listener without this focus trick.
+  if (isIosDevice()) {
+    return
   }
 
   const root = document.getElementById(BLE_KEYBOARD_FOCUS_ROOT_ID)

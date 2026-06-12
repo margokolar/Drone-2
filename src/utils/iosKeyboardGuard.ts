@@ -14,8 +14,28 @@ export function dismissVirtualKeyboard(): void {
 }
 
 /**
+ * Release ALL programmatic focus (text fields and the hidden BLE focus root).
+ *
+ * Holding web focus while a Bluetooth keyboard (e.g. BlueTurn) disconnects can
+ * wedge the iOS software keyboard system-wide until a device restart. Whenever
+ * the app hides, locks, or otherwise expects the BLE link to drop, drop focus
+ * back to the document body so nothing is held across the disconnect.
+ */
+export function releaseKeyboardFocus(): void {
+  if (typeof document === 'undefined') {
+    return
+  }
+
+  const active = document.activeElement
+  if (active instanceof HTMLElement && active !== document.body) {
+    active.blur()
+  }
+}
+
+/**
  * iOS WebKit can leave the system keyboard wedged after a PWA hides, loses focus,
- * or fights over focus with media-session handlers. Dismiss on lifecycle edges.
+ * or when a Bluetooth keyboard disconnects mid-focus. Release focus on lifecycle
+ * edges so the disconnect never happens while we hold focus.
  */
 export function installIosKeyboardGuard(): () => void {
   if (!isIosDevice()) {
@@ -24,15 +44,15 @@ export function installIosKeyboardGuard(): () => void {
 
   const onVisibilityChange = () => {
     if (document.visibilityState === 'hidden') {
-      dismissVirtualKeyboard()
+      releaseKeyboardFocus()
     }
   }
 
-  window.addEventListener('pagehide', dismissVirtualKeyboard)
+  window.addEventListener('pagehide', releaseKeyboardFocus)
   document.addEventListener('visibilitychange', onVisibilityChange)
 
   return () => {
-    window.removeEventListener('pagehide', dismissVirtualKeyboard)
+    window.removeEventListener('pagehide', releaseKeyboardFocus)
     document.removeEventListener('visibilitychange', onVisibilityChange)
   }
 }
