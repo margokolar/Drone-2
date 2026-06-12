@@ -1,6 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { dismissVirtualKeyboard } from '../utils/iosKeyboardGuard'
+import { isIosDevice } from '../utils/platform'
+import { OnScreenTextKeyboard } from './OnScreenTextKeyboard'
 
 type TextPromptModalProps = {
   open: boolean
@@ -21,6 +23,7 @@ export function TextPromptModal({
 }: TextPromptModalProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [draft, setDraft] = useState(defaultValue)
+  const useOnScreenKeyboard = useMemo(() => isIosDevice(), [])
 
   useEffect(() => {
     if (open) {
@@ -29,7 +32,7 @@ export function TextPromptModal({
   }, [defaultValue, open])
 
   useLayoutEffect(() => {
-    if (!open) {
+    if (!open || useOnScreenKeyboard) {
       return
     }
     const input = inputRef.current
@@ -38,7 +41,7 @@ export function TextPromptModal({
     }
     input.focus({ preventScroll: true })
     input.select()
-  }, [open])
+  }, [open, useOnScreenKeyboard])
 
   const close = (nextValue: string | null) => {
     dismissVirtualKeyboard()
@@ -61,29 +64,54 @@ export function TextPromptModal({
         aria-label="Cancel text entry"
         onClick={() => close(null)}
       />
-      <div className="absolute inset-x-4 top-[max(1rem,env(safe-area-inset-top))] z-[131] mx-auto w-full max-w-sm rounded-2xl border border-white/10 bg-[#1a1825] p-4 shadow-2xl">
+      <div className="absolute inset-x-3 top-[max(0.75rem,env(safe-area-inset-top))] z-[131] mx-auto w-full max-w-sm rounded-2xl border border-white/10 bg-[#1a1825] p-4 shadow-2xl">
         <div className="mb-3 text-xs uppercase tracking-[0.16em] text-white/60">{title}</div>
-        <input
-          ref={inputRef}
-          type="text"
-          inputMode="text"
-          value={draft}
-          onChange={(event) => setDraft(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault()
-              close(draft)
-            }
-          }}
-          className="mb-4 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-base text-white outline-none focus:border-fuchsia-300/50"
-          aria-label={title}
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          enterKeyHint="done"
-          data-form-type="other"
-        />
+
+        {useOnScreenKeyboard ? (
+          <div
+            className="mb-3 min-h-[3rem] w-full rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-base text-white"
+            aria-label={title}
+          >
+            {draft ? (
+              <span className="break-all">{draft}</span>
+            ) : (
+              <span className="text-white/35">…</span>
+            )}
+          </div>
+        ) : (
+          <input
+            ref={inputRef}
+            type="text"
+            inputMode="text"
+            value={draft}
+            onChange={(event) => setDraft(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                close(draft)
+              }
+            }}
+            className="mb-4 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-base text-white outline-none focus:border-fuchsia-300/50"
+            aria-label={title}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            enterKeyHint="done"
+            data-form-type="other"
+          />
+        )}
+
+        {useOnScreenKeyboard ? (
+          <div className="mb-3">
+            <OnScreenTextKeyboard
+              onKey={(char) => setDraft((current) => current + char)}
+              onBackspace={() => setDraft((current) => current.slice(0, -1))}
+              onSpace={() => setDraft((current) => `${current} `)}
+            />
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
