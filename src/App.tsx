@@ -1941,7 +1941,7 @@ function App() {
         }
       }
     }
-    const intervalId = window.setInterval(keepSessionPlaying, 4000)
+    const intervalId = window.setInterval(keepSessionPlaying, 1500)
     const onVisibilityChange = () => {
       if (!document.hidden) {
         keepSessionPlaying()
@@ -1953,6 +1953,29 @@ function App() {
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [playing])
+
+  // Un-stall the AudioContext the instant we return to the foreground or the
+  // user touches the screen, regardless of play state, so there is no dead
+  // window where pause / prev / next do nothing until the keep-alive interval
+  // catches up.
+  useEffect(() => {
+    const recover = () => {
+      void droneEngine.recoverIfStalled()
+    }
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        recover()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('focus', recover)
+    window.addEventListener('pointerdown', recover, { passive: true })
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('focus', recover)
+      window.removeEventListener('pointerdown', recover)
+    }
+  }, [])
 
   useEffect(() => {
     const navigatorWithAudioSession = navigator as Navigator & {
