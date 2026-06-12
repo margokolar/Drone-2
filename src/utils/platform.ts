@@ -1,9 +1,16 @@
-export function isIosStandalonePwa(): boolean {
-  const nav = navigator as Navigator & { standalone?: boolean }
-  const isIosDevice =
+export function isIosDevice(): boolean {
+  if (typeof navigator === 'undefined') {
+    return false
+  }
+  return (
     /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  )
+}
+
+export function isIosStandalonePwa(): boolean {
+  const nav = navigator as Navigator & { standalone?: boolean }
   const isStandalone =
     nav.standalone === true || window.matchMedia('(display-mode: standalone)').matches
-  return isIosDevice && isStandalone
+  return isIosDevice() && isStandalone
 }
