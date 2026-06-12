@@ -78,6 +78,8 @@ import {
   MEDIA_PLAY_PAUSE_KEYS,
 } from './utils/footPedalKeys'
 import { BLE_KEYBOARD_FOCUS_ROOT_ID, runMediaSessionAction } from './utils/restoreBleKeyboardFocus'
+import { BleDebugOverlay } from './components/BleDebugOverlay'
+import { bleDebugEnabled, recordBleDebug } from './utils/bleDebug'
 
 type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi'
 
@@ -1710,6 +1712,7 @@ function App() {
     }
 
     setActionHandler('play', () => {
+      recordBleDebug('mediasession', `play (playing=${useDroneStore.getState().playing})`)
       runMediaSessionAction(() => {
         // iOS decides whether a BlueTurn button sends 'play' or 'pause' purely
         // from playbackState, and a silent anchor is not reliably seen as
@@ -1730,12 +1733,15 @@ function App() {
       })
     })
     setActionHandler('pause', () => {
+      recordBleDebug('mediasession', `pause (playing=${useDroneStore.getState().playing})`)
       runMediaSessionAction(transportPause)
     })
     setActionHandler('nexttrack', () => {
+      recordBleDebug('mediasession', 'nexttrack')
       runMediaSessionAction(transportNextPreset)
     })
     setActionHandler('previoustrack', () => {
+      recordBleDebug('mediasession', 'previoustrack')
       runMediaSessionAction(transportPreviousPreset)
     })
 
@@ -1969,6 +1975,7 @@ function App() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      recordBleDebug('keydown', `key=${event.key} code=${event.code}`)
       if (isTextEditingTarget(event.target)) {
         return
       }
@@ -2133,6 +2140,9 @@ function App() {
         aria-hidden="true"
         className="fixed size-0 overflow-hidden opacity-0"
       />
+      {bleDebugEnabled() && (
+        <BleDebugOverlay getAnchorPaused={() => mediaAnchorRef.current?.paused ?? null} />
+      )}
       {controlsLocked && (
         <div
           className="fixed inset-0 z-40 touch-none"
