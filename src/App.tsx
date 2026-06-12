@@ -1712,6 +1712,12 @@ function App() {
     setActionHandler('play', () => {
       runMediaSessionAction(() => {
         transportPlay(latestRuntimeConfigRef.current)
+        const anchor = mediaAnchorRef.current
+        if (anchor && anchor.paused) {
+          // Start the silent anchor inside the MediaSession activation so iOS
+          // sees the session as genuinely playing and offers 'pause' next.
+          void anchor.play().catch(() => {})
+        }
       })
     })
     setActionHandler('pause', () => {
@@ -1806,14 +1812,51 @@ function App() {
     document.body.appendChild(anchor)
     mediaAnchorRef.current = anchor
 
-    const primeAnchor = () => {
-      // Touch the element on a user gesture so iOS unlocks future play()
-      // calls, but only keep it actively playing when the synth is too.
-      if (!useDroneStore.getState().playing) {
-        void anchor.play().then(() => anchor.pause()).catch(() => {
-          // iOS can reject before a user gesture; later gestures retry.
-        })
+    const assertPlayingSession = () => {
+      if (!('mediaSession' in navigator)) {
+        return
       }
+      try {
+        navigator.mediaSession.playbackState = 'playing'
+      } catch {
+        // Ignore browsers that reject the write.
+      }
+    }
+
+    // iOS pauses media elements on its own (after a background spell, and even
+    // foreground for a silent track). If the anchor is left paused while the
+    // synth still intends to play, iOS marks the Now Playing session as paused
+    // and from then on only dispatches the 'play' action to BlueTurn — so the
+    // pause button stops working. Keep the anchor genuinely playing whenever
+    // the synth does, and re-assert the session state.
+    const handleAnchorPause = () => {
+      if (!useDroneStore.getState().playing) {
+        return
+      }
+      void anchor.play().then(assertPlayingSession).catch(() => {
+        // iOS can reject play() outside an activation window; retried later.
+      })
+    }
+    const handleAnchorPlaying = () => {
+      if (useDroneStore.getState().playing) {
+        assertPlayingSession()
+      }
+    }
+    anchor.addEventListener('pause', handleAnchorPause)
+    anchor.addEventListener('playing', handleAnchorPlaying)
+
+    const primeAnchor = () => {
+      // Touch the element on a user gesture so iOS unlocks future play() calls.
+      // While the synth is playing, keep the anchor running rather than pausing.
+      if (useDroneStore.getState().playing) {
+        if (anchor.paused) {
+          void anchor.play().catch(() => {})
+        }
+        return
+      }
+      void anchor.play().then(() => anchor.pause()).catch(() => {
+        // iOS can reject before a user gesture; later gestures retry.
+      })
     }
 
     window.addEventListener('pointerdown', primeAnchor, { passive: true })
@@ -1824,6 +1867,8 @@ function App() {
       window.removeEventListener('pointerdown', primeAnchor)
       window.removeEventListener('keydown', primeAnchor)
       window.removeEventListener('touchend', primeAnchor)
+      anchor.removeEventListener('pause', handleAnchorPause)
+      anchor.removeEventListener('playing', handleAnchorPlaying)
       anchor.pause()
       anchor.removeAttribute('src')
       anchor.load()
