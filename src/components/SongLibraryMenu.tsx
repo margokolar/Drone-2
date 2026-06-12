@@ -1,6 +1,5 @@
 import { ArrowDown, ArrowUp, ChevronDown, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useTextPrompt } from '../hooks/useTextPrompt'
 
 const VIEWPORT_GUTTER_PX = 12
 const VIEWPORT_DROPDOWN_CLASS =
@@ -39,7 +38,6 @@ export function SongLibraryMenu({
   const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownStyle, setDropdownStyle] = useState<Record<string, number>>({})
   const menuRef = useRef<HTMLDivElement | null>(null)
-  const { requestText, modal: textPromptModal } = useTextPrompt()
   const usesViewportDropdown = dropdownPlacement === 'viewport'
 
   const updateDropdownPosition = useCallback(() => {
@@ -132,18 +130,16 @@ export function SongLibraryMenu({
             type="button"
             className="mb-2 block min-h-[38px] w-full rounded-md border border-fuchsia-300/40 bg-fuchsia-300/10 px-3 py-2 text-left text-sm text-fuchsia-100 transition hover:bg-fuchsia-300/20"
             onClick={() => {
-              void (async () => {
-                const inputName = await requestText('Song name', songName || 'My Song')
-                if (inputName === null) {
-                  return
-                }
-                const trimmed = inputName.trim()
-                if (!trimmed) {
-                  return
-                }
-                onSaveCurrentSong(trimmed)
-                setMenuOpen(false)
-              })()
+              const inputName = window.prompt('Song name', songName || 'My Song')
+              if (inputName === null) {
+                return
+              }
+              const trimmed = inputName.trim()
+              if (!trimmed) {
+                return
+              }
+              onSaveCurrentSong(trimmed)
+              setMenuOpen(false)
             }}
           >
             Save / rename song
@@ -210,7 +206,6 @@ export function SongLibraryMenu({
           })}
         </div>
       )}
-      {textPromptModal}
     </div>
   )
 }
