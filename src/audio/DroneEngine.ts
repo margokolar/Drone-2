@@ -262,6 +262,11 @@ export class DroneEngine {
     return this.context?.state === 'running'
   }
 
+  /** Current master gain value, for diagnostics (1e-4 means muted). */
+  masterGainValue(): number {
+    return this.masterGain?.gain.value ?? -1
+  }
+
   /** Compact context state for diagnostics: state@currentTime. */
   contextDebugLabel(): string {
     if (!this.context) {

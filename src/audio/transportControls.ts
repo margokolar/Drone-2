@@ -32,6 +32,12 @@ export function transportPause(): void {
   useDroneStore.getState().setPlaying(false)
   syncMediaSessionPlaybackState(false)
   recordBleDebug('note', `paused ctx=${droneEngine.contextDebugLabel()}`)
+  window.setTimeout(() => {
+    recordBleDebug(
+      'note',
+      `mute@+300 gain=${droneEngine.masterGainValue().toFixed(4)} ctx=${droneEngine.contextDebugLabel()}`,
+    )
+  }, 300)
 }
 
 export function transportTogglePlay(config: DroneRuntimeConfig): void {

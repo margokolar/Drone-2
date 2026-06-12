@@ -25,8 +25,13 @@ export function BleDebugOverlay({ getAnchorPaused }: Props) {
     'mediaSession' in navigator ? navigator.mediaSession.playbackState : 'n/a'
   const anchorPaused = getAnchorPaused()
   const contextLabel = droneEngine.contextDebugLabel()
-  const now = Date.now()
   const events = getBleDebugEvents()
+  const formatClock = (t: number) => {
+    const d = new Date(t)
+    return `${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}.${String(
+      d.getMilliseconds(),
+    ).padStart(3, '0')}`
+  }
 
   return (
     <div
@@ -42,8 +47,8 @@ export function BleDebugOverlay({ getAnchorPaused }: Props) {
           <div className="text-white/50">no pedal events yet…</div>
         ) : (
           events.map((event) => (
-            <div key={event.t}>
-              -{Math.round((now - event.t) / 100) / 10}s [{event.source}] {event.label}
+            <div key={event.seq}>
+              #{event.seq} {formatClock(event.t)} [{event.source}] {event.label}
             </div>
           ))
         )}
