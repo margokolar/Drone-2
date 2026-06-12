@@ -1896,6 +1896,43 @@ function App() {
     }
   }, [playing])
 
+  // After an idle spell iOS can quietly let the Now Playing session drift to a
+  // paused state (the silent anchor gets paused), at which point it only
+  // dispatches the 'play' action to BlueTurn — so pause and the left pedal go
+  // dead while play still works. While the synth is playing, periodically
+  // restart the anchor and re-assert playbackState='playing', and do the same
+  // immediately whenever we return to the foreground, to keep all four pedal
+  // actions (play, pause, next, previous) alive regardless of lock state.
+  useEffect(() => {
+    if (!playing) {
+      return
+    }
+    const keepSessionPlaying = () => {
+      const anchor = mediaAnchorRef.current
+      if (anchor && anchor.paused) {
+        void anchor.play().catch(() => {})
+      }
+      if ('mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.playbackState = 'playing'
+        } catch {
+          // Ignore browsers that reject the write.
+        }
+      }
+    }
+    const intervalId = window.setInterval(keepSessionPlaying, 4000)
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        keepSessionPlaying()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [playing])
+
   useEffect(() => {
     const navigatorWithAudioSession = navigator as Navigator & {
       audioSession?: { type: string }
