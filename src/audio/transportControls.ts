@@ -1,6 +1,7 @@
 import { droneEngine } from './DroneEngine'
 import type { DroneRuntimeConfig } from './types'
 import { useDroneStore } from '../store/useDroneStore'
+import { recordBleDebug } from '../utils/bleDebug'
 
 /** Shared play/pause/preset actions for UI, BlueTurn keyboard, and Media Session. */
 
@@ -30,10 +31,13 @@ export function transportPause(): void {
   droneEngine.pause()
   useDroneStore.getState().setPlaying(false)
   syncMediaSessionPlaybackState(false)
+  recordBleDebug('note', `paused ctx=${droneEngine.contextDebugLabel()}`)
 }
 
 export function transportTogglePlay(config: DroneRuntimeConfig): void {
-  if (useDroneStore.getState().playing) {
+  const before = useDroneStore.getState().playing
+  recordBleDebug('note', `toggle before=${before} ctx=${droneEngine.contextDebugLabel()}`)
+  if (before) {
     transportPause()
     return
   }
@@ -48,10 +52,12 @@ export function transportResume(config: DroneRuntimeConfig): void {
 }
 
 export function transportNextPreset(): void {
+  recordBleDebug('note', `nextPreset ctx=${droneEngine.contextDebugLabel()}`)
   useDroneStore.getState().selectNextPreset()
 }
 
 export function transportPreviousPreset(): void {
+  recordBleDebug('note', `prevPreset ctx=${droneEngine.contextDebugLabel()}`)
   useDroneStore.getState().selectPreviousPreset()
 }
 

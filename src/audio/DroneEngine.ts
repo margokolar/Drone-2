@@ -1,6 +1,7 @@
 import { dbToGain, partialTimbreWeights, normalizedBlend, waveformGainCompensation } from './audioMath'
 import type { DroneRuntimeConfig, EntryGlideParams, PartialConfig, ToneConfig } from './types'
 import { getFrequency } from '../music/tuning'
+import { recordBleDebug } from '../utils/bleDebug'
 
 type OscBundle = {
   oscillator: OscillatorNode
@@ -184,6 +185,7 @@ export class DroneEngine {
     if (!context) {
       return
     }
+    recordBleDebug('note', `recover in:${this.contextDebugLabel()}`)
     const extendedState = context.state as AudioContextState | 'interrupted'
     if (extendedState === 'suspended' || extendedState === 'interrupted') {
       try {
@@ -196,6 +198,7 @@ export class DroneEngine {
       }
     }
     if (context.state !== 'running') {
+      recordBleDebug('note', `recover bail:${this.contextDebugLabel()}`)
       return
     }
     const before = context.currentTime
@@ -208,11 +211,22 @@ export class DroneEngine {
     const delta = context.currentTime - before
     if (delta < 0.01) {
       await this.kickContext()
+      recordBleDebug('note', `recover kicked->${this.contextDebugLabel()}`)
+    } else {
+      recordBleDebug('note', `recover ok delta=${delta.toFixed(3)}`)
     }
   }
 
   isContextRunning(): boolean {
     return this.context?.state === 'running'
+  }
+
+  /** Compact context state for diagnostics: state@currentTime. */
+  contextDebugLabel(): string {
+    if (!this.context) {
+      return 'no-ctx'
+    }
+    return `${this.context.state}@${this.context.currentTime.toFixed(2)}`
   }
 
   private forceMute(now: number): void {
