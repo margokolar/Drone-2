@@ -36,6 +36,7 @@ export class DroneEngine {
   private voiceMap = new Map<string, ToneVoice>()
   private started = false
   private shouldPlay = false
+  private lastClock = { wall: 0, ctx: 0 }
 
   setPlaybackIntent(shouldPlay: boolean): void {
     this.shouldPlay = shouldPlay
@@ -217,6 +218,46 @@ export class DroneEngine {
     }
   }
 
+  /**
+   * Fast, gesture-friendly recovery with no probe delay. Samples the audio
+   * clock against wall-clock time so a frozen "running" context is detected
+   * instantly (using the previous sample) and kicked, and a suspended/
+   * interrupted context is resumed synchronously within the calling gesture.
+   */
+  async pokeClock(): Promise<void> {
+    const context = this.context
+    if (!context) {
+      return
+    }
+    const state = context.state as AudioContextState | 'interrupted'
+    const wallNow = Date.now()
+    const ctxNow = context.currentTime
+    const previous = this.lastClock
+    this.lastClock = { wall: wallNow, ctx: ctxNow }
+    if (state === 'suspended' || state === 'interrupted') {
+      recordBleDebug('note', `poke resume:${state}`)
+      try {
+        await context.resume()
+      } catch {
+        // iOS may reject until the next gesture; retried then.
+      }
+      if ((context.state as string) === 'interrupted') {
+        await this.kickContext()
+      }
+      this.lastClock = { wall: Date.now(), ctx: context.currentTime }
+      return
+    }
+    if (previous.wall > 0) {
+      const wallDelta = (wallNow - previous.wall) / 1000
+      const ctxDelta = ctxNow - previous.ctx
+      if (wallDelta > 0.25 && ctxDelta < wallDelta * 0.5) {
+        recordBleDebug('note', `poke kick frozen@${ctxNow.toFixed(2)}`)
+        await this.kickContext()
+        this.lastClock = { wall: Date.now(), ctx: context.currentTime }
+      }
+    }
+  }
+
   isContextRunning(): boolean {
     return this.context?.state === 'running'
   }
@@ -275,7 +316,7 @@ export class DroneEngine {
     // keeps sounding while the store flips to paused — desyncing play/pause so
     // the pedal can never pause again. Un-stall the context, then re-assert the
     // mute against the live clock so the drone actually goes silent.
-    void this.recoverIfStalled().then(() => {
+    void this.pokeClock().then(() => {
       if (!this.shouldPlay) {
         this.applyMute()
       }

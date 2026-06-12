@@ -1928,7 +1928,7 @@ function App() {
       // after an idle/lock spell, which silently breaks pause and preset
       // changes (their scheduled changes never render). Un-stall it here so the
       // foreground interval and return-to-foreground both keep it healthy.
-      void droneEngine.recoverIfStalled()
+      void droneEngine.pokeClock()
       const anchor = mediaAnchorRef.current
       if (anchor && anchor.paused) {
         void anchor.play().catch(() => {})
@@ -1960,7 +1960,7 @@ function App() {
   // catches up.
   useEffect(() => {
     const recover = () => {
-      void droneEngine.recoverIfStalled()
+      void droneEngine.pokeClock()
     }
     const onVisibilityChange = () => {
       if (!document.hidden) {
@@ -2016,7 +2016,7 @@ function App() {
       // un-stall an idle-frozen AudioContext before we mute (pause) or rebuild
       // voices (preset change) — otherwise those scheduled changes never render.
       if (isPlayPedal || isPresetPedal) {
-        void droneEngine.recoverIfStalled()
+        void droneEngine.pokeClock()
       }
 
       if (isPlayPedal || isPresetPedal) {
