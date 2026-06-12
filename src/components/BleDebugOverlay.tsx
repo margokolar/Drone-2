@@ -24,7 +24,7 @@ export function BleDebugOverlay({ getAnchorPaused }: Props) {
   const playbackState =
     'mediaSession' in navigator ? navigator.mediaSession.playbackState : 'n/a'
   const anchorPaused = getAnchorPaused()
-  const contextRunning = droneEngine.isContextRunning()
+  const contextLabel = droneEngine.contextDebugLabel()
   const now = Date.now()
   const events = getBleDebugEvents()
 
@@ -35,7 +35,7 @@ export function BleDebugOverlay({ getAnchorPaused }: Props) {
     >
       <div className="text-white">
         playing={String(playing)} · playbackState={playbackState} · anchorPaused=
-        {String(anchorPaused)} · ctxRunning={String(contextRunning)}
+        {String(anchorPaused)} · ctx={contextLabel}
       </div>
       <div className="mt-1 max-h-32 overflow-hidden">
         {events.length === 0 ? (
