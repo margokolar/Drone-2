@@ -1711,6 +1711,15 @@ function App() {
 
     setActionHandler('play', () => {
       runMediaSessionAction(() => {
+        // iOS decides whether a BlueTurn button sends 'play' or 'pause' purely
+        // from playbackState, and a silent anchor is not reliably seen as
+        // "playing" — so iOS often keeps dispatching 'play' and the pause side
+        // never fires. Treat 'play' as a toggle so a single pedal button still
+        // pauses an already-playing drone.
+        if (useDroneStore.getState().playing) {
+          transportPause()
+          return
+        }
         transportPlay(latestRuntimeConfigRef.current)
         const anchor = mediaAnchorRef.current
         if (anchor && anchor.paused) {
