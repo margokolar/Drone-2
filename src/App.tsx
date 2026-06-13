@@ -81,6 +81,7 @@ import {
 import { BLE_KEYBOARD_FOCUS_ROOT_ID, runMediaSessionAction } from './utils/restoreBleKeyboardFocus'
 import { BleDebugOverlay } from './components/BleDebugOverlay'
 import { bleDebugEnabled, recordBleDebug } from './utils/bleDebug'
+import { useNowPlayingKeepAlive } from './hooks/useNowPlayingKeepAlive'
 
 type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi'
 
@@ -1754,22 +1755,6 @@ function App() {
     }
   }, [])
 
-  // Hold the Now Playing session "playing" continuously, independent of the
-  // drone's play/pause. The pedal is delivered purely as keydown events, so the
-  // lock-screen play/pause icon is cosmetic — and keeping the state stable
-  // avoids the paused->playing transition that makes iOS steal the BlueTurn HID
-  // (and drop pedal keydowns) for a few seconds after an idle spell.
-  useEffect(() => {
-    if (!('mediaSession' in navigator)) {
-      return
-    }
-    try {
-      navigator.mediaSession.playbackState = 'playing'
-    } catch {
-      // Ignore browsers that reject the write.
-    }
-  }, [playing])
-
   // Show the currently selected preset name on the iOS lock screen.
   useEffect(() => {
     if (!('mediaSession' in navigator)) {
@@ -1788,11 +1773,8 @@ function App() {
     }
   }, [activePresetId, presets, songName])
 
-  // iOS PWA needs an actively playing media element for the OS to route
-  // Bluetooth controls to our MediaSession handlers. We keep a silent
-  // looping <audio> primed and play it in lock-step with the synth so iOS
-  // sees an accurate playing/paused state and dispatches the right action
-  // (play vs. pause) when a Bluetooth button is pressed.
+  // Silent looping anchor keeps iOS Now Playing alive so BlueTurn keydowns
+  // keep reaching the page after idle (never pause it on drone-pause).
   useEffect(() => {
     const sampleRate = 8000
     const numSamples = sampleRate
@@ -1896,89 +1878,7 @@ function App() {
     }
   }, [])
 
-  // Keep the silent anchor playing whenever the drone starts; never pause it on
-  // drone-pause. A paused->playing transition after idle is exactly what makes
-  // iOS grab the BlueTurn HID for the media-remote layer and swallow the next
-  // pedal keydowns, so the anchor stays continuously playing once primed.
-  useEffect(() => {
-    const anchor = mediaAnchorRef.current
-    if (!anchor) {
-      return
-    }
-    if (anchor.paused) {
-      void anchor.play().catch(() => {
-        // iOS sometimes rejects play() outside a gesture; the keep-alive retries.
-      })
-    }
-  }, [playing])
-
-  // After an idle spell iOS can quietly let the Now Playing session drift to a
-  // paused state (the silent anchor gets paused), at which point it only
-  // dispatches the 'play' action to BlueTurn — so pause and the left pedal go
-  // dead while play still works. While the synth is playing, periodically
-  // restart the anchor and re-assert playbackState='playing', and do the same
-  // immediately whenever we return to the foreground, to keep all four pedal
-  // actions (play, pause, next, previous) alive regardless of lock state.
-  useEffect(() => {
-    const keepSessionPlaying = () => {
-      // iOS can leave the AudioContext "running" with a frozen sample clock
-      // after an idle/lock spell, which silently breaks pause and preset
-      // changes (their scheduled changes never render). Un-stall it here while
-      // the drone is sounding so the foreground interval keeps it healthy.
-      if (useDroneStore.getState().playing) {
-        void droneEngine.pokeClock()
-      }
-      // Keep the silent anchor and the Now Playing session continuously
-      // "playing" — even while the drone is paused — so iOS never sees a
-      // paused->playing transition that would re-route the BlueTurn HID to the
-      // media-remote layer and drop the next pedal keydowns after idle.
-      const anchor = mediaAnchorRef.current
-      if (anchor && anchor.paused) {
-        void anchor.play().catch(() => {})
-      }
-      if ('mediaSession' in navigator) {
-        try {
-          navigator.mediaSession.playbackState = 'playing'
-        } catch {
-          // Ignore browsers that reject the write.
-        }
-      }
-    }
-    const intervalId = window.setInterval(keepSessionPlaying, 1500)
-    const onVisibilityChange = () => {
-      if (!document.hidden) {
-        keepSessionPlaying()
-      }
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => {
-      window.clearInterval(intervalId)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-    }
-  }, [])
-
-  // Un-stall the AudioContext the instant we return to the foreground or the
-  // user touches the screen, regardless of play state, so there is no dead
-  // window where pause / prev / next do nothing until the keep-alive interval
-  // catches up.
-  useEffect(() => {
-    const recover = () => {
-      void droneEngine.pokeClock()
-    }
-    const onVisibilityChange = () => {
-      if (!document.hidden) {
-        recover()
-      }
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    window.addEventListener('focus', recover)
-    window.addEventListener('pointerdown', recover, { passive: true })
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      window.removeEventListener('focus', recover)
-      window.removeEventListener('pointerdown', recover)
-    }
-  }, [])
+  useNowPlayingKeepAlive(mediaAnchorRef)
 
   useEffect(() => {
     const navigatorWithAudioSession = navigator as Navigator & {

@@ -10,13 +10,17 @@ export type BleDebugEvent = {
 let events: BleDebugEvent[] = []
 let seqCounter = 0
 const listeners = new Set<() => void>()
+let debugEnabled: boolean | null = null
 
 /** Temporary BlueTurn / Media Session diagnostics, gated behind ?debug=1. */
 export function bleDebugEnabled(): boolean {
   if (typeof window === 'undefined') {
     return false
   }
-  return new URLSearchParams(window.location.search).get('debug') === '1'
+  if (debugEnabled === null) {
+    debugEnabled = new URLSearchParams(window.location.search).get('debug') === '1'
+  }
+  return debugEnabled
 }
 
 export function recordBleDebug(source: BleDebugSource, label: string): void {
