@@ -2026,7 +2026,7 @@ function App() {
 
   const handleTabChange = useCallback(
     (tabId: TabId) => {
-      if (tabId === activeTab && tabId === 'tone') {
+      if (tabId === activeTab && (tabId === 'tone' || tabId === 'overtones')) {
         scrollToPageTop('smooth')
         return
       }

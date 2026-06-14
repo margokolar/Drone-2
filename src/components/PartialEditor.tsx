@@ -115,34 +115,34 @@ export function PartialEditor({
             </div>
 
             <div className="grid grid-cols-[1fr_auto] items-center gap-2 text-sm">
-              <span className="text-white/60">Ratio</span>
-              <div className="flex items-center justify-end gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="shrink-0 text-white/60">Ratio</span>
                 <NumericValueField
                   value={partial.ratio}
                   onCommit={(value) => onSetPartialRatio(partial.id, value)}
                   min={0.125}
                   max={16}
                   decimals={3}
-                  className="w-[4.5rem] rounded-md border border-white/20 bg-white/5 px-1.5 py-1 text-right text-sm tabular-nums text-white"
+                  className="w-[4.5rem] shrink-0 rounded-md border border-white/20 bg-white/5 px-1.5 py-1 text-right text-sm tabular-nums text-white"
                   ariaLabel="Partial ratio value"
                 />
-                <div className="flex items-center gap-1">
-                  <NumericValueField
-                    value={referenceFrequencyHz === null ? 0 : referenceFrequencyHz * partial.ratio}
-                    onCommit={(value) => {
-                      if (referenceFrequencyHz === null || referenceFrequencyHz <= 0) {
-                        return
-                      }
-                      onSetPartialRatio(partial.id, value / referenceFrequencyHz)
-                    }}
-                    min={referenceFrequencyHz === null || referenceFrequencyHz <= 0 ? 0 : referenceFrequencyHz * 0.125}
-                    max={referenceFrequencyHz === null || referenceFrequencyHz <= 0 ? 0 : referenceFrequencyHz * 16}
-                    decimals={1}
-                    className="w-[4.5rem] rounded-md border border-white/10 bg-white/3 px-1.5 py-1 text-right text-sm tabular-nums text-white"
-                    ariaLabel="Partial frequency value in hertz"
-                  />
-                  <span className="text-xs text-white/60">Hz</span>
-                </div>
+              </div>
+              <div className="flex items-center justify-end gap-1">
+                <NumericValueField
+                  value={referenceFrequencyHz === null ? 0 : referenceFrequencyHz * partial.ratio}
+                  onCommit={(value) => {
+                    if (referenceFrequencyHz === null || referenceFrequencyHz <= 0) {
+                      return
+                    }
+                    onSetPartialRatio(partial.id, value / referenceFrequencyHz)
+                  }}
+                  min={referenceFrequencyHz === null || referenceFrequencyHz <= 0 ? 0 : referenceFrequencyHz * 0.125}
+                  max={referenceFrequencyHz === null || referenceFrequencyHz <= 0 ? 0 : referenceFrequencyHz * 16}
+                  decimals={1}
+                  className="w-[4.5rem] rounded-md border border-white/10 bg-white/3 px-1.5 py-1 text-right text-sm tabular-nums text-white"
+                  ariaLabel="Partial frequency value in hertz"
+                />
+                <span className="text-xs text-white/60">Hz</span>
               </div>
               <ResettableRangeInput
                 min={0.125}
