@@ -4,38 +4,25 @@ import type { PartialConfig } from '../audio/types'
 import { defaultPartialGainDb, defaultPartialRatio } from '../presets/defaultPresets'
 import { ResettableRangeInput } from './ResettableRangeInput'
 import { NumericValueField } from './NumericValueField'
-import { TimbreMorphSlider } from './TimbreMorphSlider'
 
 type PartialEditorProps = {
   partials: PartialConfig[]
   referenceFrequencyHz: number | null
-  timbreBlend: {
-    sine: number
-    saw: number
-    square: number
-  }
   onSetPartialEnabled: (partialId: string, enabled: boolean) => void
   onSetPartialRatio: (partialId: string, ratio: number) => void
   onSetPartialGain: (partialId: string, gainDb: number) => void
   onAddPartial: () => void
   onRemovePartial: (partialId: string) => void
-  onSetTimbreValue: (key: 'sine' | 'saw' | 'square', value: number) => void
-  onTimbreChangeStart?: () => void
-  onTimbreChangeEnd?: () => void
 }
 
 export function PartialEditor({
   partials,
   referenceFrequencyHz,
-  timbreBlend,
   onSetPartialEnabled,
   onSetPartialRatio,
   onSetPartialGain,
   onAddPartial,
   onRemovePartial,
-  onSetTimbreValue,
-  onTimbreChangeStart,
-  onTimbreChangeEnd,
 }: PartialEditorProps) {
   const soloRestoreRef = useRef<Map<string, boolean> | null>(null)
 
@@ -90,14 +77,6 @@ export function PartialEditor({
 
   return (
     <div className="space-y-4">
-      <TimbreMorphSlider
-        timbreBlend={timbreBlend}
-        onSetTimbreValue={onSetTimbreValue}
-        onTimbreChangeStart={onTimbreChangeStart}
-        onTimbreChangeEnd={onTimbreChangeEnd}
-        className="landscape:hidden max-h-[500px]:hidden"
-      />
-
       <div className="space-y-3">
         {partials.map((partial, index) => (
           <article key={partial.id} className="rounded-xl border border-white/10 bg-white/5 p-3">

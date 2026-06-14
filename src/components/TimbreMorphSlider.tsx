@@ -9,7 +9,9 @@ type TimbreMorphSliderProps = {
   onTimbreChangeStart?: () => void
   onTimbreChangeEnd?: () => void
   orientation?: 'horizontal' | 'vertical'
+  variant?: 'boxed' | 'mixer'
   className?: string
+  accentClassName?: string
 }
 
 function morphFromBlend(sine: number, saw: number, square: number): number {
@@ -44,7 +46,9 @@ export function TimbreMorphSlider({
   onTimbreChangeStart,
   onTimbreChangeEnd,
   orientation = 'horizontal',
+  variant = 'boxed',
   className = '',
+  accentClassName = 'accent-fuchsia-300',
 }: TimbreMorphSliderProps) {
   const timbreMorph = morphFromBlend(timbreBlend.sine, timbreBlend.saw, timbreBlend.square)
 
@@ -102,31 +106,44 @@ export function TimbreMorphSlider({
         className={`flex flex-col gap-1 rounded-xl border border-white/10 bg-[#111019]/90 p-2 shadow-lg backdrop-blur-sm ${className}`}
       >
         <div className="flex h-44 w-10 flex-col">
-          <span className="flex h-5 shrink-0 items-center justify-center text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">
+          <span className="flex h-5 shrink-0 items-center justify-center text-[10px] font-semibold tracking-[0.12em] text-white/60">
             Square
           </span>
           <div className="relative flex min-h-0 flex-1 items-center justify-center">
             <ResettableRangeInput
               {...sharedRangeProps}
-              className="absolute left-1/2 top-1/2 h-2 w-[calc(11rem-1.25rem)] -translate-x-1/2 -translate-y-1/2 -rotate-90 accent-fuchsia-300"
+              className={`absolute left-1/2 top-1/2 h-2 w-[calc(11rem-1.25rem)] -translate-x-1/2 -translate-y-1/2 -rotate-90 ${accentClassName}`}
             />
           </div>
         </div>
-        <span className="flex h-7 shrink-0 items-center justify-center text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">
+        <span className="flex h-7 shrink-0 items-center justify-center text-[10px] font-semibold tracking-[0.12em] text-white/60">
           Saw
         </span>
       </div>
     )
   }
 
+  if (variant === 'mixer') {
+    return (
+      <div className={`grid grid-cols-[1fr_auto] items-center gap-2 text-sm ${className}`}>
+        <span className="col-span-2 flex items-center justify-between text-white/60">
+          <span>Saw</span>
+          <span>Sine</span>
+          <span>Square</span>
+        </span>
+        <ResettableRangeInput {...sharedRangeProps} className={`col-span-2 h-2 w-full ${accentClassName}`} />
+      </div>
+    )
+  }
+
   return (
     <div className={`space-y-2 rounded-xl border border-white/10 bg-white/5 p-3 ${className}`}>
-      <div className="flex items-center justify-between text-xs uppercase tracking-[0.14em] text-white/60">
+      <div className="flex items-center justify-between text-sm text-white/60">
         <span>Saw</span>
         <span>Sine</span>
         <span>Square</span>
       </div>
-      <ResettableRangeInput {...sharedRangeProps} className="h-2 w-full accent-fuchsia-300" />
+      <ResettableRangeInput {...sharedRangeProps} className={`h-2 w-full ${accentClassName}`} />
     </div>
   )
 }

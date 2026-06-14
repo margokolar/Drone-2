@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { ChevronDown } from 'lucide-react'
 import { useRef, useState } from 'react'
-import type { ToneConfig } from '../audio/types'
+import type { ToneConfig, TimbreBlend } from '../audio/types'
 import { getTonePageLabel, type NoteId, type TonalCenter } from '../music/notes'
 import { getFrequency, type TuningSystemId } from '../music/tuning'
 import {
@@ -13,6 +13,7 @@ import {
 } from '../presets/defaultPresets'
 import { PanFluteIcon } from './PanFluteIcon'
 import { ResettableRangeInput } from './ResettableRangeInput'
+import { TimbreMorphSlider } from './TimbreMorphSlider'
 import { ToneLabel } from './ToneLabel'
 
 const SPATIAL_LONG_PRESS_MS = 800
@@ -57,9 +58,11 @@ type ToneMixerProps = {
   baseOctave: number
   tuningSystemId: TuningSystemId
   tonalCenter: TonalCenter
+  fallbackTimbreBlend: TimbreBlend
   onToneGain: (noteId: NoteId, gainDb: number) => void
   onTonePan: (noteId: NoteId, pan: number) => void
   onToneDetune: (noteId: NoteId, detuneCents: number) => void
+  onToneTimbreValue: (noteId: NoteId, key: 'sine' | 'saw' | 'square', value: number) => void
   onToggleToneSolo: (noteId: NoteId) => void
   onEditOvertones: (noteId: NoteId) => void
 }
@@ -71,9 +74,11 @@ export function ToneMixer({
   baseOctave,
   tuningSystemId,
   tonalCenter,
+  fallbackTimbreBlend,
   onToneGain,
   onTonePan,
   onToneDetune,
+  onToneTimbreValue,
   onToggleToneSolo,
   onEditOvertones,
 }: ToneMixerProps) {
@@ -200,33 +205,19 @@ export function ToneMixer({
                 <PanFluteIcon size={18} />
               </button>
             </div>
-            <div className="grid grid-cols-[1fr_auto] items-center gap-2 text-sm">
-              <span className="text-white/60">Gain</span>
-              <span className="tabular-nums text-white/70">{tone.gainDb.toFixed(1)} dB</span>
-              <ResettableRangeInput
-                min={-40}
-                max={0}
-                step={0.1}
-                value={tone.gainDb}
-                onChange={(event) => onToneGain(tone.noteId, Number(event.target.value))}
-                onReset={() => onToneGain(tone.noteId, defaultToneGainDb(tone.noteId))}
-                aria-label={`${getTonePageLabel(tone.noteId)} gain. Double-click or double-tap to reset to default.`}
-                className={`col-span-2 h-2 w-full ${strictSolo ? 'accent-amber-300' : 'accent-fuchsia-300'}`}
-              />
-            </div>
             {spatialExpanded ? (
               <div id={`tone-spatial-${tone.noteId}`} className="mt-3 space-y-3">
                 <div className="grid grid-cols-[1fr_auto] items-center gap-2 text-sm">
-                  <span className="text-white/60">Detune</span>
-                  <span className="tabular-nums text-white/70">{detuneLabel}</span>
+                  <span className="text-white/60">Gain</span>
+                  <span className="tabular-nums text-white/70">{tone.gainDb.toFixed(1)} dB</span>
                   <ResettableRangeInput
-                    min={MIN_TONE_DETUNE_CENTS}
-                    max={MAX_TONE_DETUNE_CENTS}
+                    min={-40}
+                    max={0}
                     step={0.1}
-                    value={tone.detuneCents}
-                    onChange={(event) => onToneDetune(tone.noteId, Number(event.target.value))}
-                    onReset={() => onToneDetune(tone.noteId, DEFAULT_TONE_DETUNE_CENTS)}
-                    aria-label={`${getTonePageLabel(tone.noteId)} detune. Double-click or double-tap to reset to default.`}
+                    value={tone.gainDb}
+                    onChange={(event) => onToneGain(tone.noteId, Number(event.target.value))}
+                    onReset={() => onToneGain(tone.noteId, defaultToneGainDb(tone.noteId))}
+                    aria-label={`${getTonePageLabel(tone.noteId)} gain. Double-click or double-tap to reset to default.`}
                     className={`col-span-2 h-2 w-full ${strictSolo ? 'accent-amber-300' : 'accent-fuchsia-300'}`}
                   />
                 </div>
@@ -244,8 +235,43 @@ export function ToneMixer({
                     className={`col-span-2 h-2 w-full ${strictSolo ? 'accent-amber-300' : 'accent-fuchsia-300'}`}
                   />
                 </div>
+                <TimbreMorphSlider
+                  variant="mixer"
+                  timbreBlend={tone.timbreBlend ?? fallbackTimbreBlend}
+                  onSetTimbreValue={(key, value) => onToneTimbreValue(tone.noteId, key, value)}
+                  accentClassName={strictSolo ? 'accent-amber-300' : 'accent-fuchsia-300'}
+                />
+                <div className="grid grid-cols-[1fr_auto] items-center gap-2 text-sm">
+                  <span className="text-white/60">Detune</span>
+                  <span className="tabular-nums text-white/70">{detuneLabel}</span>
+                  <ResettableRangeInput
+                    min={MIN_TONE_DETUNE_CENTS}
+                    max={MAX_TONE_DETUNE_CENTS}
+                    step={0.1}
+                    value={tone.detuneCents}
+                    onChange={(event) => onToneDetune(tone.noteId, Number(event.target.value))}
+                    onReset={() => onToneDetune(tone.noteId, DEFAULT_TONE_DETUNE_CENTS)}
+                    aria-label={`${getTonePageLabel(tone.noteId)} detune. Double-click or double-tap to reset to default.`}
+                    className={`col-span-2 h-2 w-full ${strictSolo ? 'accent-amber-300' : 'accent-fuchsia-300'}`}
+                  />
+                </div>
               </div>
-            ) : null}
+            ) : (
+              <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-2 text-sm">
+                <span className="text-white/60">Gain</span>
+                <span className="tabular-nums text-white/70">{tone.gainDb.toFixed(1)} dB</span>
+                <ResettableRangeInput
+                  min={-40}
+                  max={0}
+                  step={0.1}
+                  value={tone.gainDb}
+                  onChange={(event) => onToneGain(tone.noteId, Number(event.target.value))}
+                  onReset={() => onToneGain(tone.noteId, defaultToneGainDb(tone.noteId))}
+                  aria-label={`${getTonePageLabel(tone.noteId)} gain. Double-click or double-tap to reset to default.`}
+                  className={`col-span-2 h-2 w-full ${strictSolo ? 'accent-amber-300' : 'accent-fuchsia-300'}`}
+                />
+              </div>
+            )}
           </article>
         )
       })}

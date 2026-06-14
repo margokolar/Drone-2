@@ -2477,9 +2477,11 @@ function App() {
                 baseOctave={baseOctave}
                 tuningSystemId={tuningSystemId}
                 tonalCenter={tonalCenter}
+                fallbackTimbreBlend={timbreBlend}
                 onToneGain={setToneGain}
                 onTonePan={setTonePan}
                 onToneDetune={setToneDetune}
+                onToneTimbreValue={setToneTimbreValue}
                 onToggleToneSolo={toggleToneSoloForNote}
                 onEditOvertones={(noteId) => {
                   overtoneSelectionPinnedRef.current = true
@@ -2645,6 +2647,15 @@ function App() {
                   Analyse audio
                 </button>
               </div>
+              <div className="mt-3 landscape:hidden max-h-[500px]:hidden">
+                <TimbreMorphSlider
+                  variant="mixer"
+                  timbreBlend={selectedOvertoneTimbreBlend}
+                  onSetTimbreValue={setSelectedOvertoneTimbreValue}
+                  onTimbreChangeStart={beginTimbreMorphChange}
+                  onTimbreChangeEnd={endTimbreMorphChange}
+                />
+              </div>
             </SectionCard>
             <div className="hidden shrink-0 landscape:block max-h-[500px]:block">
               <TimbreMorphSlider
@@ -2656,19 +2667,15 @@ function App() {
               />
             </div>
             </div>
-            <SectionCard title="Partials & timbre">
+            <SectionCard title="Partials">
               <PartialEditor
                 partials={selectedOvertonePartials}
                 referenceFrequencyHz={partialReferenceFrequencyHz}
-                timbreBlend={selectedOvertoneTimbreBlend}
                 onSetPartialEnabled={overtoneMidi.onPartialEnabledFromUi}
                 onSetPartialRatio={setSelectedOvertoneRatio}
                 onSetPartialGain={overtoneMidi.onPartialGainFromUi}
                 onAddPartial={addSelectedOvertonePartial}
                 onRemovePartial={removeSelectedOvertonePartial}
-                onSetTimbreValue={setSelectedOvertoneTimbreValue}
-                onTimbreChangeStart={beginTimbreMorphChange}
-                onTimbreChangeEnd={endTimbreMorphChange}
               />
             </SectionCard>
           </div>
