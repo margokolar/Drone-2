@@ -1,4 +1,4 @@
-import { Delete } from 'lucide-react'
+import { Delete, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { isIosStandalonePwa } from '../utils/platform'
@@ -130,6 +130,16 @@ export function NumericValueField({
     setDraft((current) => current.slice(0, -1))
   }
 
+  const closeEditor = () => {
+    setDraft(formatValue(value, decimals))
+    setOpen(false)
+  }
+
+  const doneEditor = () => {
+    commitValue(draft)
+    setOpen(false)
+  }
+
   return (
     <>
       <button
@@ -161,14 +171,19 @@ export function NumericValueField({
               type="button"
               className="absolute inset-0"
               aria-label="Close numeric keypad"
-              onClick={() => {
-                setDraft(formatValue(value, decimals))
-                setOpen(false)
-              }}
+              onClick={closeEditor}
             />
             <div className="absolute inset-x-3 bottom-3 z-[101] mx-auto w-auto max-w-xs rounded-2xl border border-white/10 bg-[#1a1825] p-4 shadow-2xl sm:inset-x-0 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2">
-              <div className="mb-3 text-xs uppercase tracking-[0.16em] text-white/60">
-                {ariaLabel}
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="text-xs uppercase tracking-[0.16em] text-white/60">{ariaLabel}</div>
+                <button
+                  type="button"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-md border border-white/10 text-white/70 transition hover:bg-white/10"
+                  onClick={closeEditor}
+                  aria-label="Close numeric keypad"
+                >
+                  <X size={16} />
+                </button>
               </div>
               <div className="mb-4 rounded-xl border border-white/10 bg-black/20 px-3 py-4 text-right text-2xl font-semibold tabular-nums text-white">
                 {draft || '0'}
@@ -229,10 +244,7 @@ export function NumericValueField({
                 <button
                   type="button"
                   className="min-h-[48px] rounded-xl border border-fuchsia-300/60 bg-fuchsia-300/20 px-3 text-sm font-semibold text-white transition hover:bg-fuchsia-300/30"
-                  onClick={() => {
-                    commitValue(draft)
-                    setOpen(false)
-                  }}
+                  onClick={doneEditor}
                 >
                   Done
                 </button>
