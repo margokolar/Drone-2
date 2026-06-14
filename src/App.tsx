@@ -82,6 +82,7 @@ import { BLE_KEYBOARD_FOCUS_ROOT_ID, runMediaSessionAction } from './utils/resto
 import { BleDebugOverlay } from './components/BleDebugOverlay'
 import { bleDebugEnabled, recordBleDebug } from './utils/bleDebug'
 import { useNowPlayingKeepAlive } from './hooks/useNowPlayingKeepAlive'
+import { TONE_STICKY_CHROME_ID, scrollToneMixerCardIntoView } from './utils/scrollBelowStickyChrome'
 
 type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi'
 
@@ -2008,14 +2009,31 @@ function App() {
     return () => window.clearInterval(timerId)
   }, [])
 
-  const resetTabScroll = useCallback(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
-    document.documentElement.scrollTop = 0
-    document.body.scrollTop = 0
+  const scrollToPageTop = useCallback((behavior: ScrollBehavior = 'auto') => {
+    window.scrollTo({ top: 0, left: 0, behavior })
+    if (behavior === 'auto') {
+      document.documentElement.scrollTop = 0
+      document.body.scrollTop = 0
+    }
     if (previewScrollRef.current) {
-      previewScrollRef.current.scrollTop = 0
+      previewScrollRef.current.scrollTo({ top: 0, behavior })
     }
   }, [])
+
+  const resetTabScroll = useCallback(() => {
+    scrollToPageTop('auto')
+  }, [scrollToPageTop])
+
+  const handleTabChange = useCallback(
+    (tabId: TabId) => {
+      if (tabId === activeTab && tabId === 'tone') {
+        scrollToPageTop('smooth')
+        return
+      }
+      setActiveTab(tabId)
+    },
+    [activeTab, scrollToPageTop],
+  )
 
   useLayoutEffect(() => {
     const noteId = toneMixerScrollTargetRef.current
@@ -2023,14 +2041,7 @@ function App() {
       return
     }
     toneMixerScrollTargetRef.current = null
-    window.requestAnimationFrame(() => {
-      const card = document.getElementById(toneMixerCardElementId(noteId))
-      if (card) {
-        card.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        return
-      }
-      document.getElementById(TONE_MIXER_SECTION_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
+    scrollToneMixerCardIntoView(noteId, toneMixerCardElementId, TONE_MIXER_SECTION_ID)
   }, [activeTab])
 
   useLayoutEffect(() => {
@@ -2143,6 +2154,7 @@ function App() {
         }`}
       >
         <div
+          id={TONE_STICKY_CHROME_ID}
           className={`sticky top-0 z-50 -mx-3 bg-[#111019] px-3 pb-2 pt-[env(safe-area-inset-top,0px)] ${
             activeTab === 'tone' ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}
@@ -2755,7 +2767,7 @@ function App() {
                   aria-controls={`panel-${id}`}
                   id={`tab-${id}`}
                   className={`button-safe shrink-0 rounded-lg border px-3 py-2 text-center text-sm font-medium transition landscape:hidden max-h-[500px]:hidden ${activeTab === id ? 'border-white/25 bg-white/15 text-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'}`}
-                  onClick={() => setActiveTab(id)}
+                  onClick={() => handleTabChange(id)}
                 >
                   {label}
                 </button>
