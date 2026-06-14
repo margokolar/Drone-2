@@ -17,6 +17,12 @@ import { ToneLabel } from './ToneLabel'
 
 const SPATIAL_LONG_PRESS_MS = 800
 
+export function toneMixerCardElementId(noteId: NoteId): string {
+  return `tone-mixer-${noteId}`
+}
+
+export const TONE_MIXER_SECTION_ID = 'tone-mixer-section'
+
 function formatToneFrequencyHz(hz: number): string {
   if (hz >= 100) {
     return `${hz.toFixed(1)} Hz`
@@ -122,6 +128,7 @@ export function ToneMixer({
         return (
           <article
             key={tone.noteId}
+            id={toneMixerCardElementId(tone.noteId)}
             className={`rounded-xl border p-3 transition ${
               strictSolo
                 ? 'border-amber-300/40 bg-amber-300/[0.08] shadow-[0_0_22px_rgba(251,191,36,0.14)]'

@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { GitCompareArrows, StepBack, StepForward } from 'lucide-react'
-import { tonePageLabelUsesUppercase, type NoteId } from '../music/notes'
+import { getTonePageLabel, tonePageLabelUsesUppercase, type NoteId } from '../music/notes'
 import { ToneLabel } from './ToneLabel'
 
 type OvertoneToneNavControlsProps = {
@@ -11,6 +11,7 @@ type OvertoneToneNavControlsProps = {
   onToggleSolo: () => void
   onPrevious: () => void
   onNext: () => void
+  onGoToToneMixer?: (noteId: NoteId) => void
   variant: 'portrait-solo' | 'portrait-steps' | 'landscape-inline'
 }
 
@@ -95,6 +96,7 @@ export function OvertoneToneNavControls({
   onToggleSolo,
   onPrevious,
   onNext,
+  onGoToToneMixer,
   variant,
 }: OvertoneToneNavControlsProps) {
   const toneLabelUppercase = tonePageLabelUsesUppercase(toneNoteId)
@@ -161,7 +163,18 @@ export function OvertoneToneNavControls({
   if (variant === 'portrait-solo') {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">Tone</span>
+        {onGoToToneMixer ? (
+          <button
+            type="button"
+            className="button-safe text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45 transition hover:text-white/75"
+            onClick={() => onGoToToneMixer(toneNoteId)}
+            aria-label={`Open tone mixer for ${getTonePageLabel(toneNoteId)}`}
+          >
+            Tone
+          </button>
+        ) : (
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">Tone</span>
+        )}
         {soloButton}
       </div>
     )

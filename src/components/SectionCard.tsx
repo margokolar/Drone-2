@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import clsx from 'clsx'
 
 type SectionCardProps = {
+  id?: string
   title: string
   titleAddon?: ReactNode
   rightSlot?: ReactNode
@@ -9,9 +10,10 @@ type SectionCardProps = {
   children: ReactNode
 }
 
-export function SectionCard({ title, titleAddon, rightSlot, className, children }: SectionCardProps) {
+export function SectionCard({ id, title, titleAddon, rightSlot, className, children }: SectionCardProps) {
   return (
     <section
+      id={id}
       className={clsx(
         'rounded-2xl border border-white/10 bg-slate-900/55 p-4 shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-sm',
         className,

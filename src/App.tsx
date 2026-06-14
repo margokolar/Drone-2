@@ -56,7 +56,7 @@ import { PresetList } from './components/PresetList'
 import { ResettableRangeInput } from './components/ResettableRangeInput'
 import { SectionCard } from './components/SectionCard'
 import { SongLibraryMenu } from './components/SongLibraryMenu'
-import { ToneMixer } from './components/ToneMixer'
+import { ToneMixer, TONE_MIXER_SECTION_ID, toneMixerCardElementId } from './components/ToneMixer'
 import { TopControls } from './components/TopControls'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useMetronome } from './hooks/useMetronome'
@@ -405,6 +405,7 @@ function App() {
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const overtoneSelectionPinnedRef = useRef(false)
+  const toneMixerScrollTargetRef = useRef<NoteId | null>(null)
   const previousTabRef = useRef<TabId>('tone')
   const overtoneUndoRef = useRef<Map<NoteId, OvertoneSnapshot[]>>(new Map())
   const overtoneRedoRef = useRef<Map<NoteId, OvertoneSnapshot[]>>(new Map())
@@ -1558,6 +1559,10 @@ function App() {
     },
     [allTonesCompareActive, applyToneEnabledMap, selectedOvertoneNoteId, toneSetNoteIds, toneSoloRestore],
   )
+  const goToToneMixerCard = useCallback((noteId: NoteId) => {
+    toneMixerScrollTargetRef.current = noteId
+    setActiveTab('tone')
+  }, [])
   const partialReferenceFrequencyHz = useMemo(() => {
     const sourceTone = selectedOvertoneTone ?? activeTones[0] ?? tones[0]
     if (!sourceTone) {
@@ -2013,6 +2018,22 @@ function App() {
   }, [])
 
   useLayoutEffect(() => {
+    const noteId = toneMixerScrollTargetRef.current
+    if (activeTab !== 'tone' || noteId === null) {
+      return
+    }
+    toneMixerScrollTargetRef.current = null
+    window.requestAnimationFrame(() => {
+      const card = document.getElementById(toneMixerCardElementId(noteId))
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        return
+      }
+      document.getElementById(TONE_MIXER_SECTION_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [activeTab])
+
+  useLayoutEffect(() => {
     if (activeTab !== 'overtones' && activeTab !== 'presets' && activeTab !== 'metronome') {
       return
     }
@@ -2436,7 +2457,7 @@ function App() {
                 </div>
               </div>
             </SectionCard>
-            <SectionCard title="Tone mixer">
+            <SectionCard id={TONE_MIXER_SECTION_ID} title="Tone mixer">
               <ToneMixer
                 tones={toneMixerTones}
                 allTones={tonesInToneSet}
@@ -2500,6 +2521,7 @@ function App() {
                       onToggleSolo={toggleSelectedOvertoneToneSolo}
                       onPrevious={() => selectAdjacentOvertoneTone('previous')}
                       onNext={() => selectAdjacentOvertoneTone('next')}
+                      onGoToToneMixer={goToToneMixerCard}
                     />
                   </div>
                   <div className="hide-scrollbar -mx-0.5 flex overflow-x-auto">
