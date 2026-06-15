@@ -34,10 +34,9 @@ import {
 } from 'react'
 import { metronomeEngine } from './audio/MetronomeEngine'
 import {
-  transportPause,
-  transportPlay,
+  transportPauseFromRemote,
+  transportPlayFromRemote,
   transportPresetPedalPress,
-  transportResume,
   transportTogglePlay,
   transportNextPreset,
   transportPreviousPreset,
@@ -408,8 +407,8 @@ function App() {
   const overtoneAnalyzeInputRef = useRef<HTMLInputElement | null>(null)
   const sideMenuRef = useRef<HTMLElement | null>(null)
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
-  /** Clip 5 AVRCP left the silent anchor paused — keep it until remote play or local resume. */
-  const anchorRemotePauseRef = useRef(false)
+  /** Ignore anchor `playing` events caused by our own BlueTurn keep-alive restart. */
+  const anchorSuppressTransportRef = useRef(false)
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const overtoneSelectionPinnedRef = useRef(false)
   const toneMixerScrollTargetRef = useRef<NoteId | null>(null)
@@ -1727,35 +1726,27 @@ function App() {
 
     setActionHandler('play', () => {
       recordBleDebug('mediasession', `play (playing=${useDroneStore.getState().playing})`)
-      runMediaSessionAction(() => {
-        if (useDroneStore.getState().playing) {
-          return
-        }
-        anchorRemotePauseRef.current = false
-        transportPlay(latestRuntimeConfigRef.current)
+      runMediaSessionAction('play', () => {
+        transportPlayFromRemote(latestRuntimeConfigRef.current)
         const anchor = mediaAnchorRef.current
-        if (anchor && anchor.paused) {
+        if (anchor?.paused) {
           void anchor.play().catch(() => {})
         }
       })
     })
     setActionHandler('pause', () => {
       recordBleDebug('mediasession', `pause (playing=${useDroneStore.getState().playing})`)
-      runMediaSessionAction(() => {
-        if (!useDroneStore.getState().playing) {
-          return
-        }
-        anchorRemotePauseRef.current = true
-        transportPause()
+      runMediaSessionAction('pause', () => {
+        transportPauseFromRemote()
       })
     })
     setActionHandler('nexttrack', () => {
       recordBleDebug('mediasession', 'nexttrack')
-      runMediaSessionAction(transportNextPreset)
+      runMediaSessionAction('next', transportNextPreset)
     })
     setActionHandler('previoustrack', () => {
       recordBleDebug('mediasession', 'previoustrack')
-      runMediaSessionAction(transportPreviousPreset)
+      runMediaSessionAction('prev', transportPreviousPreset)
     })
 
     return () => {
@@ -1831,9 +1822,6 @@ function App() {
     mediaAnchorRef.current = anchor
 
     const keepAnchorPlaying = () => {
-      if (anchorRemotePauseRef.current && !useDroneStore.getState().playing) {
-        return
-      }
       if (anchor.paused) {
         void anchor.play().catch(() => {
           // iOS can reject play() outside an activation window; retried later.
@@ -1841,39 +1829,43 @@ function App() {
       }
     }
 
-    // iOS BT remotes (e.g. JBL Clip 5) pause the silent anchor directly instead of
-    // always routing through MediaSession. Sync that to the drone; leave the anchor
-    // paused so a remote play press resumes it and starts the synth. Spurious pauses
-    // while the drone is already idle still get restarted for BlueTurn keep-alive.
+    const restartAnchorSilently = () => {
+      anchorSuppressTransportRef.current = true
+      void anchor.play().then(() => {
+        anchorSuppressTransportRef.current = false
+      }).catch(() => {
+        anchorSuppressTransportRef.current = false
+      })
+    }
+
+    // Clip 5 AVRCP often pauses the silent anchor directly. Sync to the drone,
+    // then restart the anchor for BlueTurn without treating that as a play press.
     const handleAnchorPause = () => {
       recordBleDebug('note', 'anchor paused')
       if (useDroneStore.getState().playing) {
-        anchorRemotePauseRef.current = true
-        transportPause()
-        return
+        transportPauseFromRemote()
       }
-      if (anchorRemotePauseRef.current) {
-        return
-      }
-      keepAnchorPlaying()
+      window.setTimeout(() => {
+        if (anchor.paused && !useDroneStore.getState().playing) {
+          restartAnchorSilently()
+        }
+      }, 80)
     }
     const handleAnchorPlaying = () => {
-      const resumeFromRemote = anchorRemotePauseRef.current
-      anchorRemotePauseRef.current = false
+      if (anchorSuppressTransportRef.current) {
+        anchorSuppressTransportRef.current = false
+        return
+      }
       keepAnchorPlaying()
-      if (resumeFromRemote && !useDroneStore.getState().playing) {
-        recordBleDebug('note', 'anchor playing → transportPlay')
-        transportPlay(latestRuntimeConfigRef.current)
+      if (!useDroneStore.getState().playing) {
+        recordBleDebug('note', 'anchor playing → remote play')
+        transportPlayFromRemote(latestRuntimeConfigRef.current)
       }
     }
     anchor.addEventListener('pause', handleAnchorPause)
     anchor.addEventListener('playing', handleAnchorPlaying)
 
     const primeAnchor = () => {
-      // Touch the element on a user gesture so iOS unlocks future play() calls.
-      if (anchorRemotePauseRef.current && !useDroneStore.getState().playing) {
-        return
-      }
       if (anchor.paused) {
         void anchor.play().catch(() => {
           // iOS can reject before a user gesture; later gestures retry.
@@ -1900,14 +1892,12 @@ function App() {
     }
   }, [])
 
-  useNowPlayingKeepAlive(mediaAnchorRef, anchorRemotePauseRef)
+  useNowPlayingKeepAlive(mediaAnchorRef)
 
-  // Local play (UI / BlueTurn) should resume the silent anchor after a BT remote pause.
   useEffect(() => {
     if (!needsIosMediaRemoteIntegration() || !playing) {
       return
     }
-    anchorRemotePauseRef.current = false
     const anchor = mediaAnchorRef.current
     if (anchor?.paused) {
       void anchor.play().catch(() => {})
@@ -2006,7 +1996,7 @@ function App() {
         return
       }
       if (matchesFootPedalKey(event, MEDIA_PLAY_PAUSE_KEYS)) {
-        if (wasMediaSessionHandledRecently()) {
+        if (wasMediaSessionHandledRecently('play') || wasMediaSessionHandledRecently('pause')) {
           event.preventDefault()
           return
         }
@@ -2015,29 +2005,25 @@ function App() {
         return
       }
       if (matchesFootPedalKey(event, MEDIA_PLAY_KEYS)) {
-        if (wasMediaSessionHandledRecently()) {
+        if (wasMediaSessionHandledRecently('play')) {
           event.preventDefault()
           return
         }
         event.preventDefault()
-        if (!useDroneStore.getState().playing) {
-          transportResume(latestRuntimeConfigRef.current)
-        }
+        transportPlayFromRemote(latestRuntimeConfigRef.current)
         return
       }
       if (matchesFootPedalKey(event, MEDIA_PAUSE_KEYS)) {
-        if (wasMediaSessionHandledRecently()) {
+        if (wasMediaSessionHandledRecently('pause')) {
           event.preventDefault()
           return
         }
         event.preventDefault()
-        if (useDroneStore.getState().playing) {
-          transportPause()
-        }
+        transportPauseFromRemote()
         return
       }
       if (matchesFootPedalKey(event, MEDIA_TRACK_NEXT_KEYS)) {
-        if (wasMediaSessionHandledRecently()) {
+        if (wasMediaSessionHandledRecently('next')) {
           event.preventDefault()
           return
         }
@@ -2046,7 +2032,7 @@ function App() {
         return
       }
       if (matchesFootPedalKey(event, MEDIA_TRACK_PREVIOUS_KEYS)) {
-        if (wasMediaSessionHandledRecently()) {
+        if (wasMediaSessionHandledRecently('prev')) {
           event.preventDefault()
           return
         }

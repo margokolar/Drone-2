@@ -35,6 +35,26 @@ export function transportPlay(config: DroneRuntimeConfig): void {
   }
 }
 
+/** Low-latency play for BT media remotes (Clip 5, lock screen). Runs inside the MediaSession gesture. */
+export function transportPlayFromRemote(config: DroneRuntimeConfig): void {
+  if (useDroneStore.getState().playing) {
+    return
+  }
+  droneEngine.setPlaybackIntent(true)
+  droneEngine.prepareContext()
+  void droneEngine.pokeClock()
+  if (droneEngine.canFastResume()) {
+    droneEngine.fastResume(config, { skipEntryGlide: true })
+  } else {
+    droneEngine.ensureRunning(config)
+  }
+  useDroneStore.getState().setPlaying(true)
+  if (needsIosMediaRemoteIntegration()) {
+    syncMediaSessionPlaybackState(true)
+  }
+  recordBleDebug('note', `remote play ctx=${droneEngine.contextDebugLabel()}`)
+}
+
 export function transportPause(): void {
   droneEngine.pause()
   useDroneStore.getState().setPlaying(false)
@@ -48,6 +68,19 @@ export function transportPause(): void {
       `mute@+300 gain=${droneEngine.masterGainValue().toFixed(4)} ctx=${droneEngine.contextDebugLabel()}`,
     )
   }, 300)
+}
+
+/** Low-latency pause for BT media remotes. */
+export function transportPauseFromRemote(): void {
+  if (!useDroneStore.getState().playing) {
+    return
+  }
+  droneEngine.pause()
+  useDroneStore.getState().setPlaying(false)
+  if (needsIosMediaRemoteIntegration()) {
+    syncMediaSessionPlaybackState(false)
+  }
+  recordBleDebug('note', `remote pause ctx=${droneEngine.contextDebugLabel()}`)
 }
 
 export function transportTogglePlay(config: DroneRuntimeConfig): void {
