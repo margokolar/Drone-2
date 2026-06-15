@@ -407,8 +407,6 @@ function App() {
   const overtoneAnalyzeInputRef = useRef<HTMLInputElement | null>(null)
   const sideMenuRef = useRef<HTMLElement | null>(null)
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
-  /** Ignore anchor `playing` events caused by our own BlueTurn keep-alive restart. */
-  const anchorSuppressTransportRef = useRef(false)
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const overtoneSelectionPinnedRef = useRef(false)
   const toneMixerScrollTargetRef = useRef<NoteId | null>(null)
@@ -1817,21 +1815,14 @@ function App() {
     document.body.appendChild(anchor)
     mediaAnchorRef.current = anchor
 
+    let ignoreAnchorPlayUntil = 0
+
     const keepAnchorPlaying = () => {
       if (anchor.paused) {
         void anchor.play().catch(() => {
           // iOS can reject play() outside an activation window; retried later.
         })
       }
-    }
-
-    const restartAnchorSilently = () => {
-      anchorSuppressTransportRef.current = true
-      void anchor.play().then(() => {
-        anchorSuppressTransportRef.current = false
-      }).catch(() => {
-        anchorSuppressTransportRef.current = false
-      })
     }
 
     // Clip 5 AVRCP often pauses the silent anchor directly. Sync to the drone,
@@ -1841,15 +1832,13 @@ function App() {
       if (useDroneStore.getState().playing) {
         transportPauseFromRemote()
       }
-      window.setTimeout(() => {
-        if (anchor.paused && !useDroneStore.getState().playing) {
-          restartAnchorSilently()
-        }
-      }, 0)
+      if (anchor.paused && !useDroneStore.getState().playing) {
+        ignoreAnchorPlayUntil = Date.now() + 100
+        void anchor.play().catch(() => {})
+      }
     }
     const handleAnchorPlaying = () => {
-      if (anchorSuppressTransportRef.current) {
-        anchorSuppressTransportRef.current = false
+      if (Date.now() < ignoreAnchorPlayUntil) {
         return
       }
       if (!useDroneStore.getState().playing) {

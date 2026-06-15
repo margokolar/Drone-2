@@ -38,27 +38,42 @@ export class DroneEngine {
   private started = false
   private shouldPlay = false
   private lastClock = { wall: 0, ctx: 0 }
+  private gesturePlaybackPending = false
 
   setPlaybackIntent(shouldPlay: boolean): void {
     this.shouldPlay = shouldPlay
   }
 
-  /**
-   * Resume the AudioContext from a user gesture without starting voices.
-   * iOS Safari only honours AudioContext.resume() when it runs within the
-   * same microtask as the gesture.
-   */
-  prepareContext(): void {
-    const context = this.ensureContext()
-    const contextState = context.state as AudioContextState | 'interrupted'
-    if (context.state !== 'running') {
-      void context
-        .resume()
-        .catch(() => {
-          // iOS can reject resume() while the page is still warming up; the
-          // caller may retry on the next user gesture.
-        })
+  /** Transport started audio synchronously in a user-gesture handler; skip React sync ramp. */
+  markGesturePlaybackStarted(): void {
+    this.gesturePlaybackPending = true
+  }
+
+  consumeGesturePlayback(): boolean {
+    if (!this.gesturePlaybackPending) {
+      return false
     }
+    this.gesturePlaybackPending = false
+    return true
+  }
+
+  /**
+   * Resume the AudioContext inside a user-gesture handler without async kick.
+   * iOS Safari only honours AudioContext.resume() when it runs within the gesture.
+   */
+  prepareContextForGesture(): void {
+    const context = this.ensureContext()
+    if (context.state !== 'running') {
+      void context.resume().catch(() => {})
+    }
+  }
+  prepareContext(): void {
+    this.prepareContextForGesture()
+    const context = this.context
+    if (!context) {
+      return
+    }
+    const contextState = context.state as AudioContextState | 'interrupted'
     if (contextState === 'interrupted') {
       void this.kickContext()
     }

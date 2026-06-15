@@ -24,6 +24,7 @@ export function transportSyncPlaybackState(): void {
 
 export function transportPlay(config: DroneRuntimeConfig): void {
   droneEngine.setPlaybackIntent(true)
+  droneEngine.markGesturePlaybackStarted()
   if (droneEngine.canFastResume()) {
     droneEngine.fastResume(config)
   } else {
@@ -35,12 +36,23 @@ export function transportPlay(config: DroneRuntimeConfig): void {
   }
 }
 
-/** Low-latency play for BT media remotes (Clip 5, lock screen). Same path as UI/pedal. */
+/** Low-latency play for BT media remotes (Clip 5, lock screen). */
 export function transportPlayFromRemote(config: DroneRuntimeConfig): void {
   if (useDroneStore.getState().playing) {
     return
   }
-  transportPlay(config)
+  droneEngine.setPlaybackIntent(true)
+  droneEngine.markGesturePlaybackStarted()
+  droneEngine.prepareContextForGesture()
+  if (droneEngine.canFastResume()) {
+    droneEngine.fastResume(config, { skipEntryGlide: true })
+  } else {
+    droneEngine.ensureRunning(config)
+  }
+  useDroneStore.getState().setPlaying(true)
+  if (needsIosMediaRemoteIntegration()) {
+    syncMediaSessionPlaybackState(true)
+  }
   recordBleDebug('note', `remote play ctx=${droneEngine.contextDebugLabel()}`)
 }
 
