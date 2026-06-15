@@ -1,4 +1,4 @@
-/** iRig BlueTurn HID arrows — parem pedaal play/pause, vasak preset next/prev. */
+/** HID foot pedals — parem play/pause, vasak preset next (topelt = prev). */
 export const FOOT_PEDAL_PLAY_KEYS = new Set([
   'ArrowDown',
   'ArrowRight',
@@ -7,12 +7,14 @@ export const FOOT_PEDAL_PLAY_KEYS = new Set([
   'Minus',
 ])
 
+/** AirTurn DUO / BlueTurn vasak pedaal — nooled, Page Up, MediaTrackNext. */
 export const FOOT_PEDAL_PRESET_KEYS = new Set([
   'ArrowUp',
   'ArrowLeft',
   'PageUp',
   'NumpadAdd',
   'Equal',
+  'MediaTrackNext',
 ])
 
 export const MEDIA_PLAY_PAUSE_KEYS = new Set(['MediaPlayPause'])

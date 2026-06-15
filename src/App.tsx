@@ -76,7 +76,6 @@ import {
   MEDIA_PAUSE_KEYS,
   MEDIA_PLAY_KEYS,
   MEDIA_PLAY_PAUSE_KEYS,
-  MEDIA_TRACK_NEXT_KEYS,
   MEDIA_TRACK_PREVIOUS_KEYS,
 } from './utils/footPedalKeys'
 import { wasMediaSessionHandledRecently } from './utils/mediaRemoteDedupe'
@@ -407,6 +406,8 @@ function App() {
   const overtoneAnalyzeInputRef = useRef<HTMLInputElement | null>(null)
   const sideMenuRef = useRef<HTMLElement | null>(null)
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
+  /** Clip 5 left the silent anchor paused — keep it until explicit play/resume. */
+  const anchorRemotePauseHoldRef = useRef(false)
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const overtoneSelectionPinnedRef = useRef(false)
   const toneMixerScrollTargetRef = useRef<NoteId | null>(null)
@@ -1725,12 +1726,21 @@ function App() {
     setActionHandler('play', () => {
       recordBleDebug('mediasession', `play (playing=${useDroneStore.getState().playing})`)
       runMediaSessionAction('play', () => {
+        anchorRemotePauseHoldRef.current = false
         transportPlayFromRemote(latestRuntimeConfigRef.current)
+        const anchor = mediaAnchorRef.current
+        if (anchor?.paused) {
+          void anchor.play().catch(() => {})
+        }
       })
     })
     setActionHandler('pause', () => {
       recordBleDebug('mediasession', `pause (playing=${useDroneStore.getState().playing})`)
       runMediaSessionAction('pause', () => {
+        if (!useDroneStore.getState().playing) {
+          return
+        }
+        anchorRemotePauseHoldRef.current = true
         transportPauseFromRemote()
       })
     })
@@ -1815,9 +1825,10 @@ function App() {
     document.body.appendChild(anchor)
     mediaAnchorRef.current = anchor
 
-    let ignoreAnchorPlayUntil = 0
-
     const keepAnchorPlaying = () => {
+      if (anchorRemotePauseHoldRef.current && !useDroneStore.getState().playing) {
+        return
+      }
       if (anchor.paused) {
         void anchor.play().catch(() => {
           // iOS can reject play() outside an activation window; retried later.
@@ -1825,23 +1836,22 @@ function App() {
       }
     }
 
-    // Clip 5 AVRCP often pauses the silent anchor directly. Sync to the drone,
-    // then restart the anchor for BlueTurn without treating that as a play press.
+    // Clip 5 AVRCP pauses the silent anchor directly. Sync to the drone and leave
+    // the anchor paused so the next remote play press resumes it and starts audio.
     const handleAnchorPause = () => {
       recordBleDebug('note', 'anchor paused')
       if (useDroneStore.getState().playing) {
+        anchorRemotePauseHoldRef.current = true
         transportPauseFromRemote()
-      }
-      if (anchor.paused && !useDroneStore.getState().playing) {
-        ignoreAnchorPlayUntil = Date.now() + 100
-        void anchor.play().catch(() => {})
-      }
-    }
-    const handleAnchorPlaying = () => {
-      if (Date.now() < ignoreAnchorPlayUntil) {
         return
       }
-      if (!useDroneStore.getState().playing) {
+      anchorRemotePauseHoldRef.current = false
+      keepAnchorPlaying()
+    }
+    const handleAnchorPlaying = () => {
+      const resumeFromRemote = anchorRemotePauseHoldRef.current
+      anchorRemotePauseHoldRef.current = false
+      if (resumeFromRemote && !useDroneStore.getState().playing) {
         recordBleDebug('note', 'anchor playing → remote play')
         transportPlayFromRemote(latestRuntimeConfigRef.current)
       }
@@ -1851,6 +1861,9 @@ function App() {
     anchor.addEventListener('playing', handleAnchorPlaying)
 
     const primeAnchor = () => {
+      if (anchorRemotePauseHoldRef.current && !useDroneStore.getState().playing) {
+        return
+      }
       if (anchor.paused) {
         void anchor.play().catch(() => {
           // iOS can reject before a user gesture; later gestures retry.
@@ -1877,12 +1890,13 @@ function App() {
     }
   }, [])
 
-  useNowPlayingKeepAlive(mediaAnchorRef)
+  useNowPlayingKeepAlive(mediaAnchorRef, anchorRemotePauseHoldRef)
 
   useEffect(() => {
     if (!needsIosMediaRemoteIntegration() || !playing) {
       return
     }
+    anchorRemotePauseHoldRef.current = false
     const anchor = mediaAnchorRef.current
     if (anchor?.paused) {
       void anchor.play().catch(() => {})
@@ -2007,22 +2021,17 @@ function App() {
         transportPauseFromRemote()
         return
       }
-      if (matchesFootPedalKey(event, MEDIA_TRACK_NEXT_KEYS)) {
-        if (wasMediaSessionHandledRecently('next')) {
-          event.preventDefault()
-          return
-        }
-        event.preventDefault()
-        transportNextPreset()
-        return
-      }
+      // Dedicated prev — no MediaSession dedupe (AirTurn HID must not be swallowed).
       if (matchesFootPedalKey(event, MEDIA_TRACK_PREVIOUS_KEYS)) {
-        if (wasMediaSessionHandledRecently('prev')) {
+        if (event.repeat) {
           event.preventDefault()
           return
         }
         event.preventDefault()
+        event.stopPropagation()
+        void droneEngine.pokeClock()
         transportPreviousPreset()
+        return
       }
     }
     window.addEventListener('keydown', onKeyDown, true)
