@@ -35,7 +35,6 @@ import {
 import { metronomeEngine } from './audio/MetronomeEngine'
 import {
   transportPause,
-  transportPlay,
   transportPresetPedalPress,
   transportResume,
   transportTogglePlay,
@@ -1723,20 +1722,17 @@ function App() {
     setActionHandler('play', () => {
       recordBleDebug('mediasession', `play (playing=${useDroneStore.getState().playing})`)
       runMediaSessionAction(() => {
-        // iOS decides whether a BlueTurn button sends 'play' or 'pause' purely
-        // from playbackState, and a silent anchor is not reliably seen as
-        // "playing" — so iOS often keeps dispatching 'play' and the pause side
-        // never fires. Treat 'play' as a toggle so a single pedal button still
-        // pauses an already-playing drone.
+        // When the drone is playing, treat MediaSession play as pause (BlueTurn
+        // single-button toggle when iOS only dispatches 'play').
         if (useDroneStore.getState().playing) {
           transportPause()
           return
         }
-        transportPlay(latestRuntimeConfigRef.current)
+        // BlueTurn keep-alive marks the silent anchor session as "playing" even
+        // while the drone is paused. iOS fires a spurious 'play' on PWA open —
+        // restart the anchor only; do not start the drone until a pedal/keydown.
         const anchor = mediaAnchorRef.current
-        if (anchor && anchor.paused) {
-          // Start the silent anchor inside the MediaSession activation so iOS
-          // sees the session as genuinely playing and offers 'pause' next.
+        if (anchor?.paused) {
           void anchor.play().catch(() => {})
         }
       })
