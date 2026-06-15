@@ -2,6 +2,7 @@ import { dbToGain, partialTimbreWeights, normalizedBlend, waveformGainCompensati
 import type { DroneRuntimeConfig, EntryGlideParams, PartialConfig, ToneConfig } from './types'
 import { getFrequency } from '../music/tuning'
 import { recordBleDebug } from '../utils/bleDebug'
+import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
 
 type OscBundle = {
   oscillator: OscillatorNode
@@ -306,13 +307,19 @@ export class DroneEngine {
   }
 
   /** Mute quickly but keep voices alive for low-latency resume (BT media remotes). */
-  pause(): void {
+  pause(options?: { immediate?: boolean }): void {
     this.shouldPlay = false
     if (!this.context || !this.masterGain) {
       return
     }
     for (const voice of this.voiceMap.values()) {
       voice.entryGlideEndTime = null
+    }
+    const now = this.context.currentTime
+    const immediate = options?.immediate ?? !needsIosMediaRemoteIntegration()
+    if (immediate) {
+      this.forceMute(now)
+      return
     }
     this.applyMute()
     // iOS can leave the AudioContext reporting "running" while its sample clock

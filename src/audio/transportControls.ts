@@ -2,6 +2,7 @@ import { droneEngine } from './DroneEngine'
 import type { DroneRuntimeConfig } from './types'
 import { useDroneStore } from '../store/useDroneStore'
 import { recordBleDebug } from '../utils/bleDebug'
+import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
 
 /** Shared play/pause/preset actions for UI, BlueTurn keyboard, and Media Session. */
 
@@ -16,6 +17,11 @@ function syncMediaSessionPlaybackState(playing: boolean): void {
   }
 }
 
+/** Re-apply playbackState from store (e.g. after iOS resumes the silent anchor). */
+export function transportSyncPlaybackState(): void {
+  syncMediaSessionPlaybackState(useDroneStore.getState().playing)
+}
+
 export function transportPlay(config: DroneRuntimeConfig): void {
   droneEngine.setPlaybackIntent(true)
   if (droneEngine.canFastResume()) {
@@ -24,13 +30,17 @@ export function transportPlay(config: DroneRuntimeConfig): void {
     droneEngine.ensureRunning(config)
   }
   useDroneStore.getState().setPlaying(true)
-  syncMediaSessionPlaybackState(true)
+  if (needsIosMediaRemoteIntegration()) {
+    syncMediaSessionPlaybackState(true)
+  }
 }
 
 export function transportPause(): void {
   droneEngine.pause()
   useDroneStore.getState().setPlaying(false)
-  syncMediaSessionPlaybackState(false)
+  if (needsIosMediaRemoteIntegration()) {
+    syncMediaSessionPlaybackState(false)
+  }
   recordBleDebug('note', `paused ctx=${droneEngine.contextDebugLabel()}`)
   window.setTimeout(() => {
     recordBleDebug(
@@ -54,7 +64,9 @@ export function transportResume(config: DroneRuntimeConfig): void {
   droneEngine.setPlaybackIntent(true)
   droneEngine.fastResume(config)
   useDroneStore.getState().setPlaying(true)
-  syncMediaSessionPlaybackState(true)
+  if (needsIosMediaRemoteIntegration()) {
+    syncMediaSessionPlaybackState(true)
+  }
 }
 
 export function transportNextPreset(): void {
