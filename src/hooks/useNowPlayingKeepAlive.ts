@@ -4,22 +4,23 @@ import { useDroneStore } from '../store/useDroneStore'
 import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
 
 /** Keep iOS Now Playing + silent anchor continuously active so BlueTurn keydowns survive idle. */
-export function useNowPlayingKeepAlive(
-  mediaAnchorRef: RefObject<HTMLAudioElement | null>,
-  anchorRemotePauseHoldRef: RefObject<boolean>,
-): void {
+export function useNowPlayingKeepAlive(mediaAnchorRef: RefObject<HTMLAudioElement | null>): void {
   useEffect(() => {
     if (!needsIosMediaRemoteIntegration()) {
       return
     }
 
-    const keepAnchorPlaying = () => {
-      if (anchorRemotePauseHoldRef.current && !useDroneStore.getState().playing) {
-        return
-      }
+    const assertPlayingSession = () => {
       const anchor = mediaAnchorRef.current
       if (anchor?.paused) {
         void anchor.play().catch(() => {})
+      }
+      if ('mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.playbackState = 'playing'
+        } catch {
+          // Ignore browsers that reject the write.
+        }
       }
     }
 
@@ -27,7 +28,7 @@ export function useNowPlayingKeepAlive(
       if (useDroneStore.getState().playing) {
         void droneEngine.pokeClock()
       }
-      keepAnchorPlaying()
+      assertPlayingSession()
     }
 
     const intervalId = window.setInterval(maintainSession, 1500)
@@ -54,5 +55,5 @@ export function useNowPlayingKeepAlive(
       window.removeEventListener('focus', onForegroundGesture)
       window.removeEventListener('pointerdown', onForegroundGesture)
     }
-  }, [anchorRemotePauseHoldRef, mediaAnchorRef])
+  }, [mediaAnchorRef])
 }

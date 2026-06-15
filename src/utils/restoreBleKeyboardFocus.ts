@@ -1,4 +1,3 @@
-import { markMediaSessionAction, type MediaRemoteAction } from './mediaRemoteDedupe'
 import { isIosDevice } from './platform'
 
 export const BLE_KEYBOARD_FOCUS_ROOT_ID = 'ble-keyboard-focus-root'
@@ -41,8 +40,7 @@ export function queueBleKeyboardFocusRecovery(): void {
   })
 }
 
-export function runMediaSessionAction(action: MediaRemoteAction, handler: () => void): void {
-  markMediaSessionAction(action)
-  handler()
+export function runMediaSessionAction(action: () => void): void {
+  action()
   queueBleKeyboardFocusRecovery()
 }

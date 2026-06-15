@@ -1,27 +1,29 @@
-/** HID foot pedals — parem play/pause, vasak preset next (topelt = prev). */
+/** iRig BlueTurn (HID keyboard) — parem pedaal play/pause, vasak preset next/prev. */
 export const FOOT_PEDAL_PLAY_KEYS = new Set([
   'ArrowDown',
   'ArrowRight',
   'PageDown',
   'NumpadSubtract',
   'Minus',
+  'AudioVolumeDown',
+  'VolumeDown',
+  'MediaTrackPrevious',
 ])
 
-/** AirTurn DUO / BlueTurn vasak pedaal — nooled, Page Up, MediaTrackNext. */
+export const MEDIA_PLAY_PAUSE_KEYS = new Set(['MediaPlayPause'])
+export const MEDIA_PLAY_KEYS = new Set(['MediaPlay'])
+export const MEDIA_PAUSE_KEYS = new Set(['MediaPause'])
+
 export const FOOT_PEDAL_PRESET_KEYS = new Set([
   'ArrowUp',
   'ArrowLeft',
   'PageUp',
   'NumpadAdd',
   'Equal',
+  'AudioVolumeUp',
+  'VolumeUp',
   'MediaTrackNext',
 ])
-
-export const MEDIA_PLAY_PAUSE_KEYS = new Set(['MediaPlayPause'])
-export const MEDIA_PLAY_KEYS = new Set(['MediaPlay'])
-export const MEDIA_PAUSE_KEYS = new Set(['MediaPause'])
-export const MEDIA_TRACK_NEXT_KEYS = new Set(['MediaTrackNext'])
-export const MEDIA_TRACK_PREVIOUS_KEYS = new Set(['MediaTrackPrevious'])
 
 const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'password', 'number', 'tel', 'url'])
 
