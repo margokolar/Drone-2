@@ -68,7 +68,7 @@ export class DroneEngine {
     if (this.context) {
       return this.context
     }
-    const context = new AudioContext()
+    const context = new AudioContext({ latencyHint: 'interactive' })
     const masterGain = context.createGain()
     const lowPass = context.createBiquadFilter()
     const limiter = context.createDynamicsCompressor()
@@ -126,8 +126,60 @@ export class DroneEngine {
     if (!options?.skipEntryGlide) {
       this.reapplyEntryGlides(config, now)
     }
+    this.snapAudibleLevels(config, now)
+  }
+
+  /** True when a gesture handler already unmuted the graph synchronously. */
+  isReadyForInstantResume(): boolean {
+    return this.canFastResume() && this.isContextRunning()
+  }
+
+  private snapAudibleLevels(config: DroneRuntimeConfig, now: number): void {
+    if (!this.masterGain) {
+      return
+    }
     this.masterGain.gain.cancelScheduledValues(now)
     this.masterGain.gain.setValueAtTime(dbToGain(config.masterGainDb), now)
+
+    for (const [noteId, voice] of this.voiceMap.entries()) {
+      const toneConfig = config.tones.find((tone) => tone.noteId === noteId && tone.enabled)
+      if (!toneConfig) {
+        continue
+      }
+      const toneGain = Math.max(0.0001, dbToGain(toneConfig.gainDb))
+      voice.outputGain.gain.cancelScheduledValues(now)
+      voice.outputGain.gain.setValueAtTime(toneGain, now)
+
+      const blend = normalizedBlend(toneConfig.timbreBlend ?? config.timbreBlend)
+      const activePartials = (toneConfig.partials ?? config.partials).filter((partial) => partial.enabled)
+      let index = 0
+      for (let partialIndex = 0; partialIndex < activePartials.length; partialIndex += 1) {
+        const partial = activePartials[partialIndex]
+        const partialLinear = dbToGain(partial.gainDb)
+        const harmonicIndex = partialIndex + 1
+        const timbreWeights = partialTimbreWeights(harmonicIndex, blend, config.harmonicTimbreEnabled)
+        const waveTypes = ['sine', 'sawtooth', 'square'] as const
+        const waveTarget = [timbreWeights.sine, timbreWeights.saw, timbreWeights.square]
+        for (let waveIndex = 0; waveIndex < 3; waveIndex += 1) {
+          const bundle = voice.oscillators[index]
+          if (!bundle) {
+            continue
+          }
+          const weightedAmount = waveTarget[waveIndex] ?? 0
+          const waveType = waveTypes[waveIndex]
+          const nextWaveGain =
+            weightedAmount > 0
+              ? Math.max(
+                  0.0001,
+                  partialLinear * weightedAmount * waveformGainCompensation(waveType),
+                )
+              : 0.0001
+          bundle.gainNode.gain.cancelScheduledValues(now)
+          bundle.gainNode.gain.setValueAtTime(nextWaveGain, now)
+          index += 1
+        }
+      }
+    }
   }
 
   /** Re-run entry glide after pause; glides finish silently while muted during pause. */
@@ -167,6 +219,9 @@ export class DroneEngine {
    * PWA returns from background (bugs.webkit.org/show_bug.cgi?id=263627).
    */
   async kickContext(): Promise<void> {
+    if (this.shouldPlay) {
+      return
+    }
     const context = this.context
     if (!context) {
       return
@@ -228,6 +283,9 @@ export class DroneEngine {
    * interrupted context is resumed synchronously within the calling gesture.
    */
   async pokeClock(): Promise<void> {
+    if (this.shouldPlay) {
+      return
+    }
     const context = this.context
     if (!context) {
       return

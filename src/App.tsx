@@ -1728,10 +1728,6 @@ function App() {
       recordBleDebug('mediasession', `play (playing=${useDroneStore.getState().playing})`)
       runMediaSessionAction('play', () => {
         transportPlayFromRemote(latestRuntimeConfigRef.current)
-        const anchor = mediaAnchorRef.current
-        if (anchor?.paused) {
-          void anchor.play().catch(() => {})
-        }
       })
     })
     setActionHandler('pause', () => {
@@ -1814,7 +1810,7 @@ function App() {
     anchor.preload = 'auto'
     anchor.setAttribute('playsinline', '')
     anchor.setAttribute('webkit-playsinline', '')
-    anchor.muted = false
+    anchor.muted = true
     anchor.volume = 1
     anchor.setAttribute('aria-hidden', 'true')
     anchor.style.cssText = 'position:fixed;width:0;height:0;opacity:0;pointer-events:none'
@@ -1849,18 +1845,18 @@ function App() {
         if (anchor.paused && !useDroneStore.getState().playing) {
           restartAnchorSilently()
         }
-      }, 80)
+      }, 0)
     }
     const handleAnchorPlaying = () => {
       if (anchorSuppressTransportRef.current) {
         anchorSuppressTransportRef.current = false
         return
       }
-      keepAnchorPlaying()
       if (!useDroneStore.getState().playing) {
         recordBleDebug('note', 'anchor playing → remote play')
         transportPlayFromRemote(latestRuntimeConfigRef.current)
       }
+      keepAnchorPlaying()
     }
     anchor.addEventListener('pause', handleAnchorPause)
     anchor.addEventListener('playing', handleAnchorPlaying)

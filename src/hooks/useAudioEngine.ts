@@ -19,6 +19,9 @@ export function useAudioEngine(config: DroneRuntimeConfig, playing: boolean): vo
     if (!playing) {
       return
     }
+    if (droneEngine.isReadyForInstantResume()) {
+      return
+    }
     void droneEngine.start(latestConfigRef.current)
   }, [playing])
 }
