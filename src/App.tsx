@@ -78,6 +78,8 @@ import {
   MEDIA_PAUSE_KEYS,
   MEDIA_PLAY_KEYS,
   MEDIA_PLAY_PAUSE_KEYS,
+  MEDIA_TRACK_NEXT_KEYS,
+  MEDIA_TRACK_PREVIOUS_KEYS,
 } from './utils/footPedalKeys'
 import { BLE_KEYBOARD_FOCUS_ROOT_ID, runMediaSessionAction } from './utils/restoreBleKeyboardFocus'
 import { markMediaSessionAction, wasMediaSessionHandledRecently } from './utils/mediaRemoteDedupe'
@@ -411,6 +413,7 @@ function App() {
   const clipRemoteHoldRef = useRef(false)
   const userGestureSeenRef = useRef(false)
   const clipRemoteActiveRef = useRef(false)
+  const mediaSessionMountTimeRef = useRef(Date.now())
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const overtoneSelectionPinnedRef = useRef(false)
   const toneMixerScrollTargetRef = useRef<NoteId | null>(null)
@@ -1739,7 +1742,8 @@ function App() {
           return
         }
         // Block spurious startup play while the BlueTurn keep-alive session is active.
-        if (!userGestureSeenRef.current && !clipRemoteActiveRef.current) {
+        const inStartupWindow = Date.now() - mediaSessionMountTimeRef.current < 2000
+        if (inStartupWindow && !userGestureSeenRef.current && !clipRemoteActiveRef.current) {
           const anchor = mediaAnchorRef.current
           if (anchor?.paused) {
             void anchor.play().catch(() => {})
@@ -1772,6 +1776,7 @@ function App() {
     })
     setActionHandler('nexttrack', () => {
       recordBleDebug('mediasession', 'nexttrack')
+      clipRemoteActiveRef.current = true
       runMediaSessionAction(() => {
         void droneEngine.pokeClock()
         transportNextPreset()
@@ -1779,6 +1784,7 @@ function App() {
     })
     setActionHandler('previoustrack', () => {
       recordBleDebug('mediasession', 'previoustrack')
+      clipRemoteActiveRef.current = true
       runMediaSessionAction(() => {
         void droneEngine.pokeClock()
         transportPreviousPreset()
@@ -1890,8 +1896,11 @@ function App() {
         transportPauseFromRemote()
         return
       }
+      if (clipRemoteHoldRef.current) {
+        recordBleDebug('note', 'anchor paused (clip hold)')
+        return
+      }
       recordBleDebug('note', 'anchor paused (restarting)')
-      clipRemoteHoldRef.current = false
       void anchor.play().then(assertBlueTurnSession).catch(() => {
         // iOS can reject play() outside an activation window; retried later.
       })
@@ -2035,6 +2044,30 @@ function App() {
 
       if (isPlayPedal) {
         handleTogglePlay()
+        return
+      }
+
+      if (matchesFootPedalKey(event, MEDIA_TRACK_PREVIOUS_KEYS)) {
+        if (event.repeat) {
+          event.preventDefault()
+          return
+        }
+        event.preventDefault()
+        event.stopPropagation()
+        void droneEngine.pokeClock()
+        transportPreviousPreset()
+        return
+      }
+
+      if (matchesFootPedalKey(event, MEDIA_TRACK_NEXT_KEYS)) {
+        if (event.repeat) {
+          event.preventDefault()
+          return
+        }
+        event.preventDefault()
+        event.stopPropagation()
+        void droneEngine.pokeClock()
+        transportNextPreset()
         return
       }
 
