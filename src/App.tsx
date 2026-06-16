@@ -407,6 +407,7 @@ function App() {
   const sideMenuRef = useRef<HTMLElement | null>(null)
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
   const anchorRemotePauseHoldRef = useRef(false)
+  const mediaSessionMountTimeRef = useRef(Date.now())
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const overtoneSelectionPinnedRef = useRef(false)
   const toneMixerScrollTargetRef = useRef<NoteId | null>(null)
@@ -1736,13 +1737,20 @@ function App() {
           transportPlayFromRemote(latestRuntimeConfigRef.current)
           return
         }
+        // Ignore iOS startup/playback-state noise right after opening the app.
+        if (Date.now() - mediaSessionMountTimeRef.current < 2000) {
+          const anchor = mediaAnchorRef.current
+          if (anchor?.paused) {
+            void anchor.play().catch(() => {})
+          }
+          return
+        }
+        // Outside startup window, allow play to resume even if iOS skipped pause.
+        transportPlayFromRemote(latestRuntimeConfigRef.current)
+        return
         // BlueTurn keep-alive marks the silent anchor session as "playing" even
         // while the drone is paused. iOS fires a spurious 'play' on PWA open —
         // restart the anchor only; do not start the drone until a pedal/keydown.
-        const anchor = mediaAnchorRef.current
-        if (anchor?.paused) {
-          void anchor.play().catch(() => {})
-        }
       })
     })
     setActionHandler('pause', () => {
