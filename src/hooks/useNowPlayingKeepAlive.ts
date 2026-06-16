@@ -14,19 +14,26 @@ export function useNowPlayingKeepAlive(
     }
 
     const assertPlayingSession = () => {
-      if (anchorRemotePauseHoldRef.current && !useDroneStore.getState().playing) {
-        return
-      }
-      const anchor = mediaAnchorRef.current
-      if (anchor?.paused) {
-        void anchor.play().catch(() => {})
-      }
+      const dronePlaying = useDroneStore.getState().playing
+      const remoteHold = anchorRemotePauseHoldRef.current && !dronePlaying
+
       if ('mediaSession' in navigator) {
         try {
-          navigator.mediaSession.playbackState = 'playing'
+          // Clip 5 remote pause must stay visibly paused; BlueTurn local pause keeps
+          // playbackState "playing" so HID keydowns still reach the page after idle.
+          navigator.mediaSession.playbackState = remoteHold ? 'paused' : 'playing'
         } catch {
           // Ignore browsers that reject the write.
         }
+      }
+
+      if (remoteHold) {
+        return
+      }
+
+      const anchor = mediaAnchorRef.current
+      if (anchor?.paused) {
+        void anchor.play().catch(() => {})
       }
     }
 

@@ -78,8 +78,11 @@ import {
   MEDIA_PAUSE_KEYS,
   MEDIA_PLAY_KEYS,
   MEDIA_PLAY_PAUSE_KEYS,
+  MEDIA_TRACK_NEXT_KEYS,
+  MEDIA_TRACK_PREVIOUS_KEYS,
 } from './utils/footPedalKeys'
 import { BLE_KEYBOARD_FOCUS_ROOT_ID, runMediaSessionAction } from './utils/restoreBleKeyboardFocus'
+import { markMediaSessionAction, wasMediaSessionHandledRecently } from './utils/mediaRemoteDedupe'
 import { BleDebugOverlay } from './components/BleDebugOverlay'
 import { bleDebugEnabled, recordBleDebug } from './utils/bleDebug'
 import { useNowPlayingKeepAlive } from './hooks/useNowPlayingKeepAlive'
@@ -1726,9 +1729,15 @@ function App() {
 
     setActionHandler('play', () => {
       recordBleDebug('mediasession', `play (playing=${useDroneStore.getState().playing})`)
+      if (wasMediaSessionHandledRecently('play')) {
+        return
+      }
+      markMediaSessionAction('play')
       runMediaSessionAction(() => {
         if (useDroneStore.getState().playing) {
-          transportPause()
+          // Clip 5 pause uses the pause handler or anchor pause; BlueTurn uses HID
+          // keydown. Ignoring play-while-playing avoids iOS double-firing play right
+          // after a remote resume, which was immediately pausing again.
           return
         }
         if (!userGestureSeenRef.current && !remoteSessionActiveRef.current) {
@@ -1749,6 +1758,10 @@ function App() {
     })
     setActionHandler('pause', () => {
       recordBleDebug('mediasession', `pause (playing=${useDroneStore.getState().playing})`)
+      if (wasMediaSessionHandledRecently('pause')) {
+        return
+      }
+      markMediaSessionAction('pause')
       runMediaSessionAction(() => {
         if (!useDroneStore.getState().playing) {
           return
@@ -1760,11 +1773,17 @@ function App() {
     })
     setActionHandler('nexttrack', () => {
       recordBleDebug('mediasession', 'nexttrack')
-      runMediaSessionAction(transportNextPreset)
+      runMediaSessionAction(() => {
+        void droneEngine.pokeClock()
+        transportNextPreset()
+      })
     })
     setActionHandler('previoustrack', () => {
       recordBleDebug('mediasession', 'previoustrack')
-      runMediaSessionAction(transportPreviousPreset)
+      runMediaSessionAction(() => {
+        void droneEngine.pokeClock()
+        transportPreviousPreset()
+      })
     })
 
     return () => {
@@ -1870,6 +1889,7 @@ function App() {
       anchorRemotePauseHoldRef.current = false
       if (resumeFromRemote && !useDroneStore.getState().playing) {
         recordBleDebug('note', 'anchor playing → remote play')
+        markMediaSessionAction('play')
         transportPlayFromRemote(latestRuntimeConfigRef.current)
       }
       keepAnchorPlaying()
@@ -1999,6 +2019,30 @@ function App() {
 
       if (isPlayPedal) {
         handleTogglePlay()
+        return
+      }
+
+      if (matchesFootPedalKey(event, MEDIA_TRACK_PREVIOUS_KEYS)) {
+        if (event.repeat) {
+          event.preventDefault()
+          return
+        }
+        event.preventDefault()
+        event.stopPropagation()
+        void droneEngine.pokeClock()
+        transportPreviousPreset()
+        return
+      }
+
+      if (matchesFootPedalKey(event, MEDIA_TRACK_NEXT_KEYS)) {
+        if (event.repeat) {
+          event.preventDefault()
+          return
+        }
+        event.preventDefault()
+        event.stopPropagation()
+        void droneEngine.pokeClock()
+        transportNextPreset()
         return
       }
 
