@@ -4,36 +4,23 @@ import { useDroneStore } from '../store/useDroneStore'
 import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
 
 /** Keep iOS Now Playing + silent anchor continuously active so BlueTurn keydowns survive idle. */
-export function useNowPlayingKeepAlive(
-  mediaAnchorRef: RefObject<HTMLAudioElement | null>,
-  anchorRemotePauseHoldRef: RefObject<boolean>,
-): void {
+export function useNowPlayingKeepAlive(mediaAnchorRef: RefObject<HTMLAudioElement | null>): void {
   useEffect(() => {
     if (!needsIosMediaRemoteIntegration()) {
       return
     }
 
     const assertPlayingSession = () => {
-      const dronePlaying = useDroneStore.getState().playing
-      const remoteHold = anchorRemotePauseHoldRef.current && !dronePlaying
-
-      if ('mediaSession' in navigator) {
-        try {
-          // Clip 5 remote pause must stay visibly paused; BlueTurn local pause keeps
-          // playbackState "playing" so HID keydowns still reach the page after idle.
-          navigator.mediaSession.playbackState = remoteHold ? 'paused' : 'playing'
-        } catch {
-          // Ignore browsers that reject the write.
-        }
-      }
-
-      if (remoteHold) {
-        return
-      }
-
       const anchor = mediaAnchorRef.current
       if (anchor?.paused) {
         void anchor.play().catch(() => {})
+      }
+      if ('mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.playbackState = 'playing'
+        } catch {
+          // Ignore browsers that reject the write.
+        }
       }
     }
 
@@ -68,5 +55,5 @@ export function useNowPlayingKeepAlive(
       window.removeEventListener('focus', onForegroundGesture)
       window.removeEventListener('pointerdown', onForegroundGesture)
     }
-  }, [anchorRemotePauseHoldRef, mediaAnchorRef])
+  }, [mediaAnchorRef])
 }
