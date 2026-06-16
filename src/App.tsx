@@ -35,6 +35,8 @@ import {
 import { metronomeEngine } from './audio/MetronomeEngine'
 import {
   transportPause,
+  transportPauseFromRemote,
+  transportPlayFromRemote,
   transportPresetPedalPress,
   transportResume,
   transportTogglePlay,
@@ -404,6 +406,7 @@ function App() {
   const overtoneAnalyzeInputRef = useRef<HTMLInputElement | null>(null)
   const sideMenuRef = useRef<HTMLElement | null>(null)
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
+  const anchorRemotePauseHoldRef = useRef(false)
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const overtoneSelectionPinnedRef = useRef(false)
   const toneMixerScrollTargetRef = useRef<NoteId | null>(null)
@@ -1728,6 +1731,11 @@ function App() {
           transportPause()
           return
         }
+        if (anchorRemotePauseHoldRef.current) {
+          anchorRemotePauseHoldRef.current = false
+          transportPlayFromRemote(latestRuntimeConfigRef.current)
+          return
+        }
         // BlueTurn keep-alive marks the silent anchor session as "playing" even
         // while the drone is paused. iOS fires a spurious 'play' on PWA open —
         // restart the anchor only; do not start the drone until a pedal/keydown.
@@ -1739,7 +1747,13 @@ function App() {
     })
     setActionHandler('pause', () => {
       recordBleDebug('mediasession', `pause (playing=${useDroneStore.getState().playing})`)
-      runMediaSessionAction(transportPause)
+      runMediaSessionAction(() => {
+        if (!useDroneStore.getState().playing) {
+          return
+        }
+        anchorRemotePauseHoldRef.current = true
+        transportPauseFromRemote()
+      })
     })
     setActionHandler('nexttrack', () => {
       recordBleDebug('mediasession', 'nexttrack')
