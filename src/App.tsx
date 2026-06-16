@@ -77,8 +77,6 @@ import {
   MEDIA_PAUSE_KEYS,
   MEDIA_PLAY_KEYS,
   MEDIA_PLAY_PAUSE_KEYS,
-  MEDIA_TRACK_NEXT_KEYS,
-  MEDIA_TRACK_PREVIOUS_KEYS,
 } from './utils/footPedalKeys'
 import { BLE_KEYBOARD_FOCUS_ROOT_ID, runMediaSessionAction } from './utils/restoreBleKeyboardFocus'
 import { BleDebugOverlay } from './components/BleDebugOverlay'
@@ -1737,6 +1735,8 @@ function App() {
         transportPlay(latestRuntimeConfigRef.current)
         const anchor = mediaAnchorRef.current
         if (anchor && anchor.paused) {
+          // Start the silent anchor inside the MediaSession activation so iOS
+          // sees the session as genuinely playing and offers 'pause' next.
           void anchor.play().catch(() => {})
         }
       })
@@ -1747,17 +1747,11 @@ function App() {
     })
     setActionHandler('nexttrack', () => {
       recordBleDebug('mediasession', 'nexttrack')
-      runMediaSessionAction(() => {
-        void droneEngine.pokeClock()
-        transportNextPreset()
-      })
+      runMediaSessionAction(transportNextPreset)
     })
     setActionHandler('previoustrack', () => {
       recordBleDebug('mediasession', 'previoustrack')
-      runMediaSessionAction(() => {
-        void droneEngine.pokeClock()
-        transportPreviousPreset()
-      })
+      runMediaSessionAction(transportPreviousPreset)
     })
 
     return () => {
@@ -1867,6 +1861,8 @@ function App() {
     anchor.addEventListener('playing', handleAnchorPlaying)
 
     const primeAnchor = () => {
+      // Touch the element on a user gesture so iOS unlocks future play() calls,
+      // and keep it running regardless of the drone's play/pause state.
       if (anchor.paused) {
         void anchor.play().catch(() => {
           // iOS can reject before a user gesture; later gestures retry.
@@ -1976,35 +1972,7 @@ function App() {
         return
       }
 
-      if (matchesFootPedalKey(event, MEDIA_TRACK_PREVIOUS_KEYS)) {
-        if (event.repeat) {
-          event.preventDefault()
-          return
-        }
-        event.preventDefault()
-        event.stopPropagation()
-        void droneEngine.pokeClock()
-        transportPreviousPreset()
-        return
-      }
-
-      if (matchesFootPedalKey(event, MEDIA_TRACK_NEXT_KEYS)) {
-        if (event.repeat) {
-          event.preventDefault()
-          return
-        }
-        event.preventDefault()
-        event.stopPropagation()
-        void droneEngine.pokeClock()
-        transportNextPreset()
-        return
-      }
-
       if (isPresetPedal) {
-        recordBleDebug(
-          'note',
-          `preset pedal code=${event.code} key=${event.key} keyCode=${event.keyCode}`,
-        )
         handlePresetPedalPress()
         return
       }
