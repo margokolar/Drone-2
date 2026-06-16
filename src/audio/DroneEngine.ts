@@ -301,6 +301,7 @@ export class DroneEngine {
     if (this.shouldPlay) {
       return
     }
+    this.prepareContextForGesture()
     const context = this.context
     if (!context) {
       return
