@@ -113,7 +113,7 @@ export function transportPreviousPreset(): void {
   useDroneStore.getState().selectPreviousPreset()
 }
 
-/** Single tap = next preset immediately; double tap within windowMs = previous preset. */
+/** Single tap = next preset; double tap within windowMs = previous preset. */
 export function transportPresetPedalPress(
   pendingTimeoutRef: { current: number | null },
   windowMs = 260,
@@ -124,8 +124,8 @@ export function transportPresetPedalPress(
     transportPreviousPreset()
     return
   }
-  transportNextPreset()
   pendingTimeoutRef.current = window.setTimeout(() => {
+    transportNextPreset()
     pendingTimeoutRef.current = null
   }, windowMs)
 }
