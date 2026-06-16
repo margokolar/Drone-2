@@ -12,6 +12,7 @@ export function useAudioEngine(config: DroneRuntimeConfig, playing: boolean): vo
       droneEngine.pause()
       return
     }
+    droneEngine.prepareContextForGesture()
     droneEngine.syncConfig(config, false)
   }, [config, playing])
 

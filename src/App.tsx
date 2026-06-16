@@ -2001,6 +2001,10 @@ function App() {
       }
 
       if (isPresetPedal) {
+        recordBleDebug(
+          'note',
+          `preset pedal code=${event.code} key=${event.key} keyCode=${event.keyCode}`,
+        )
         handlePresetPedalPress()
         return
       }
