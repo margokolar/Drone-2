@@ -407,7 +407,8 @@ function App() {
   const sideMenuRef = useRef<HTMLElement | null>(null)
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
   const anchorRemotePauseHoldRef = useRef(false)
-  const mediaSessionMountTimeRef = useRef(Date.now())
+  const userGestureSeenRef = useRef(false)
+  const remoteSessionActiveRef = useRef(false)
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const overtoneSelectionPinnedRef = useRef(false)
   const toneMixerScrollTargetRef = useRef<NoteId | null>(null)
@@ -1726,31 +1727,24 @@ function App() {
     setActionHandler('play', () => {
       recordBleDebug('mediasession', `play (playing=${useDroneStore.getState().playing})`)
       runMediaSessionAction(() => {
-        // When the drone is playing, treat MediaSession play as pause (BlueTurn
-        // single-button toggle when iOS only dispatches 'play').
         if (useDroneStore.getState().playing) {
           transportPause()
           return
         }
-        if (anchorRemotePauseHoldRef.current) {
-          anchorRemotePauseHoldRef.current = false
-          transportPlayFromRemote(latestRuntimeConfigRef.current)
-          return
-        }
-        // Ignore iOS startup/playback-state noise right after opening the app.
-        if (Date.now() - mediaSessionMountTimeRef.current < 2000) {
+        if (!userGestureSeenRef.current && !remoteSessionActiveRef.current) {
           const anchor = mediaAnchorRef.current
           if (anchor?.paused) {
             void anchor.play().catch(() => {})
           }
           return
         }
-        // Outside startup window, allow play to resume even if iOS skipped pause.
+        remoteSessionActiveRef.current = true
+        anchorRemotePauseHoldRef.current = false
         transportPlayFromRemote(latestRuntimeConfigRef.current)
-        return
-        // BlueTurn keep-alive marks the silent anchor session as "playing" even
-        // while the drone is paused. iOS fires a spurious 'play' on PWA open —
-        // restart the anchor only; do not start the drone until a pedal/keydown.
+        const anchor = mediaAnchorRef.current
+        if (anchor?.paused) {
+          void anchor.play().catch(() => {})
+        }
       })
     })
     setActionHandler('pause', () => {
@@ -1759,6 +1753,7 @@ function App() {
         if (!useDroneStore.getState().playing) {
           return
         }
+        remoteSessionActiveRef.current = true
         anchorRemotePauseHoldRef.current = true
         transportPauseFromRemote()
       })
@@ -1837,50 +1832,56 @@ function App() {
     anchor.preload = 'auto'
     anchor.setAttribute('playsinline', '')
     anchor.setAttribute('webkit-playsinline', '')
-    anchor.muted = false
+    anchor.muted = true
     anchor.volume = 1
     anchor.setAttribute('aria-hidden', 'true')
     anchor.style.cssText = 'position:fixed;width:0;height:0;opacity:0;pointer-events:none'
     document.body.appendChild(anchor)
     mediaAnchorRef.current = anchor
 
-    const assertPlayingSession = () => {
-      if (!('mediaSession' in navigator)) {
+    const keepAnchorPlaying = () => {
+      if (anchorRemotePauseHoldRef.current && !useDroneStore.getState().playing) {
         return
       }
-      try {
-        navigator.mediaSession.playbackState = 'playing'
-      } catch {
-        // Ignore browsers that reject the write.
+      if (anchor.paused) {
+        void anchor.play().catch(() => {
+          // iOS can reject play() outside an activation window; retried later.
+        })
       }
     }
 
-    // Keep the silent anchor playing continuously — even while the drone is
-    // paused — and never let it sit paused. Root cause of the BlueTurn
-    // "~5s dead window after the first post-idle press": pausing the anchor on
-    // drone-pause and restarting it on the next play creates a paused->playing
-    // transition in the iOS Now Playing session. After an idle spell iOS treats
-    // that transition as a fresh activation and re-routes the connected BlueTurn
-    // HID device to the media-remote subsystem for a few seconds. Because the
-    // pedal only ever sends raw ArrowDown *keydown* events (never MediaSession
-    // commands), those presses are swallowed entirely during that window. Keeping
-    // the session continuously "playing" means there is no transition for iOS to
-    // arbitrate, so every pedal keydown keeps reaching the page.
+    // Clip 5 AVRCP pauses the silent anchor directly. Sync to the drone and leave
+    // the anchor paused so the next remote play press resumes it and starts audio.
+    // BlueTurn HID pauses only the drone — the anchor keeps playing for keep-alive.
     const handleAnchorPause = () => {
-      recordBleDebug('note', 'anchor paused (restarting)')
-      void anchor.play().then(assertPlayingSession).catch(() => {
-        // iOS can reject play() outside an activation window; retried later.
-      })
+      recordBleDebug('note', 'anchor paused')
+      remoteSessionActiveRef.current = true
+      if (useDroneStore.getState().playing) {
+        anchorRemotePauseHoldRef.current = true
+        transportPauseFromRemote()
+        return
+      }
+      anchorRemotePauseHoldRef.current = false
+      keepAnchorPlaying()
     }
     const handleAnchorPlaying = () => {
-      assertPlayingSession()
+      remoteSessionActiveRef.current = true
+      const resumeFromRemote = anchorRemotePauseHoldRef.current
+      anchorRemotePauseHoldRef.current = false
+      if (resumeFromRemote && !useDroneStore.getState().playing) {
+        recordBleDebug('note', 'anchor playing → remote play')
+        transportPlayFromRemote(latestRuntimeConfigRef.current)
+      }
+      keepAnchorPlaying()
     }
     anchor.addEventListener('pause', handleAnchorPause)
     anchor.addEventListener('playing', handleAnchorPlaying)
 
     const primeAnchor = () => {
-      // Touch the element on a user gesture so iOS unlocks future play() calls,
-      // and keep it running regardless of the drone's play/pause state.
+      userGestureSeenRef.current = true
+      if (anchorRemotePauseHoldRef.current && !useDroneStore.getState().playing) {
+        return
+      }
       if (anchor.paused) {
         void anchor.play().catch(() => {
           // iOS can reject before a user gesture; later gestures retry.
@@ -1907,7 +1908,18 @@ function App() {
     }
   }, [])
 
-  useNowPlayingKeepAlive(mediaAnchorRef)
+  useNowPlayingKeepAlive(mediaAnchorRef, anchorRemotePauseHoldRef)
+
+  useEffect(() => {
+    if (!needsIosMediaRemoteIntegration() || !playing) {
+      return
+    }
+    anchorRemotePauseHoldRef.current = false
+    const anchor = mediaAnchorRef.current
+    if (anchor?.paused) {
+      void anchor.play().catch(() => {})
+    }
+  }, [playing])
 
   useEffect(() => {
     const navigatorWithAudioSession = navigator as Navigator & {
