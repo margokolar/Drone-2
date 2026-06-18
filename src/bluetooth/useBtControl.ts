@@ -106,15 +106,19 @@ function maintainSpeakerAnchor(
   clipRemoteHoldRef: RefObject<boolean>,
 ): void {
   const dronePlaying = useDroneStore.getState().playing
+  setMediaSessionPlaybackState(dronePlaying)
+
   const clipHold = clipRemoteHoldRef.current && !dronePlaying
   if (clipHold) {
-    setMediaSessionPlaybackState(false)
     return
+  }
+
+  if (dronePlaying) {
+    clipRemoteHoldRef.current = false
   }
   if (anchor.paused) {
     void anchor.play().catch(() => {})
   }
-  setMediaSessionPlaybackState(true)
 }
 
 export function useBtControl({
@@ -305,6 +309,7 @@ export function useBtControl({
           }
           clipRemoteHoldRef.current = true
           transportPauseFromRemote()
+          anchor.pause()
         })
       })
       setActionHandler('nexttrack', () => {
@@ -342,8 +347,8 @@ export function useBtControl({
         recordBleDebug('note', 'speaker anchor paused (clip hold)')
         return
       }
-      recordBleDebug('note', 'speaker anchor paused (restarting)')
-      void anchor.play().then(() => setMediaSessionPlaybackState(true)).catch(() => {})
+      recordBleDebug('note', 'speaker anchor paused (drone idle)')
+      setMediaSessionPlaybackState(false)
     }
     const onSpeakerAnchorPlaying = () => {
       const resumeFromClipRemote = clipRemoteHoldRef.current
@@ -352,12 +357,10 @@ export function useBtControl({
         recordBleDebug('note', 'speaker anchor playing → remote play')
         markMediaSessionAction('play')
         transportPlayFromRemote(latestRuntimeConfigRef.current)
+        return
       }
-      if (!clipRemoteHoldRef.current) {
+      if (useDroneStore.getState().playing) {
         setMediaSessionPlaybackState(true)
-      }
-      if (!clipRemoteHoldRef.current && anchor.paused) {
-        void anchor.play().catch(() => {})
       }
     }
 
@@ -369,6 +372,8 @@ export function useBtControl({
       onAnchorPlaying = onPedalAnchorPlaying
       setupPedalMediaSession()
     } else {
+      clipRemoteHoldRef.current = false
+      setMediaSessionPlaybackState(useDroneStore.getState().playing)
       onAnchorPause = onSpeakerAnchorPause
       onAnchorPlaying = onSpeakerAnchorPlaying
       setupSpeakerMediaSession()
@@ -502,7 +507,11 @@ export function useBtControl({
   }, [btControlMode, handleTogglePlay, handlePresetPedalPress, latestRuntimeConfigRef])
 
   useEffect(() => {
-    if (btControlMode !== 'speaker' || !playing || !needsIosMediaRemoteIntegration()) {
+    if (btControlMode !== 'speaker' || !needsIosMediaRemoteIntegration()) {
+      return
+    }
+    setMediaSessionPlaybackState(playing)
+    if (!playing) {
       return
     }
     clipRemoteHoldRef.current = false
