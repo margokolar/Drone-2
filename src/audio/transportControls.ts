@@ -113,6 +113,20 @@ export function transportPreviousPreset(): void {
   useDroneStore.getState().selectPreviousPreset()
 }
 
+const MASTER_GAIN_STEP_DB = 2
+
+export function transportVolumeUp(): void {
+  const state = useDroneStore.getState()
+  state.setMasterGainDb(state.masterGainDb + MASTER_GAIN_STEP_DB)
+  recordBleDebug('note', `vol up ${useDroneStore.getState().masterGainDb.toFixed(1)} dB`)
+}
+
+export function transportVolumeDown(): void {
+  const state = useDroneStore.getState()
+  state.setMasterGainDb(state.masterGainDb - MASTER_GAIN_STEP_DB)
+  recordBleDebug('note', `vol down ${useDroneStore.getState().masterGainDb.toFixed(1)} dB`)
+}
+
 /** Single tap = next preset; double tap within windowMs = previous preset. */
 export function transportPresetPedalPress(
   pendingTimeoutRef: { current: number | null },

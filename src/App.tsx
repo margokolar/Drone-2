@@ -34,15 +34,9 @@ import {
 } from 'react'
 import { metronomeEngine } from './audio/MetronomeEngine'
 import {
-  transportPause,
-  transportPlay,
   transportPresetPedalPress,
-  transportResume,
   transportTogglePlay,
-  transportNextPreset,
-  transportPreviousPreset,
 } from './audio/transportControls'
-import { droneEngine } from './audio/DroneEngine'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
 import { MetronomeControls } from './components/MetronomeControls'
@@ -69,20 +63,11 @@ import {
 import { getFrequency, findLowestEnabledToneNoteId, findHighestEnabledToneNoteId } from './music/tuning'
 import { createDefaultPartials, DEFAULT_MASTER_GAIN_DB, DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS, DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS, DEFAULT_ENTRY_GLIDE_LOWEST_CENTS, DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS, type Preset } from './presets/defaultPresets'
 import { useDroneStore } from './store/useDroneStore'
-import {
-  FOOT_PEDAL_PLAY_KEYS,
-  FOOT_PEDAL_PRESET_KEYS,
-  isTextEditingTarget,
-  matchesFootPedalKey,
-  MEDIA_PAUSE_KEYS,
-  MEDIA_PLAY_KEYS,
-  MEDIA_PLAY_PAUSE_KEYS,
-} from './utils/footPedalKeys'
-import { BLE_KEYBOARD_FOCUS_ROOT_ID, runMediaSessionAction } from './utils/restoreBleKeyboardFocus'
+import { BtControlMenuSection } from './bluetooth/BtControlMenuSection'
+import { useBtControl } from './bluetooth/useBtControl'
+import { BLE_KEYBOARD_FOCUS_ROOT_ID } from './utils/restoreBleKeyboardFocus'
 import { BleDebugOverlay } from './components/BleDebugOverlay'
 import { bleDebugEnabled, recordBleDebug } from './utils/bleDebug'
-import { useNowPlayingKeepAlive } from './hooks/useNowPlayingKeepAlive'
-import { needsIosMediaRemoteIntegration } from './utils/mediaSessionEnvironment'
 import { TONE_STICKY_CHROME_ID, scrollToneMixerCardIntoView } from './utils/scrollBelowStickyChrome'
 
 type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi'
@@ -404,7 +389,6 @@ function App() {
   const globalImportInputRef = useRef<HTMLInputElement | null>(null)
   const overtoneAnalyzeInputRef = useRef<HTMLInputElement | null>(null)
   const sideMenuRef = useRef<HTMLElement | null>(null)
-  const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const overtoneSelectionPinnedRef = useRef(false)
   const toneMixerScrollTargetRef = useRef<NoteId | null>(null)
@@ -1659,6 +1643,15 @@ function App() {
     transportPresetPedalPress(upPressTimeoutRef)
   }, [])
 
+  const mediaAnchorRef = useBtControl({
+    latestRuntimeConfigRef,
+    handleTogglePlay,
+    handlePresetPedalPress,
+    activePresetId,
+    presets,
+    songName,
+  })
+
   useEffect(() => {
     useDroneStore.setState((state) => ({
       tones: state.tones.map((tone) => (toneSetNoteIds.has(tone.noteId) ? tone : { ...tone, enabled: false })),
@@ -1705,193 +1698,6 @@ function App() {
   })
 
   useEffect(() => {
-    if (!needsIosMediaRemoteIntegration() || !('mediaSession' in navigator)) {
-      return
-    }
-
-    const setActionHandler = (
-      action: MediaSessionAction,
-      handler: MediaSessionActionHandler | null,
-    ) => {
-      try {
-        navigator.mediaSession.setActionHandler(action, handler)
-      } catch {
-        // iOS Safari can reject unsupported handlers; keep play/pause working.
-      }
-    }
-
-    setActionHandler('play', () => {
-      recordBleDebug('mediasession', `play (playing=${useDroneStore.getState().playing})`)
-      runMediaSessionAction(() => {
-        // iOS decides whether a BlueTurn button sends 'play' or 'pause' purely
-        // from playbackState, and a silent anchor is not reliably seen as
-        // "playing" — so iOS often keeps dispatching 'play' and the pause side
-        // never fires. Treat 'play' as a toggle so a single pedal button still
-        // pauses an already-playing drone.
-        if (useDroneStore.getState().playing) {
-          transportPause()
-          return
-        }
-        transportPlay(latestRuntimeConfigRef.current)
-        const anchor = mediaAnchorRef.current
-        if (anchor && anchor.paused) {
-          // Start the silent anchor inside the MediaSession activation so iOS
-          // sees the session as genuinely playing and offers 'pause' next.
-          void anchor.play().catch(() => {})
-        }
-      })
-    })
-    setActionHandler('pause', () => {
-      recordBleDebug('mediasession', `pause (playing=${useDroneStore.getState().playing})`)
-      runMediaSessionAction(transportPause)
-    })
-    setActionHandler('nexttrack', () => {
-      recordBleDebug('mediasession', 'nexttrack')
-      runMediaSessionAction(transportNextPreset)
-    })
-    setActionHandler('previoustrack', () => {
-      recordBleDebug('mediasession', 'previoustrack')
-      runMediaSessionAction(transportPreviousPreset)
-    })
-
-    return () => {
-      setActionHandler('play', null)
-      setActionHandler('pause', null)
-      setActionHandler('nexttrack', null)
-      setActionHandler('previoustrack', null)
-    }
-  }, [])
-
-  // Show the currently selected preset name on the iOS lock screen.
-  useEffect(() => {
-    if (!needsIosMediaRemoteIntegration() || !('mediaSession' in navigator)) {
-      return
-    }
-    const activePresetName =
-      presets.find((preset) => preset.id === activePresetId)?.name ?? 'Drone'
-    try {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: activePresetName,
-        artist: songName || 'Drone',
-        album: 'Drone App',
-      })
-    } catch {
-      // Some browsers reject MediaMetadata before user gesture; ignore.
-    }
-  }, [activePresetId, presets, songName])
-
-  // Silent looping anchor keeps iOS Now Playing alive so BlueTurn keydowns
-  // keep reaching the page after idle (never pause it on drone-pause).
-  useEffect(() => {
-    if (!needsIosMediaRemoteIntegration()) {
-      return
-    }
-
-    const sampleRate = 8000
-    const numSamples = sampleRate
-    const buffer = new ArrayBuffer(44 + numSamples * 2)
-    const view = new DataView(buffer)
-    const writeString = (offset: number, str: string) => {
-      for (let i = 0; i < str.length; i += 1) {
-        view.setUint8(offset + i, str.charCodeAt(i))
-      }
-    }
-    writeString(0, 'RIFF')
-    view.setUint32(4, 36 + numSamples * 2, true)
-    writeString(8, 'WAVE')
-    writeString(12, 'fmt ')
-    view.setUint32(16, 16, true)
-    view.setUint16(20, 1, true)
-    view.setUint16(22, 1, true)
-    view.setUint32(24, sampleRate, true)
-    view.setUint32(28, sampleRate * 2, true)
-    view.setUint16(32, 2, true)
-    view.setUint16(34, 16, true)
-    writeString(36, 'data')
-    view.setUint32(40, numSamples * 2, true)
-
-    const silentBlob = new Blob([buffer], { type: 'audio/wav' })
-    const silentUrl = URL.createObjectURL(silentBlob)
-
-    const anchor = document.createElement('audio')
-    anchor.src = silentUrl
-    anchor.loop = true
-    anchor.preload = 'auto'
-    anchor.setAttribute('playsinline', '')
-    anchor.setAttribute('webkit-playsinline', '')
-    anchor.muted = false
-    anchor.volume = 1
-    anchor.setAttribute('aria-hidden', 'true')
-    anchor.style.cssText = 'position:fixed;width:0;height:0;opacity:0;pointer-events:none'
-    document.body.appendChild(anchor)
-    mediaAnchorRef.current = anchor
-
-    const assertPlayingSession = () => {
-      if (!('mediaSession' in navigator)) {
-        return
-      }
-      try {
-        navigator.mediaSession.playbackState = 'playing'
-      } catch {
-        // Ignore browsers that reject the write.
-      }
-    }
-
-    // Keep the silent anchor playing continuously — even while the drone is
-    // paused — and never let it sit paused. Root cause of the BlueTurn
-    // "~5s dead window after the first post-idle press": pausing the anchor on
-    // drone-pause and restarting it on the next play creates a paused->playing
-    // transition in the iOS Now Playing session. After an idle spell iOS treats
-    // that transition as a fresh activation and re-routes the connected BlueTurn
-    // HID device to the media-remote subsystem for a few seconds. Because the
-    // pedal only ever sends raw ArrowDown *keydown* events (never MediaSession
-    // commands), those presses are swallowed entirely during that window. Keeping
-    // the session continuously "playing" means there is no transition for iOS to
-    // arbitrate, so every pedal keydown keeps reaching the page.
-    const handleAnchorPause = () => {
-      recordBleDebug('note', 'anchor paused (restarting)')
-      void anchor.play().then(assertPlayingSession).catch(() => {
-        // iOS can reject play() outside an activation window; retried later.
-      })
-    }
-    const handleAnchorPlaying = () => {
-      assertPlayingSession()
-    }
-    anchor.addEventListener('pause', handleAnchorPause)
-    anchor.addEventListener('playing', handleAnchorPlaying)
-
-    const primeAnchor = () => {
-      // Touch the element on a user gesture so iOS unlocks future play() calls,
-      // and keep it running regardless of the drone's play/pause state.
-      if (anchor.paused) {
-        void anchor.play().catch(() => {
-          // iOS can reject before a user gesture; later gestures retry.
-        })
-      }
-    }
-
-    window.addEventListener('pointerdown', primeAnchor, { passive: true })
-    window.addEventListener('keydown', primeAnchor)
-    window.addEventListener('touchend', primeAnchor, { passive: true })
-
-    return () => {
-      window.removeEventListener('pointerdown', primeAnchor)
-      window.removeEventListener('keydown', primeAnchor)
-      window.removeEventListener('touchend', primeAnchor)
-      anchor.removeEventListener('pause', handleAnchorPause)
-      anchor.removeEventListener('playing', handleAnchorPlaying)
-      anchor.pause()
-      anchor.removeAttribute('src')
-      anchor.load()
-      anchor.remove()
-      URL.revokeObjectURL(silentUrl)
-      mediaAnchorRef.current = null
-    }
-  }, [])
-
-  useNowPlayingKeepAlive(mediaAnchorRef)
-
-  useEffect(() => {
     const navigatorWithAudioSession = navigator as Navigator & {
       audioSession?: { type: string }
     }
@@ -1935,77 +1741,6 @@ function App() {
       window.removeEventListener('focus', onFocus)
     }
   }, [])
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      recordBleDebug(
-        'keydown',
-        `key=${event.key} code=${event.code} hasFocus=${document.hasFocus()} active=${
-          document.activeElement?.tagName ?? 'none'
-        }`,
-      )
-      if (isTextEditingTarget(event.target)) {
-        return
-      }
-
-      const isPlayPedal = matchesFootPedalKey(event, FOOT_PEDAL_PLAY_KEYS)
-      const isPresetPedal = matchesFootPedalKey(event, FOOT_PEDAL_PRESET_KEYS)
-
-      // A pedal press is a user gesture, so this is the most reliable moment to
-      // un-stall an idle-frozen AudioContext before we mute (pause) or rebuild
-      // voices (preset change) — otherwise those scheduled changes never render.
-      if (isPlayPedal || isPresetPedal) {
-        void droneEngine.pokeClock()
-      }
-
-      if (isPlayPedal || isPresetPedal) {
-        if (event.repeat) {
-          event.preventDefault()
-          return
-        }
-        event.preventDefault()
-        event.stopPropagation()
-      }
-
-      if (isPlayPedal) {
-        handleTogglePlay()
-        return
-      }
-
-      if (isPresetPedal) {
-        handlePresetPedalPress()
-        return
-      }
-
-      if (event.code === 'Space' || event.key === ' ') {
-        event.preventDefault()
-        handleTogglePlay()
-        return
-      }
-      if (matchesFootPedalKey(event, MEDIA_PLAY_PAUSE_KEYS)) {
-        event.preventDefault()
-        handleTogglePlay()
-        return
-      }
-      if (matchesFootPedalKey(event, MEDIA_PLAY_KEYS)) {
-        event.preventDefault()
-        transportResume(latestRuntimeConfigRef.current)
-        return
-      }
-      if (matchesFootPedalKey(event, MEDIA_PAUSE_KEYS)) {
-        event.preventDefault()
-        transportPause()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown, true)
-    return () => {
-      if (upPressTimeoutRef.current !== null) {
-        window.clearTimeout(upPressTimeoutRef.current)
-        upPressTimeoutRef.current = null
-      }
-      window.removeEventListener('keydown', onKeyDown, true)
-    }
-  }, [handleTogglePlay, handlePresetPedalPress])
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
@@ -3052,6 +2787,9 @@ function App() {
                   </button>
                 </div>
               ) : null}
+              <div data-keep-menu-open>
+                <BtControlMenuSection />
+              </div>
               <button
                 type="button"
                 className="button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"

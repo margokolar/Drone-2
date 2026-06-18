@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { PartialConfig, TimbreBlend, ToneConfig } from '../audio/types'
+import type { BtControlMode } from '../bluetooth/types'
 import { TONAL_CENTERS, migrateLegacyNoteId, NOTE_IDS, type NoteId, type TonalCenter } from '../music/notes'
 import {
   MAX_BASE_OCTAVE,
@@ -59,6 +60,7 @@ type DroneState = {
   metronomeVolumeDb: number
   metronomeMuted: boolean
   controlsLocked: boolean
+  btControlMode: BtControlMode
   setPlaying: (playing: boolean) => void
   togglePlaying: () => void
   setReferenceA4Hz: (frequency: number) => void
@@ -110,6 +112,7 @@ type DroneState = {
   setMetronomeMuted: (muted: boolean) => void
   setControlsLocked: (locked: boolean) => void
   toggleControlsLocked: () => void
+  setBtControlMode: (mode: BtControlMode) => void
   saveActivePreset: () => void
   savePreset: (presetId: string) => void
   saveAsPreset: () => void
@@ -373,6 +376,7 @@ export const useDroneStore = create<DroneState>()(
       metronomeVolumeDb: -15,
       metronomeMuted: false,
       controlsLocked: false,
+      btControlMode: 'pedal',
       setPlaying: (playing) => set({ playing }),
       togglePlaying: () => set((state) => ({ playing: !state.playing })),
       setReferenceA4Hz: (frequency) => set({ referenceA4Hz: clamp(frequency, 400, 480) }),
@@ -777,6 +781,7 @@ export const useDroneStore = create<DroneState>()(
       setMetronomeMuted: (muted) => set({ metronomeMuted: muted }),
       setControlsLocked: (locked) => set({ controlsLocked: locked }),
       toggleControlsLocked: () => set((state) => ({ controlsLocked: !state.controlsLocked })),
+      setBtControlMode: (mode) => set({ btControlMode: mode }),
       saveActivePreset: () => {
         const { activePresetId } = get()
         get().savePreset(activePresetId)
@@ -1213,6 +1218,7 @@ export const useDroneStore = create<DroneState>()(
           ),
           globalOvertoneEditEnabled: typed.globalOvertoneEditEnabled ?? false,
           controlsLocked: typed.controlsLocked ?? false,
+          btControlMode: typed.btControlMode === 'speaker' ? 'speaker' : 'pedal',
         }
       },
       partialize: (state) => ({
@@ -1240,6 +1246,7 @@ export const useDroneStore = create<DroneState>()(
         metronomeVolumeDb: state.metronomeVolumeDb,
         metronomeMuted: state.metronomeMuted,
         controlsLocked: state.controlsLocked,
+        btControlMode: state.btControlMode,
       }),
     },
   ),
