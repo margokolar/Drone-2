@@ -130,7 +130,7 @@ export function transportVolumeDown(): void {
 /** Single tap = next preset; double tap within windowMs = previous preset. */
 export function transportPresetPedalPress(
   pendingTimeoutRef: { current: number | null },
-  windowMs = 260,
+  windowMs = 1000,
 ): void {
   if (pendingTimeoutRef.current !== null) {
     window.clearTimeout(pendingTimeoutRef.current)
