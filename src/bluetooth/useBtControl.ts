@@ -25,6 +25,8 @@ import {
   MEDIA_PLAY_PAUSE_KEYS,
   MEDIA_TRACK_NEXT_KEYS,
   MEDIA_TRACK_PREVIOUS_KEYS,
+  PT_PEDAL_NEXT_KEYS,
+  PT_PEDAL_PREVIOUS_KEYS,
   UNIVERSAL_VOLUME_DOWN_KEYS,
   UNIVERSAL_VOLUME_UP_KEYS,
 } from '../utils/footPedalKeys'
@@ -199,6 +201,22 @@ export function useBtControl({
         return
       }
       if (event.repeat) {
+        return
+      }
+
+      if (matchesFootPedalKey(event, PT_PEDAL_NEXT_KEYS)) {
+        event.preventDefault()
+        event.stopPropagation()
+        void droneEngine.pokeClock()
+        transportNextPreset()
+        return
+      }
+
+      if (matchesFootPedalKey(event, PT_PEDAL_PREVIOUS_KEYS)) {
+        event.preventDefault()
+        event.stopPropagation()
+        void droneEngine.pokeClock()
+        transportPreviousPreset()
         return
       }
 

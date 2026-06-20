@@ -2,7 +2,6 @@
 export const FOOT_PEDAL_PLAY_KEYS = new Set([
   'ArrowDown',
   'ArrowRight',
-  'PageDown',
   'NumpadSubtract',
   'Minus',
 ])
@@ -10,10 +9,13 @@ export const FOOT_PEDAL_PLAY_KEYS = new Set([
 export const FOOT_PEDAL_PRESET_KEYS = new Set([
   'ArrowUp',
   'ArrowLeft',
-  'PageUp',
   'NumpadAdd',
   'Equal',
 ])
+
+/** PT pedal — PageUp/PageDown direct preset prev/next (no double-tap window). */
+export const PT_PEDAL_NEXT_KEYS = new Set(['PageUp'])
+export const PT_PEDAL_PREVIOUS_KEYS = new Set(['PageDown'])
 
 /** Universal in both BT modes — master gain only, never play/preset. */
 export const UNIVERSAL_VOLUME_UP_KEYS = new Set(['AudioVolumeUp', 'VolumeUp'])
