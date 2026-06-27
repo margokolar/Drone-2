@@ -1,6 +1,6 @@
 import clsx from 'clsx'
-import { ArrowDownUp, ChevronDown, AudioWaveform } from 'lucide-react'
-import { useRef, useState, type ChangeEvent } from 'react'
+import { ArrowDownUp, AudioWaveform } from 'lucide-react'
+import type { ChangeEvent } from 'react'
 import type { ToneConfig, TimbreBlend } from '../audio/types'
 import { getTonePageLabel, type NoteId, type TonalCenter } from '../music/notes'
 import { getFrequency, type TuningSystemId } from '../music/tuning'
@@ -15,8 +15,6 @@ import { PanFluteIcon } from './PanFluteIcon'
 import { ResettableRangeInput } from './ResettableRangeInput'
 import { TimbreMorphSlider } from './TimbreMorphSlider'
 import { ToneLabel } from './ToneLabel'
-
-const SPATIAL_LONG_PRESS_MS = 800
 
 export function toneMixerCardElementId(noteId: NoteId): string {
   return `tone-mixer-${noteId}`
@@ -127,6 +125,7 @@ function ToneDetuneFader({
 type ToneMixerProps = {
   tones: ToneConfig[]
   allTones: ToneConfig[]
+  spatialExpanded: boolean
   referenceA4Hz: number
   baseOctave: number
   tuningSystemId: TuningSystemId
@@ -143,6 +142,7 @@ type ToneMixerProps = {
 export function ToneMixer({
   tones,
   allTones,
+  spatialExpanded,
   referenceA4Hz,
   baseOctave,
   tuningSystemId,
@@ -155,40 +155,6 @@ export function ToneMixer({
   onToggleToneSolo,
   onEditOvertones,
 }: ToneMixerProps) {
-  const [spatialExpandedByNote, setSpatialExpandedByNote] = useState<Partial<Record<NoteId, boolean>>>({})
-  const spatialLongPressTimerRef = useRef<number | null>(null)
-  const spatialLongPressTriggeredRef = useRef(false)
-
-  const isSpatialExpanded = (noteId: NoteId): boolean => spatialExpandedByNote[noteId] ?? false
-
-  const clearSpatialLongPressTimer = () => {
-    if (spatialLongPressTimerRef.current !== null) {
-      window.clearTimeout(spatialLongPressTimerRef.current)
-      spatialLongPressTimerRef.current = null
-    }
-  }
-
-  const toggleAllSpatialOnLongPress = () => {
-    if (tones.length === 0) {
-      return
-    }
-    setSpatialExpandedByNote((current) => {
-      const allExpanded = tones.every((tone) => current[tone.noteId] ?? false)
-      const next = { ...current }
-      for (const tone of tones) {
-        next[tone.noteId] = !allExpanded
-      }
-      return next
-    })
-  }
-
-  const toggleSpatialExpanded = (noteId: NoteId) => {
-    setSpatialExpandedByNote((current) => ({
-      ...current,
-      [noteId]: !isSpatialExpanded(noteId),
-    }))
-  }
-
   if (tones.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-white/15 p-3 text-sm text-white/60">
@@ -201,9 +167,7 @@ export function ToneMixer({
     <div className="hide-scrollbar flex items-start gap-2 overflow-x-auto rounded-xl border border-white/10 bg-white/5 p-3">
       {tones.map((tone) => {
         const strictSolo = isToneStrictSolo(allTones, tone.noteId)
-        const spatialExpanded = isSpatialExpanded(tone.noteId)
         const accentClassName = toneGainAccentClass(strictSolo)
-        const detuneLabel = `${tone.detuneCents > 0 ? '+' : ''}${Math.round(tone.detuneCents)} c`
         const toneFrequencyHz = getToneFrequencyHz(
           tone.noteId,
           tone.detuneCents,
@@ -218,7 +182,7 @@ export function ToneMixer({
             key={tone.noteId}
             id={toneMixerCardElementId(tone.noteId)}
             className={clsx(
-              'tone-mixer-channel flex shrink-0 flex-col items-center gap-1 rounded-xl border px-2 py-2 transition',
+              'tone-mixer-channel flex shrink-0 flex-col items-center gap-0 rounded-xl border px-2 py-2 transition',
               spatialExpanded && 'tone-mixer-channel--expanded',
               strictSolo
                 ? 'border-amber-300/40 bg-amber-300/[0.08] shadow-[0_0_22px_rgba(251,191,36,0.14)]'
@@ -238,58 +202,50 @@ export function ToneMixer({
             >
               <ToneLabel noteId={tone.noteId} />
             </button>
-            <div className="tone-mixer-fader-block w-full">
-              <div className="tone-mixer-fader-head">
-                {!spatialExpanded ? (
-                  <span className="tabular-nums text-[11px] leading-none text-white/75">{tone.gainDb.toFixed(1)} dB</span>
-                ) : (
-                  <div className="flex w-full items-center justify-center gap-1">
-                    <span
-                      className="flex h-3.5 w-[1.625rem] items-center justify-center text-white/60"
-                      title="Waveform"
-                      aria-hidden
-                    >
-                      <AudioWaveform size={12} strokeWidth={2} />
-                    </span>
-                    <span
-                      className="flex h-3.5 w-[1.625rem] items-center justify-center text-white/60"
-                      title="Detune"
-                      aria-hidden
-                    >
-                      <ArrowDownUp size={12} strokeWidth={2} />
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div id={`tone-spatial-${tone.noteId}`} className="tone-mixer-fader-slot">
-                {spatialExpanded ? (
-                  <div className="flex h-full items-stretch justify-center gap-1">
-                    <TimbreMorphSlider
-                      variant="mixer"
-                      orientation="vertical"
-                      compact
-                      faderOnly
-                      timbreBlend={tone.timbreBlend ?? fallbackTimbreBlend}
-                      onSetTimbreValue={(key, value) => onToneTimbreValue(tone.noteId, key, value)}
-                      accentClassName={accentClassName}
-                    />
-                    <ToneDetuneFader
-                      tone={tone}
-                      strictSolo={strictSolo}
-                      onToneDetune={onToneDetune}
-                      compact
-                    />
-                  </div>
-                ) : (
-                  <ToneGainFader tone={tone} strictSolo={strictSolo} onToneGain={onToneGain} />
-                )}
-              </div>
-              {spatialExpanded ? (
-                <div className="tone-mixer-fader-foot">
-                  <span className="tone-mixer-fader-foot-spacer" aria-hidden />
-                  <span className="tone-mixer-fader-foot-value tabular-nums">{detuneLabel}</span>
+            <div className="tone-mixer-value-row">
+              {!spatialExpanded ? (
+                <span className="tabular-nums text-[11px] leading-none text-white/75">{tone.gainDb.toFixed(1)} dB</span>
+              ) : (
+                <div className="flex w-full items-center justify-center gap-1">
+                  <span
+                    className="flex h-3.5 w-[1.625rem] items-center justify-center text-white/60"
+                    title="Waveform"
+                    aria-hidden
+                  >
+                    <AudioWaveform size={12} strokeWidth={2} />
+                  </span>
+                  <span
+                    className="flex h-3.5 w-[1.625rem] items-center justify-center text-white/60"
+                    title="Detune"
+                    aria-hidden
+                  >
+                    <ArrowDownUp size={12} strokeWidth={2} />
+                  </span>
                 </div>
-              ) : null}
+              )}
+            </div>
+            <div id={`tone-spatial-${tone.noteId}`} className="tone-mixer-fader-slot">
+              {spatialExpanded ? (
+                <div className="flex h-full items-stretch justify-center gap-1">
+                  <TimbreMorphSlider
+                    variant="mixer"
+                    orientation="vertical"
+                    compact
+                    faderOnly
+                    timbreBlend={tone.timbreBlend ?? fallbackTimbreBlend}
+                    onSetTimbreValue={(key, value) => onToneTimbreValue(tone.noteId, key, value)}
+                    accentClassName={accentClassName}
+                  />
+                  <ToneDetuneFader
+                    tone={tone}
+                    strictSolo={strictSolo}
+                    onToneDetune={onToneDetune}
+                    compact
+                  />
+                </div>
+              ) : (
+                <ToneGainFader tone={tone} strictSolo={strictSolo} onToneGain={onToneGain} />
+              )}
             </div>
             {spatialExpanded ? (
               <div className="tone-mixer-pan grid w-full grid-cols-[1fr_auto] items-center gap-1.5 border-t border-white/10 pt-2 text-xs">
@@ -307,57 +263,25 @@ export function ToneMixer({
                 />
               </div>
             ) : null}
-            <span
+            <div
               className={clsx(
-                'tone-mixer-hz tabular-nums text-[10px] leading-tight text-white/55',
-                spatialExpanded && 'tone-mixer-hz--expanded',
+                'tone-mixer-value-row',
+                !spatialExpanded && 'tone-mixer-value-row--after-fader',
               )}
             >
-              {formatToneFrequencyHz(toneFrequencyHz)}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                className="button-safe flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/70 transition hover:bg-white/10"
-                onPointerDown={() => {
-                  spatialLongPressTriggeredRef.current = false
-                  clearSpatialLongPressTimer()
-                  spatialLongPressTimerRef.current = window.setTimeout(() => {
-                    spatialLongPressTriggeredRef.current = true
-                    toggleAllSpatialOnLongPress()
-                  }, SPATIAL_LONG_PRESS_MS)
-                }}
-                onPointerUp={clearSpatialLongPressTimer}
-                onPointerLeave={clearSpatialLongPressTimer}
-                onPointerCancel={clearSpatialLongPressTimer}
-                onClick={() => {
-                  if (spatialLongPressTriggeredRef.current) {
-                    spatialLongPressTriggeredRef.current = false
-                    return
-                  }
-                  toggleSpatialExpanded(tone.noteId)
-                }}
-                aria-expanded={spatialExpanded}
-                aria-controls={`tone-spatial-${tone.noteId}`}
-                aria-label={`${spatialExpanded ? 'Peida' : 'Näita'} detune ja pan: ${getTonePageLabel(tone.noteId)}. Pikalt vajuta, et avada või sulgeda kõigi toonide detune ja pan.`}
-                title="Detune & Pan. Long-press to expand or collapse all tones."
-              >
-                <ChevronDown
-                  size={16}
-                  className={clsx('transition-transform', spatialExpanded && 'rotate-180')}
-                  aria-hidden
-                />
-              </button>
-              <button
-                type="button"
-                className="button-safe flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10"
-                onClick={() => onEditOvertones(tone.noteId)}
-                aria-label={`Edit ${getTonePageLabel(tone.noteId)} timbre`}
-                title="Timbre"
-              >
-                <PanFluteIcon size={16} />
-              </button>
+              <span className="tone-mixer-hz tabular-nums text-[10px] leading-tight text-white/55">
+                {formatToneFrequencyHz(toneFrequencyHz)}
+              </span>
             </div>
+            <button
+              type="button"
+              className="button-safe flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10"
+              onClick={() => onEditOvertones(tone.noteId)}
+              aria-label={`Edit ${getTonePageLabel(tone.noteId)} timbre`}
+              title="Timbre"
+            >
+              <PanFluteIcon size={16} />
+            </button>
           </article>
         )
       })}

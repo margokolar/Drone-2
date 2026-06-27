@@ -404,6 +404,7 @@ function App() {
   const [toneSetQuickGrid, setToneSetQuickGrid] = useState('')
   const [toneSetJsonCollapsed, setToneSetJsonCollapsed] = useState(true)
   const [toneSetEditorError, setToneSetEditorError] = useState<string | null>(null)
+  const [toneMixerSpatialExpanded, setToneMixerSpatialExpanded] = useState(false)
   const playing = useDroneStore((state) => state.playing)
   const activePresetId = useDroneStore((state) => state.activePresetId)
   const songName = useDroneStore((state) => state.songName)
@@ -2081,10 +2082,39 @@ function App() {
                 </div>
               </div>
             </SectionCard>
-            <SectionCard id={TONE_MIXER_SECTION_ID} title="Tone mixer">
+            <SectionCard
+              id={TONE_MIXER_SECTION_ID}
+              title="Tone mixer"
+              titleAddon={
+                <button
+                  type="button"
+                  className={`button-safe flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition ${
+                    toneMixerSpatialExpanded
+                      ? 'border-fuchsia-300/50 bg-fuchsia-300/15 text-fuchsia-100 hover:bg-fuchsia-300/25'
+                      : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
+                  }`}
+                  onClick={() => setToneMixerSpatialExpanded((current) => !current)}
+                  aria-expanded={toneMixerSpatialExpanded}
+                  aria-controls={TONE_MIXER_SECTION_ID}
+                  aria-label={
+                    toneMixerSpatialExpanded
+                      ? 'Peida detune ja pan kõigil toonidel'
+                      : 'Näita detune ja pan kõigil toonidel'
+                  }
+                  title="Detune & Pan"
+                >
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform${toneMixerSpatialExpanded ? ' rotate-180' : ''}`}
+                    aria-hidden
+                  />
+                </button>
+              }
+            >
               <ToneMixer
                 tones={toneMixerTones}
                 allTones={tonesInToneSet}
+                spatialExpanded={toneMixerSpatialExpanded}
                 referenceA4Hz={referenceA4Hz}
                 baseOctave={baseOctave}
                 tuningSystemId={tuningSystemId}
