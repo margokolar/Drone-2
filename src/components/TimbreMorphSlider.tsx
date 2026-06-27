@@ -1,4 +1,6 @@
 import type { ChangeEvent, KeyboardEvent } from 'react'
+import clsx from 'clsx'
+import { AudioWaveform } from 'lucide-react'
 import type { TimbreBlend } from '../audio/types'
 import { DEFAULT_TIMBRE_BLEND } from '../presets/defaultPresets'
 import { ResettableRangeInput } from './ResettableRangeInput'
@@ -10,6 +12,8 @@ type TimbreMorphSliderProps = {
   onTimbreChangeEnd?: () => void
   orientation?: 'horizontal' | 'vertical'
   variant?: 'boxed' | 'mixer'
+  compact?: boolean
+  faderOnly?: boolean
   className?: string
   accentClassName?: string
 }
@@ -47,6 +51,8 @@ export function TimbreMorphSlider({
   onTimbreChangeEnd,
   orientation = 'horizontal',
   variant = 'boxed',
+  compact = false,
+  faderOnly = false,
   className = '',
   accentClassName = 'accent-fuchsia-300',
 }: TimbreMorphSliderProps) {
@@ -101,6 +107,53 @@ export function TimbreMorphSlider({
   }
 
   if (orientation === 'vertical') {
+    if (variant === 'mixer') {
+      const fader = (
+        <div
+          className={clsx(
+            'tone-mixer-fader-vertical tone-mixer-fader-vertical--aux',
+            compact && 'tone-mixer-fader-vertical--aux-compact',
+          )}
+        >
+          <ResettableRangeInput
+            {...sharedRangeProps}
+            className={clsx(
+              'tone-mixer-fader-vertical-input tone-mixer-fader-vertical-input--aux',
+              compact && 'tone-mixer-fader-vertical-input--aux-compact',
+              accentClassName,
+            )}
+          />
+        </div>
+      )
+
+      if (faderOnly) {
+        return fader
+      }
+
+      return (
+        <div className={`flex flex-col items-center gap-0.5 ${className}`}>
+          {compact ? (
+            <span
+              className="flex h-3.5 w-3.5 items-center justify-center text-white/60"
+              title="Waveform"
+              aria-hidden
+            >
+              <AudioWaveform size={12} strokeWidth={2} />
+            </span>
+          ) : (
+            <span className="text-[9px] leading-none text-white/60">Sine</span>
+          )}
+          {fader}
+          {!compact ? (
+            <span className="flex items-center justify-between gap-2 text-[9px] text-white/45">
+              <span>Saw</span>
+              <span>Sq</span>
+            </span>
+          ) : null}
+        </div>
+      )
+    }
+
     return (
       <div
         className={`flex flex-col gap-1 rounded-xl border border-white/10 bg-[#111019]/90 p-2 shadow-lg backdrop-blur-sm ${className}`}
