@@ -106,17 +106,19 @@ select {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0.125rem;
+  margin-bottom: 0.375rem;
 }
 
 .tone-mixer-fader-slot {
-  --tone-mixer-fader-length: 15rem;
+  --tone-mixer-fader-length: 13.5rem;
+  box-sizing: border-box;
   display: flex;
-  height: var(--tone-mixer-fader-length);
+  height: 15rem;
   width: 100%;
   flex-shrink: 0;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
+  padding: 0.75rem 0;
 }
 
 .tone-mixer-fader-foot {
@@ -126,7 +128,7 @@ select {
   align-items: center;
   justify-content: center;
   gap: 0.25rem;
-  margin-top: 0.125rem;
+  margin-top: 0.375rem;
 }
 
 .tone-mixer-fader-foot-spacer {
@@ -173,4 +175,12 @@ select {
 .tone-mixer-fader-vertical-input--aux,
 .tone-mixer-fader-vertical-input--aux-compact {
   width: var(--tone-mixer-fader-length);
+}
+
+.tone-mixer-pan {
+  margin-bottom: 0.125rem;
+}
+
+.tone-mixer-hz--expanded {
+  margin-top: 0.625rem;
 }

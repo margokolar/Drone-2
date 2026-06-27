@@ -292,7 +292,7 @@ export function ToneMixer({
               ) : null}
             </div>
             {spatialExpanded ? (
-              <div className="grid w-full grid-cols-[1fr_auto] items-center gap-1.5 border-t border-white/10 pt-2 text-xs">
+              <div className="tone-mixer-pan grid w-full grid-cols-[1fr_auto] items-center gap-1.5 border-t border-white/10 pt-2 text-xs">
                 <span className="text-white/60">Pan</span>
                 <span className="tabular-nums text-white/70">{tone.pan.toFixed(2)}</span>
                 <ResettableRangeInput
@@ -307,7 +307,12 @@ export function ToneMixer({
                 />
               </div>
             ) : null}
-            <span className="tabular-nums text-[10px] leading-tight text-white/55">
+            <span
+              className={clsx(
+                'tone-mixer-hz tabular-nums text-[10px] leading-tight text-white/55',
+                spatialExpanded && 'tone-mixer-hz--expanded',
+              )}
+            >
               {formatToneFrequencyHz(toneFrequencyHz)}
             </span>
             <div className="flex items-center gap-1">
