@@ -87,6 +87,7 @@ select {
 .tone-mixer-channel {
   width: 4.875rem;
   --tone-mixer-gap: 0.625rem;
+  --tone-mixer-fader-length: 10.5rem;
 }
 
 .tone-mixer-channel--expanded {
@@ -112,7 +113,6 @@ select {
 }
 
 .tone-mixer-fader-slot {
-  --tone-mixer-fader-length: 13.5rem;
   box-sizing: border-box;
   display: flex;
   height: calc(var(--tone-mixer-fader-length) + var(--tone-mixer-gap));
