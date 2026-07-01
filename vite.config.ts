@@ -17,8 +17,8 @@ export default defineConfig({
       },
       manifest: {
         id: '/',
-        name: 'Drone 2',
-        short_name: 'Drone 2',
+        name: 'Drone 3',
+        short_name: 'Drone 3',
         description: 'Experimental drone reference tool',
         theme_color: '#141319',
         background_color: '#141319',

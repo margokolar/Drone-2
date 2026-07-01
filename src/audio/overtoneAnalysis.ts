@@ -18,7 +18,7 @@ function isNearFrequency(hz: number, others: number[], toleranceRatio = 0.045): 
   return others.some((other) => other > 0 && Math.abs(hz - other) / other < toleranceRatio)
 }
 
-function estimateFundamentalHz(
+export function estimateFundamentalHz(
   samples: Float32Array,
   sampleRate: number,
   minHz = 60,
@@ -30,10 +30,7 @@ function estimateFundamentalHz(
     return null
   }
 
-  let bestLag = -1
-  let bestScore = -Infinity
-
-  for (let lag = minLag; lag <= maxLag; lag += 1) {
+  const normalizedAutocorrelation = (lag: number): number => {
     let ac = 0
     let normA = 0
     let normB = 0
@@ -46,9 +43,16 @@ function estimateFundamentalHz(
       normB += b * b
     }
     if (normA <= 1e-12 || normB <= 1e-12) {
-      continue
+      return 0
     }
-    const normalized = ac / Math.sqrt(normA * normB)
+    return ac / Math.sqrt(normA * normB)
+  }
+
+  let bestLag = -1
+  let bestScore = -Infinity
+
+  for (let lag = minLag; lag <= maxLag; lag += 1) {
+    const normalized = normalizedAutocorrelation(lag)
     if (normalized > bestScore) {
       bestScore = normalized
       bestLag = lag
@@ -59,10 +63,25 @@ function estimateFundamentalHz(
     return null
   }
 
-  return sampleRate / bestLag
+  // Parabolic interpolation around the autocorrelation peak for sub-sample lag
+  // accuracy. This matters most at high fundamentals, where one sample of lag
+  // error equals tens of cents.
+  let refinedLag = bestLag
+  if (bestLag > minLag && bestLag < maxLag) {
+    const y0 = normalizedAutocorrelation(bestLag - 1)
+    const y1 = bestScore
+    const y2 = normalizedAutocorrelation(bestLag + 1)
+    const denom = y0 - 2 * y1 + y2
+    if (Math.abs(denom) > 1e-9) {
+      const offset = Math.max(-1, Math.min(1, (0.5 * (y0 - y2)) / denom))
+      refinedLag = bestLag + offset
+    }
+  }
+
+  return sampleRate / refinedLag
 }
 
-function goertzelMagnitude(
+export function goertzelMagnitude(
   samples: Float32Array,
   sampleRate: number,
   frequency: number,

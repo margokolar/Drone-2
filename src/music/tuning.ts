@@ -132,7 +132,7 @@ function noteClassToMidiInReferenceOctave(
   return 12 * (octave + 1) + semitoneFromC;
 }
 
-function midiFromNoteId(noteId: NoteId, baseOctave: number): number {
+export function midiFromNoteId(noteId: NoteId, baseOctave: number): number {
   const { noteClass, octaveOffset } = splitNoteId(noteId);
   return (
     noteClassToMidiInReferenceOctave(noteClass, baseOctave) + octaveOffset * 12

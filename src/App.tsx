@@ -38,7 +38,7 @@ import {
 } from './audio/transportControls'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
-import { EntryGlideControls } from './components/EntryGlideControls'
+import { AddFollowerControls, AddMicToolbarButton } from './components/AddFollowerControls'
 import { MetronomeControls } from './components/MetronomeControls'
 import { NoteSelector } from './components/NoteSelector'
 import { OvertoneBars } from './components/OvertoneBars'
@@ -52,6 +52,8 @@ import { SectionCard } from './components/SectionCard'
 import { SongLibraryMenu } from './components/SongLibraryMenu'
 import { ToneMixer, TONE_MIXER_SECTION_ID, toneMixerCardElementId } from './components/ToneMixer'
 import { TopControls } from './components/TopControls'
+import { EntryGlideControls } from './components/EntryGlideControls'
+import { useAddFollower } from './hooks/useAddFollower'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useMetronome } from './hooks/useMetronome'
 import { useOvertoneMidi } from './hooks/useOvertoneMidi'
@@ -70,15 +72,16 @@ import { BleDebugOverlay } from './components/BleDebugOverlay'
 import { bleDebugEnabled, recordBleDebug } from './utils/bleDebug'
 import { TONE_STICKY_CHROME_ID, scrollToneMixerCardIntoView } from './utils/scrollBelowStickyChrome'
 
-type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi'
+type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'add' | 'midi'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'tone', label: 'Tone' },
   { id: 'overtones', label: 'Timbre' },
   { id: 'presets', label: 'Presets' },
   { id: 'metronome', label: 'Click' },
+  { id: 'add', label: 'ADD' },
 ]
-const APP_VERSION = '2.1'
+const APP_VERSION = '3.0'
 const DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS = 800
 const TOUCH_LOCK_LONG_PRESS_MS = 800
 /** ~Safari viewport, loogilised CSS px (mitte dünaamiline Dynamic Island / toolbar). */
@@ -1680,6 +1683,8 @@ function App() {
   }, [activePresetId])
 
   useAudioEngine(runtimeConfig, playing)
+
+  const addFollower = useAddFollower()
   useMetronome({
     enabled: metronomeEnabled,
     bpm: metronomeBpm,
@@ -1775,7 +1780,7 @@ function App() {
   }, [activeTab])
 
   useLayoutEffect(() => {
-    if (activeTab !== 'overtones' && activeTab !== 'presets' && activeTab !== 'metronome') {
+    if (activeTab !== 'overtones' && activeTab !== 'presets' && activeTab !== 'metronome' && activeTab !== 'add') {
       return
     }
     resetTabScroll()
@@ -2356,6 +2361,15 @@ function App() {
           <div
             className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
             role="tabpanel"
+            id="panel-add"
+            aria-labelledby="tab-add"
+            hidden={activeTab !== 'add'}
+          >
+            <AddFollowerControls {...addFollower} />
+          </div>
+          <div
+            className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
+            role="tabpanel"
             id="panel-presets"
             aria-labelledby="tab-presets"
             hidden={activeTab !== 'presets'}
@@ -2525,7 +2539,7 @@ function App() {
             </div>
           </nav>
           <div className="rounded-xl border border-white/10 bg-[#111019]/95 p-2 backdrop-blur-sm">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <button
                   type="button"
                   className="button-safe flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-2 py-3 text-white transition hover:bg-white/10"
@@ -2541,10 +2555,15 @@ function App() {
                   aria-label={playing ? 'Pause' : 'Play'}
                 >
                   {(playing && <Pause size={22} />) || <Play size={22} />}
-                  <span className="inline-block w-14 text-center whitespace-nowrap">
+                  <span className="hidden min-[380px]:inline-block w-14 text-center whitespace-nowrap">
                     {playing ? 'Pause' : 'Play'}
                   </span>
                 </button>
+                <AddMicToolbarButton
+                  listening={addFollower.listening}
+                  startListening={addFollower.startListening}
+                  stopListening={addFollower.stopListening}
+                />
                 <button
                   type="button"
                   className="button-safe flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-2 py-3 text-white transition hover:bg-white/10"
@@ -2734,7 +2753,7 @@ function App() {
               <div className="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/70">
                 <div className="mb-1 flex items-center gap-2 text-white/80">
                   <Info size={14} />
-                  Drone v{APP_VERSION}
+                  Drone 3 v{APP_VERSION}
                 </div>
                 <p>Professional drone reference for tuning and intonation practice.</p>
                 <p className="mt-2 text-xs text-white/55">(c) Margo Kõlar</p>
