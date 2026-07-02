@@ -7,6 +7,78 @@ import {
   DEFAULT_ADD_HARMONIC_RATIO,
 } from '../music/harmonicSeries'
 
+type AudioSessionType =
+  | 'auto'
+  | 'playback'
+  | 'transient'
+  | 'transient-solo'
+  | 'play-and-record'
+
+type NavigatorWithAudioSession = Navigator & {
+  audioSession?: {
+    type: AudioSessionType
+    state?: string
+  }
+}
+
+/**
+ * iOS Safari does not route Web Audio (`AudioContext`) output to Bluetooth
+ * during microphone capture — it keeps it on the phone receiver. Playing
+ * inaudible audio through an `<audio>` element activates iOS's media audio
+ * route (like a native media app), which routes output to the connected
+ * Bluetooth speaker. The AudioContext shares that output route.
+ */
+function createSilentRouteAudioUrl(): string {
+  const sampleRate = 44100
+  const seconds = 2
+  const numSamples = sampleRate * seconds
+  const buffer = new ArrayBuffer(44 + numSamples * 2)
+  const view = new DataView(buffer)
+  const writeStr = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i += 1) {
+      view.setUint8(offset + i, str.charCodeAt(i))
+    }
+  }
+  writeStr(0, 'RIFF')
+  view.setUint32(4, 36 + numSamples * 2, true)
+  writeStr(8, 'WAVE')
+  writeStr(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true) // PCM
+  view.setUint16(22, 1, true) // mono
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true)
+  view.setUint16(32, 2, true)
+  view.setUint16(34, 16, true)
+  writeStr(36, 'data')
+  view.setUint32(40, numSamples * 2, true)
+  // Very low-amplitude sine (~-50 dBFS) so iOS sees a real signal to route;
+  // the element volume is set near zero, so it is inaudible.
+  for (let i = 0; i < numSamples; i += 1) {
+    const sample = Math.sin((2 * Math.PI * 220 * i) / sampleRate) * 100
+    view.setInt16(44 + i * 2, sample, true)
+  }
+  return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }))
+}
+
+/**
+ * iOS Safari exposes `navigator.audioSession`. If the session type is left as
+ * `playback` (which a playback-only Web Audio AudioContext can set), capture
+ * fails with "AudioSession category is not compatible with audio capture"
+ * (InvalidStateError). Force a capture-compatible category before getUserMedia.
+ */
+function setIosAudioSessionType(type: AudioSessionType): void {
+  const audioSession = (navigator as NavigatorWithAudioSession).audioSession
+  if (!audioSession) {
+    return
+  }
+  try {
+    audioSession.type = type
+  } catch {
+    // Some browsers throw if the type cannot be applied; ignore.
+  }
+}
+
 const ANALYSIS_FFT_SIZE = 8192
 const DISPLAY_UPDATE_MS = 80
 const MAX_MISSED_PITCH_FRAMES = 3
@@ -43,6 +115,7 @@ export type AddFollowerState = {
   detectedHz: number | null
   outputHz: number | null
   micError: string | null
+  clearMicError: () => void
   setHarmonicRatio: (ratio: number) => void
   setInputGainDb: (gainDb: number) => void
   setOutputGainDb: (gainDb: number) => void
@@ -62,6 +135,7 @@ export function useAddFollower(): AddFollowerState {
   const [micError, setMicError] = useState<string | null>(null)
 
   const mediaStreamRef = useRef<MediaStream | null>(null)
+  const silentRouteRef = useRef<HTMLAudioElement | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
   const micInputGainRef = useRef<GainNode | null>(null)
@@ -91,6 +165,9 @@ export function useAddFollower(): AddFollowerState {
       cancelAnimationFrame(rafRef.current)
       rafRef.current = null
     }
+    if (silentRouteRef.current) {
+      silentRouteRef.current.pause()
+    }
     analyserRef.current?.disconnect()
     analyserRef.current = null
     micInputGainRef.current?.disconnect()
@@ -101,6 +178,10 @@ export function useAddFollower(): AddFollowerState {
     mediaStreamRef.current = null
     samplesRef.current = null
     releaseOutput()
+    // Restore hi-fi output routing: playback -> auto "kicks" iOS out of the
+    // degraded play-and-record route back to A2DP.
+    setIosAudioSessionType('playback')
+    setIosAudioSessionType('auto')
     setListening(false)
   }, [releaseOutput])
 
@@ -181,6 +262,40 @@ export function useAddFollower(): AddFollowerState {
     setMicError(null)
 
     try {
+      // Activate iOS media audio routing synchronously in the user gesture so
+      // output goes to the Bluetooth speaker (not the phone receiver) during
+      // mic capture. Web Audio alone does not trigger this route.
+      if (!silentRouteRef.current) {
+        const el = new Audio(createSilentRouteAudioUrl())
+        el.loop = true
+        el.volume = 0.01
+        silentRouteRef.current = el
+      }
+      void silentRouteRef.current.play().catch(() => {
+        // Autoplay can reject if activation was lost; the AudioContext resume
+        // below is the fallback for the actual drone output.
+      })
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error(
+          'Mikrofon vajab turvalist ühendust (HTTPS). Ava leht https:// aadressilt ' +
+            '(nt Vercel) või localhost — HTTP LAN-aadressil ei luba brauser mikrofoni.',
+        )
+      }
+
+      // Reset to `auto` (capture-compatible) before getUserMedia. Setting
+      // play-and-record BEFORE capture starts makes iOS sometimes pick the
+      // wrong mic/route (see WebKit bug 282939) — the reliable order is:
+      // auto -> getUserMedia -> play-and-record.
+      setIosAudioSessionType('auto')
+
+      // Get the mic stream first. On iOS the audio session category is chosen
+      // when the AudioContext is resumed, and it only becomes "play and record"
+      // if a live MediaStream input is already connected by then. So: create
+      // the context (suspended), attach the mic input, THEN resume. Resuming
+      // before the input is attached locks the session to "playback" and
+      // createMediaStreamSource throws "AudioSession category is not
+      // compatible with audio capture" (InvalidStateError).
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
@@ -188,8 +303,14 @@ export function useAddFollower(): AddFollowerState {
           autoGainControl: false,
         },
       })
-      await addEngine.resume()
-      addEngine.setOutputGainDb(outputGainDb)
+
+      // Lock the session to play-and-record after capture starts. iOS cannot
+      // route Web Audio output to an A2DP Bluetooth speaker during capture
+      // (no allowBluetoothA2DP in the web API), but in play-and-record the
+      // user can manually re-route output via Control Center if the speaker
+      // supports the hands-free (HFP) profile.
+      setIosAudioSessionType('play-and-record')
+
       const audioContext = addEngine.ensureContext()
       const source = audioContext.createMediaStreamSource(stream)
       const inputGain = audioContext.createGain()
@@ -199,6 +320,11 @@ export function useAddFollower(): AddFollowerState {
       analyser.smoothingTimeConstant = 0
       source.connect(inputGain)
       inputGain.connect(analyser)
+
+      // Resume now that the mic input is attached — iOS selects "play and
+      // record" for the session.
+      await addEngine.resume()
+      addEngine.setOutputGainDb(outputGainDb)
 
       mediaStreamRef.current = stream
       micSourceRef.current = source
@@ -219,7 +345,13 @@ export function useAddFollower(): AddFollowerState {
       rafRef.current = requestAnimationFrame(tick)
     } catch (error) {
       stopListening()
-      const message = error instanceof Error ? error.message : 'Microphone access failed.'
+      // Tear down any half-created / session-locked AudioContext so the next
+      // attempt starts fresh (a context that resumed in "playback" mode stays
+      // locked and would keep rejecting capture).
+      addEngine.dispose()
+      const baseMessage = error instanceof Error ? error.message : 'Microphone access failed.'
+      const errorName = error instanceof Error && error.name ? ` [${error.name}]` : ''
+      const message = `${baseMessage}${errorName}`
       setMicError(message)
     }
   }, [inputGainDb, listening, outputGainDb, stopListening])
@@ -262,6 +394,10 @@ export function useAddFollower(): AddFollowerState {
     setInputGainDbState(gainDb)
   }, [])
 
+  const clearMicError = useCallback(() => {
+    setMicError(null)
+  }, [])
+
   const setOutputGainDb = useCallback((gainDb: number) => {
     setOutputGainDbState(gainDb)
   }, [])
@@ -280,6 +416,7 @@ export function useAddFollower(): AddFollowerState {
     detectedHz,
     outputHz,
     micError,
+    clearMicError,
     setHarmonicRatio,
     setInputGainDb,
     setOutputGainDb,

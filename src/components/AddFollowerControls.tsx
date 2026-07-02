@@ -66,22 +66,27 @@ function HarmonicOptionButton({
 
 type AddMicToolbarButtonProps = {
   listening: boolean
+  micError: string | null
   startListening: () => void
   stopListening: () => void
 }
 
 export function AddMicToolbarButton({
   listening,
+  micError,
   startListening,
   stopListening,
 }: AddMicToolbarButtonProps) {
+  const showError = !listening && Boolean(micError)
   return (
     <button
       type="button"
       className={`button-safe flex min-h-[44px] items-center justify-center rounded-xl border px-2 py-3 transition ${
-        listening
-          ? 'border-cyan-300/80 bg-cyan-300/25 text-cyan-50 hover:bg-cyan-300/35'
-          : 'border-cyan-300/50 bg-cyan-400/15 text-white hover:bg-cyan-300/25'
+        showError
+          ? 'border-rose-300/80 bg-rose-300/15 text-rose-100'
+          : listening
+            ? 'border-cyan-300/80 bg-cyan-300/25 text-cyan-50 hover:bg-cyan-300/35'
+            : 'border-cyan-300/50 bg-cyan-400/15 text-white hover:bg-cyan-300/25'
       }`}
       onClick={() => {
         if (listening) {
@@ -92,6 +97,7 @@ export function AddMicToolbarButton({
       }}
       aria-label={listening ? 'Stop ADD microphone' : 'Start ADD microphone'}
       aria-pressed={listening}
+      title={micError ?? undefined}
     >
       {listening ? <MicOff size={22} /> : <Mic size={22} />}
     </button>

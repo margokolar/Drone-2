@@ -1874,6 +1874,23 @@ function App() {
       {bleDebugEnabled() && (
         <BleDebugOverlay getAnchorPaused={() => mediaAnchorRef.current?.paused ?? null} />
       )}
+      {addFollower.micError && !addFollower.listening && (
+        <div
+          role="alert"
+          className="fixed left-1/2 top-2 z-[130] flex max-w-[calc(100vw-1.5rem)] w-[22rem] max-w-full -translate-x-1/2 items-start gap-2 rounded-xl border border-rose-300/40 bg-rose-950/95 px-3 py-2 text-xs text-rose-50 shadow-lg backdrop-blur"
+        >
+          <span className="mt-0.5 shrink-0 font-semibold uppercase tracking-wide">ADD mic</span>
+          <span className="flex-1 break-words">{addFollower.micError}</span>
+          <button
+            type="button"
+            className="button-safe shrink-0 rounded px-1 text-rose-200/80 hover:text-rose-50"
+            aria-label="Dismiss ADD microphone error"
+            onClick={addFollower.clearMicError}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
       {controlsLocked && (
         <div
           className="fixed inset-0 z-40 touch-none"
@@ -2561,6 +2578,7 @@ function App() {
                 </button>
                 <AddMicToolbarButton
                   listening={addFollower.listening}
+                  micError={addFollower.micError}
                   startListening={addFollower.startListening}
                   stopListening={addFollower.stopListening}
                 />

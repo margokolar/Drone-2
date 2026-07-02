@@ -20,6 +20,7 @@ export class AddEngine {
   private oscillator: OscillatorNode | null = null
   private active = false
   private outputGainDb = DEFAULT_ADD_OUTPUT_GAIN_DB
+  private outputConnected = false
 
   ensureContext(): AudioContext {
     if (this.context) {
@@ -28,10 +29,23 @@ export class AddEngine {
     const context = new AudioContext({ latencyHint: 'interactive' })
     const masterGain = context.createGain()
     masterGain.gain.value = dbToGain(this.outputGainDb)
-    masterGain.connect(context.destination)
+    // NOTE: masterGain is NOT connected to destination here. On iOS, connecting
+    // output before a MediaStream input is attached locks the audio session to
+    // "playback", after which capture fails with "audio session category is not
+    // compatible with audio capture". Output is connected lazily in
+    // ensureOutputConnected() once the mic input has been attached.
     this.context = context
     this.masterGain = masterGain
     return context
+  }
+
+  /** Connect the output path to the destination. Safe to call multiple times. */
+  ensureOutputConnected(): void {
+    if (this.outputConnected || !this.context || !this.masterGain) {
+      return
+    }
+    this.masterGain.connect(this.context.destination)
+    this.outputConnected = true
   }
 
   getContext(): AudioContext | null {
@@ -93,6 +107,7 @@ export class AddEngine {
     this.stopVoiceImmediate()
 
     const context = this.ensureContext()
+    this.ensureOutputConnected()
     const now = context.currentTime
     const voiceGain = context.createGain()
     voiceGain.gain.setValueAtTime(0.0001, now)
@@ -157,6 +172,7 @@ export class AddEngine {
       this.masterGain.disconnect()
     }
     this.masterGain = null
+    this.outputConnected = false
     if (this.context) {
       void this.context.close()
     }
