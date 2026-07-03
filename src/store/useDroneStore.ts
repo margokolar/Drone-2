@@ -11,6 +11,7 @@ import {
 } from '../music/tuning'
 import {
   createDefaultPartials,
+  createDefaultShine,
   DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS,
   DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS,
   DEFAULT_ENTRY_GLIDE_LOWEST_CENTS,
@@ -20,7 +21,9 @@ import {
   DEFAULT_TONE_DETUNE_CENTS,
   MAX_TONE_DETUNE_CENTS,
   MIN_TONE_DETUNE_CENTS,
+  SHINE_HARMONIC_COUNT,
   type Preset,
+  type ShineConfig,
 } from '../presets/defaultPresets'
 
 type SongEntry = {
@@ -55,6 +58,7 @@ type DroneState = {
   globalOvertoneEditEnabled: boolean
   tones: ToneConfig[]
   partials: PartialConfig[]
+  shine: ShineConfig
   metronomeEnabled: boolean
   metronomeBpm: number
   metronomeVolumeDb: number
@@ -94,6 +98,7 @@ type DroneState = {
   setToneGain: (noteId: NoteId, gainDb: number) => void
   setTonePan: (noteId: NoteId, pan: number) => void
   setToneDetune: (noteId: NoteId, detuneCents: number) => void
+  setShine: (shine: ShineConfig) => void
   setPartialGain: (partialId: string, gainDb: number) => void
   setPartialRatio: (partialId: string, ratio: number) => void
   setPartialEnabled: (partialId: string, enabled: boolean) => void
@@ -130,6 +135,7 @@ type DroneState = {
   deleteSongFromLibrary: (songId: string) => void
   moveSongInLibrary: (songId: string, direction: 'up' | 'down') => void
   saveCurrentSongToLibrary: (songName?: string) => void
+  saveAsNewSong: (songName?: string) => void
   selectNextPreset: () => void
   selectPreviousPreset: () => void
 }
@@ -144,6 +150,28 @@ function clamp(value: number, min: number, max: number): number {
   return value
 }
 
+function normalizeBooleanArray(source: unknown, fallback: boolean): boolean[] {
+  const input = Array.isArray(source) ? source : []
+  return Array.from({ length: SHINE_HARMONIC_COUNT }, (_, index) =>
+    typeof input[index] === 'boolean' ? (input[index] as boolean) : fallback,
+  )
+}
+
+function normalizeShine(shine: ShineConfig | undefined): ShineConfig {
+  const source = shine ?? createDefaultShine()
+  const levelsInput = Array.isArray(source.levels) ? source.levels : []
+  return {
+    enabled: Boolean(source.enabled),
+    volume: clamp(typeof source.volume === 'number' ? source.volume : 0.6, 0, 1),
+    octaveIndex: clamp(Math.round(source.octaveIndex ?? 2), 0, 4),
+    levels: Array.from({ length: SHINE_HARMONIC_COUNT }, (_, index) =>
+      clamp(typeof levelsInput[index] === 'number' ? levelsInput[index] : 0, 0, 1),
+    ),
+    autos: normalizeBooleanArray(source.autos, true),
+    bumps: normalizeBooleanArray(source.bumps, false),
+  }
+}
+
 function duplicatePresetData(preset: Preset): Preset {
   const partials = normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial })))
   const timbreBlend = normalizeTimbreBlend(preset.timbreBlend ?? DEFAULT_TIMBRE_BLEND)
@@ -152,6 +180,7 @@ function duplicatePresetData(preset: Preset): Preset {
     tones: migrateTones(preset.tones, partials, timbreBlend),
     partials,
     timbreBlend,
+    shine: normalizeShine(preset.shine),
   }
 }
 
@@ -165,6 +194,7 @@ function applyPresetState(preset: Preset): Pick<
   | 'timbreBlend'
   | 'tones'
   | 'partials'
+  | 'shine'
 > {
   return {
     activePresetId: preset.id,
@@ -179,13 +209,14 @@ function applyPresetState(preset: Preset): Pick<
     ),
     partials: normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial }))),
     timbreBlend: normalizeTimbreBlend(preset.timbreBlend ?? DEFAULT_TIMBRE_BLEND),
+    shine: normalizeShine(preset.shine),
   }
 }
 
 function snapshotPresetFromState(
   state: Pick<
     DroneState,
-    'tuningSystemId' | 'tonalCenter' | 'baseOctave' | 'masterGainDb' | 'timbreBlend' | 'tones' | 'partials'
+    'tuningSystemId' | 'tonalCenter' | 'baseOctave' | 'masterGainDb' | 'timbreBlend' | 'tones' | 'partials' | 'shine'
   >,
   presetId: string,
   name: string,
@@ -200,6 +231,7 @@ function snapshotPresetFromState(
     timbreBlend: { ...state.timbreBlend },
     tones: state.tones.map((tone) => normalizeTone(tone, state.partials, state.timbreBlend)),
     partials: normalizePartials(state.partials.map((partial) => ({ ...partial }))),
+    shine: normalizeShine(state.shine),
   }
 }
 
@@ -371,6 +403,7 @@ export const useDroneStore = create<DroneState>()(
       globalOvertoneEditEnabled: false,
       tones: INITIAL_PRESET.tones.map((tone) => ({ ...tone })),
       partials: normalizePartials(INITIAL_PRESET.partials.map((partial) => ({ ...partial }))),
+      shine: normalizeShine(INITIAL_PRESET.shine),
       metronomeEnabled: false,
       metronomeBpm: 72,
       metronomeVolumeDb: -15,
@@ -596,6 +629,7 @@ export const useDroneStore = create<DroneState>()(
             }
           }),
         })),
+      setShine: (shine) => set({ shine: normalizeShine(shine) }),
       setPartialGain: (partialId, gainDb) =>
         set((state) => ({
           partials: state.partials.map((partial) => {
@@ -812,6 +846,7 @@ export const useDroneStore = create<DroneState>()(
             timbreBlend: { ...state.timbreBlend },
             tones: state.tones.map((tone) => normalizeTone(tone, state.partials, state.timbreBlend)),
             partials: normalizePartials(state.partials.map((partial) => ({ ...partial }))),
+            shine: normalizeShine(state.shine),
           }
           return {
             presets: [...state.presets, nextPreset],
@@ -1105,6 +1140,27 @@ export const useDroneStore = create<DroneState>()(
             songLibrary: nextLibrary,
           }
         }),
+      saveAsNewSong: (songName) =>
+        set((state) => {
+          const baseName = songName?.trim() || `${state.songName || 'Song'} copy`
+          const existingNames = new Set(state.songLibrary.map((entry) => entry.name))
+          let resolvedName = baseName
+          let collisionIndex = 2
+          while (existingNames.has(resolvedName)) {
+            resolvedName = `${baseName} ${collisionIndex}`
+            collisionIndex += 1
+          }
+          const newSong: SongEntry = {
+            id: `song-${Date.now()}`,
+            name: resolvedName,
+            presets: state.presets.map((preset) => duplicatePresetData(preset)),
+            activePresetId: state.activePresetId,
+          }
+          return {
+            songName: resolvedName,
+            songLibrary: [...state.songLibrary, newSong],
+          }
+        }),
       selectNextPreset: () => {
         const state = get()
         if (state.presets.length === 0) {
@@ -1133,7 +1189,7 @@ export const useDroneStore = create<DroneState>()(
     }),
     {
       name: 'bourdon-store-v1',
-      version: 15,
+      version: 16,
       migrate: (persistedState) => {
         const typed = persistedState as Partial<DroneState> | undefined
         if (!typed) {
@@ -1174,6 +1230,7 @@ export const useDroneStore = create<DroneState>()(
           partials: incomingPartials,
           timbreBlend: incomingTimbre,
           tones: migratedTones,
+          shine: normalizeShine(typed.shine),
           baseOctave: clamp(typed.baseOctave ?? 3, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
           songName: typed.songName ?? 'My Song',
           songLibrary:
@@ -1241,6 +1298,7 @@ export const useDroneStore = create<DroneState>()(
         globalOvertoneEditEnabled: state.globalOvertoneEditEnabled,
         tones: state.tones,
         partials: state.partials,
+        shine: state.shine,
         metronomeEnabled: state.metronomeEnabled,
         metronomeBpm: state.metronomeBpm,
         metronomeVolumeDb: state.metronomeVolumeDb,

@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Check, Copy, Pencil, Save, Trash2 } from 'lucide-re
 import { useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { Preset } from '../presets/defaultPresets'
+import { triggerSaveFlash } from '../utils/saveFlash'
 
 type PresetListProps = {
   presets: Preset[]
@@ -210,6 +211,7 @@ export function PresetList({
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation()
+                          triggerSaveFlash(event.currentTarget)
                           onSavePreset()
                         }}
                         className={saveButtonClass}

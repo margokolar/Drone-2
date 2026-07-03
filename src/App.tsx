@@ -52,12 +52,15 @@ import { SectionCard } from './components/SectionCard'
 import { SongLibraryMenu } from './components/SongLibraryMenu'
 import { ToneMixer, TONE_MIXER_SECTION_ID, toneMixerCardElementId } from './components/ToneMixer'
 import { TopControls } from './components/TopControls'
+import { ShineControls } from './components/ShineControls'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useMetronome } from './hooks/useMetronome'
 import { useOvertoneMidi } from './hooks/useOvertoneMidi'
+import { DEFAULT_SHINE_VOLUME, useShine } from './hooks/useShine'
 import {
   getTonePageLabel,
   NOTE_IDS,
+  SEMITONES_FROM_C,
   type NoteId,
 } from './music/notes'
 import { getFrequency, findLowestEnabledToneNoteId, findHighestEnabledToneNoteId } from './music/tuning'
@@ -69,14 +72,16 @@ import { BLE_KEYBOARD_FOCUS_ROOT_ID } from './utils/restoreBleKeyboardFocus'
 import { BleDebugOverlay } from './components/BleDebugOverlay'
 import { bleDebugEnabled, recordBleDebug } from './utils/bleDebug'
 import { TONE_STICKY_CHROME_ID, scrollToneMixerCardIntoView } from './utils/scrollBelowStickyChrome'
+import { triggerSaveFlash } from './utils/saveFlash'
 
-type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi'
+type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'midi' | 'shine'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'tone', label: 'Tone' },
   { id: 'overtones', label: 'Timbre' },
   { id: 'presets', label: 'Presets' },
   { id: 'metronome', label: 'Click' },
+  { id: 'shine', label: 'Shine' },
 ]
 const APP_VERSION = '2.1'
 const DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS = 800
@@ -489,6 +494,7 @@ function App() {
   const deleteSongFromLibrary = useDroneStore((state) => state.deleteSongFromLibrary)
   const moveSongInLibrary = useDroneStore((state) => state.moveSongInLibrary)
   const saveCurrentSongToLibrary = useDroneStore((state) => state.saveCurrentSongToLibrary)
+  const saveAsNewSong = useDroneStore((state) => state.saveAsNewSong)
   const selectNextPreset = useDroneStore((state) => state.selectNextPreset)
   const selectPreviousPreset = useDroneStore((state) => state.selectPreviousPreset)
 
@@ -1118,16 +1124,8 @@ function App() {
     window.location.href = 'jblportable://'
   }, [])
   const saveAsSong = useCallback(() => {
-    const inputName = window.prompt('Song name', `${songName} copy`)
-    if (inputName === null) {
-      return
-    }
-    const trimmedName = inputName.trim()
-    if (!trimmedName) {
-      return
-    }
-    saveCurrentSongToLibrary(trimmedName)
-  }, [saveCurrentSongToLibrary, songName])
+    saveAsNewSong()
+  }, [saveAsNewSong])
   const saveToneSetLayout = useCallback((layout: ToneSetLayout) => {
     setToneSetLayout(layout)
     try {
@@ -1686,6 +1684,7 @@ function App() {
     volumeDb: metronomeVolumeDb,
     muted: metronomeMuted,
   })
+  const shine = useShine(referenceA4Hz, SEMITONES_FROM_C[tonalCenter], masterGainDb, playing)
 
   useEffect(() => {
     const navigatorWithAudioSession = navigator as Navigator & {
@@ -1985,7 +1984,10 @@ function App() {
                   <button
                     type="button"
                     className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] text-white/80 transition hover:bg-[#352a48]"
-                    onClick={saveActivePreset}
+                    onClick={(event) => {
+                      triggerSaveFlash(event.currentTarget)
+                      saveActivePreset()
+                    }}
                     aria-label="Save current preset"
                   >
                     <Save size={15} />
@@ -1993,7 +1995,10 @@ function App() {
                   <button
                     type="button"
                     className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] text-white/80 transition hover:bg-[#352a48]"
-                    onClick={saveAsPreset}
+                    onClick={(event) => {
+                      triggerSaveFlash(event.currentTarget)
+                      saveAsPreset()
+                    }}
                     aria-label="Save as new preset"
                   >
                     <Copy size={15} />
@@ -2008,7 +2013,10 @@ function App() {
                   <button
                     type="button"
                     className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] text-white/80 transition hover:bg-[#352a48]"
-                    onClick={() => saveCurrentSongToLibrary()}
+                    onClick={(event) => {
+                      triggerSaveFlash(event.currentTarget)
+                      saveCurrentSongToLibrary()
+                    }}
                     aria-label="Save current song"
                   >
                     <Save size={15} />
@@ -2016,7 +2024,10 @@ function App() {
                   <button
                     type="button"
                     className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] text-white/80 transition hover:bg-[#352a48]"
-                    onClick={saveAsSong}
+                    onClick={(event) => {
+                      triggerSaveFlash(event.currentTarget)
+                      saveAsSong()
+                    }}
                     aria-label="Save as new song"
                   >
                     <Copy size={15} />
@@ -2026,6 +2037,7 @@ function App() {
                   songName={songName}
                   songLibrary={songLibrary}
                   onSaveCurrentSong={saveCurrentSongToLibrary}
+                  onSaveAsNewSong={saveAsNewSong}
                   onLoadSong={loadSongFromLibrary}
                   onMoveSong={moveSongInLibrary}
                   onDeleteSong={deleteSongFromLibrary}
@@ -2063,6 +2075,9 @@ function App() {
                   soloModeActive={toneSelectionSoloMode}
                   onTonePress={handleToneSelectionPress}
                   onToneLongPress={handleToneSelectionLongPress}
+                  shineActive={shine.enabled}
+                  onShineToggle={shine.toggleRunning}
+                  onShineLongPress={() => setActiveTab('shine')}
                 />
                 <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                   <div className="mb-1 flex items-center justify-between">
@@ -2078,6 +2093,22 @@ function App() {
                     onReset={() => setMasterGainDb(DEFAULT_MASTER_GAIN_DB)}
                     aria-label="Master gain. Double-click or double-tap to reset to default."
                     className="h-1.5 w-full accent-fuchsia-300"
+                  />
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-xs uppercase tracking-[0.16em] text-white/60">Shine volume</span>
+                    <span className="text-xs tabular-nums text-white/70">{Math.round(shine.volume * 100)}%</span>
+                  </div>
+                  <ResettableRangeInput
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={shine.volume}
+                    onChange={(event) => shine.setVolume(Number(event.target.value))}
+                    onReset={() => shine.setVolume(DEFAULT_SHINE_VOLUME)}
+                    aria-label="Shine volume (obeys the global master gain). Double-click or double-tap to reset to 60%."
+                    className="h-1.5 w-full accent-cyan-300"
                   />
                 </div>
               </div>
@@ -2198,7 +2229,10 @@ function App() {
                         <button
                           type="button"
                           className={overtoneIconButtonClass('portrait-solo')}
-                          onClick={saveOvertoneToActivePreset}
+                          onClick={(event) => {
+                            triggerSaveFlash(event.currentTarget)
+                            saveOvertoneToActivePreset()
+                          }}
                           aria-label="Save overtone changes to current preset"
                         >
                           <Save size={16} />
@@ -2367,6 +2401,7 @@ function App() {
                   songName={songName}
                   songLibrary={songLibrary}
                   onSaveCurrentSong={saveCurrentSongToLibrary}
+                  onSaveAsNewSong={saveAsNewSong}
                   onLoadSong={loadSongFromLibrary}
                   onMoveSong={moveSongInLibrary}
                   onDeleteSong={deleteSongFromLibrary}
@@ -2410,6 +2445,20 @@ function App() {
               outputOptions={overtoneMidi.outputOptions}
             />
           </div>
+          <div
+            className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
+            role="tabpanel"
+            id="panel-shine"
+            aria-labelledby="tab-shine"
+            hidden={activeTab !== 'shine'}
+          >
+            <ShineControls
+              {...shine}
+              tonalCenter={tonalCenter}
+              onTonalCenterChange={setTonalCenter}
+              onSavePreset={saveActivePreset}
+            />
+          </div>
         </main>
       </div>
       <div className="fixed bottom-0 left-0 right-0 z-30 px-3 pb-2">
@@ -2439,7 +2488,10 @@ function App() {
                   <button
                     type="button"
                     className={overtoneIconButtonClass('landscape-inline')}
-                    onClick={saveOvertoneToActivePreset}
+                    onClick={(event) => {
+                      triggerSaveFlash(event.currentTarget)
+                      saveOvertoneToActivePreset()
+                    }}
                     aria-label="Save overtone changes to current preset"
                   >
                     <Save size={16} />
@@ -2894,7 +2946,10 @@ function App() {
               <button
                 type="button"
                 className="button-safe min-h-[44px] flex flex-1 items-center justify-center rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
-                onClick={saveAndApplyCustomToneSet}
+                onClick={(event) => {
+                  triggerSaveFlash(event.currentTarget)
+                  saveAndApplyCustomToneSet()
+                }}
                 aria-label="Save custom tone set"
                 title="Save"
               >

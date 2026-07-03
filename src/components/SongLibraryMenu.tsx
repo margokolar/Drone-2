@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ChevronDown, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, ChevronDown, Copy, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 const VIEWPORT_GUTTER_PX = 12
@@ -18,6 +18,7 @@ type SongLibraryMenuProps = {
   songName: string
   songLibrary: SongEntry[]
   onSaveCurrentSong: (songName?: string) => void
+  onSaveAsNewSong: (songName?: string) => void
   onLoadSong: (songId: string) => void
   onMoveSong: (songId: string, direction: 'up' | 'down') => void
   onDeleteSong: (songId: string) => void
@@ -29,6 +30,7 @@ export function SongLibraryMenu({
   songName,
   songLibrary,
   onSaveCurrentSong,
+  onSaveAsNewSong,
   onLoadSong,
   onMoveSong,
   onDeleteSong,
@@ -36,9 +38,19 @@ export function SongLibraryMenu({
   dropdownPlacement = 'viewport',
 }: SongLibraryMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [nameDraft, setNameDraft] = useState(songName)
   const [dropdownStyle, setDropdownStyle] = useState<Record<string, number>>({})
   const menuRef = useRef<HTMLDivElement | null>(null)
   const usesViewportDropdown = dropdownPlacement === 'viewport'
+
+  const commitSongName = useCallback(() => {
+    const trimmed = nameDraft.trim()
+    if (!trimmed) {
+      return
+    }
+    onSaveCurrentSong(trimmed)
+    setMenuOpen(false)
+  }, [nameDraft, onSaveCurrentSong])
 
   const updateDropdownPosition = useCallback(() => {
     const container = menuRef.current
@@ -85,6 +97,12 @@ export function SongLibraryMenu({
   }, [menuOpen, updateDropdownPosition])
 
   useEffect(() => {
+    if (menuOpen) {
+      setNameDraft(songName)
+    }
+  }, [menuOpen, songName])
+
+  useEffect(() => {
     if (!menuOpen) {
       return
     }
@@ -126,23 +144,53 @@ export function SongLibraryMenu({
           className={usesViewportDropdown ? VIEWPORT_DROPDOWN_CLASS : ANCHOR_DROPDOWN_CLASS}
           style={dropdownStyle}
         >
+          <form
+            className="mb-2 flex items-center gap-1.5"
+            onSubmit={(event) => {
+              event.preventDefault()
+              commitSongName()
+            }}
+          >
+            <input
+              type="text"
+              value={nameDraft}
+              onChange={(event) => setNameDraft(event.target.value)}
+              onKeyDown={(event) => {
+                event.stopPropagation()
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  commitSongName()
+                }
+              }}
+              className="min-h-[38px] w-full min-w-0 flex-1 appearance-none rounded-md border border-fuchsia-300/40 bg-fuchsia-300/10 px-3 py-2 text-sm text-fuchsia-50 outline-none transition focus:border-fuchsia-300/70"
+              placeholder="Song name"
+              aria-label="Song name"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              enterKeyHint="done"
+            />
+            <button
+              type="submit"
+              className="flex min-h-[38px] min-w-[38px] shrink-0 items-center justify-center rounded-md border border-fuchsia-300/50 bg-fuchsia-300/20 p-1.5 text-fuchsia-100 transition hover:bg-fuchsia-300/30 disabled:opacity-40"
+              disabled={!nameDraft.trim()}
+              aria-label="Save / rename song"
+              title="Save / rename song"
+            >
+              <Check size={16} />
+            </button>
+          </form>
           <button
             type="button"
-            className="mb-2 block min-h-[38px] w-full rounded-md border border-fuchsia-300/40 bg-fuchsia-300/10 px-3 py-2 text-left text-sm text-fuchsia-100 transition hover:bg-fuchsia-300/20"
+            className="mb-2 flex min-h-[38px] w-full items-center justify-center gap-2 rounded-md border border-cyan-300/40 bg-cyan-300/10 px-3 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/20"
             onClick={() => {
-              const inputName = window.prompt('Song name', songName || 'My Song')
-              if (inputName === null) {
-                return
-              }
-              const trimmed = inputName.trim()
-              if (!trimmed) {
-                return
-              }
-              onSaveCurrentSong(trimmed)
+              onSaveAsNewSong(nameDraft.trim() || undefined)
               setMenuOpen(false)
             }}
           >
-            Save / rename song
+            <Copy size={15} />
+            Save as new song
           </button>
           {songLibrary.map((song) => {
             const isActiveSong = song.name === songName

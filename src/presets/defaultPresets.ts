@@ -29,6 +29,30 @@ export function defaultPartialGainDb(harmonicIndex: number): number {
   return -8 - harmonicIndex * 2
 }
 
+export const SHINE_HARMONIC_COUNT = 16
+export const DEFAULT_SHINE_VOLUME = 0.6
+export const DEFAULT_SHINE_OCTAVE_INDEX = 2
+
+export type ShineConfig = {
+  enabled: boolean
+  volume: number
+  octaveIndex: number
+  levels: number[]
+  autos: boolean[]
+  bumps: boolean[]
+}
+
+export function createDefaultShine(): ShineConfig {
+  return {
+    enabled: false,
+    volume: DEFAULT_SHINE_VOLUME,
+    octaveIndex: DEFAULT_SHINE_OCTAVE_INDEX,
+    levels: new Array<number>(SHINE_HARMONIC_COUNT).fill(0),
+    autos: new Array<boolean>(SHINE_HARMONIC_COUNT).fill(true),
+    bumps: new Array<boolean>(SHINE_HARMONIC_COUNT).fill(false),
+  }
+}
+
 export type Preset = {
   id: string
   name: string
@@ -39,6 +63,7 @@ export type Preset = {
   tones: ToneConfig[]
   partials: PartialConfig[]
   timbreBlend: TimbreBlend
+  shine: ShineConfig
 }
 
 export function createDefaultPartials(): PartialConfig[] {
@@ -124,6 +149,7 @@ function makePreset(
     tones: withEnabledTones(toneIds),
     partials: clonePartials(),
     timbreBlend: { ...BASE_TIMBRE },
+    shine: createDefaultShine(),
   }
 }
 
