@@ -24,7 +24,9 @@ const ATTACK_SECONDS = 0.025
 const RELEASE_SECONDS = 0.08
 const REBUILD_RELEASE_SECONDS = 0.03
 const PARAM_SMOOTH_SECONDS = 0.015
-const LIMITER_THRESHOLD_DB = -3
+// Transparent brickwall safety limiter: only engages at the very top of the
+// range to catch peaks/clipping, so normal playback has no audible leveling.
+const LIMITER_THRESHOLD_DB = -1
 
 const DEFAULT_ENTRY_GLIDE: EntryGlideParams = {
   cents: 0,
@@ -91,10 +93,10 @@ export class DroneEngine {
     lowPass.frequency.value = 6500
     lowPass.Q.value = 0.7
     limiter.threshold.value = LIMITER_THRESHOLD_DB
-    limiter.knee.value = 6
-    limiter.ratio.value = 10
-    limiter.attack.value = 0.003
-    limiter.release.value = 0.1
+    limiter.knee.value = 0
+    limiter.ratio.value = 20
+    limiter.attack.value = 0.002
+    limiter.release.value = 0.05
     masterGain.gain.value = 0.0001
     masterGain.connect(lowPass)
     lowPass.connect(limiter)
