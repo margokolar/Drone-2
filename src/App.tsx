@@ -30,6 +30,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type TouchEvent as ReactTouchEvent,
 } from 'react'
 import { metronomeEngine } from './audio/MetronomeEngine'
 import {
@@ -1764,6 +1765,56 @@ function App() {
     [activeTab, scrollToPageTop],
   )
 
+  const swipeStartRef = useRef<{ x: number; y: number; ignore: boolean } | null>(null)
+
+  const handleSwipeTouchStart = useCallback(
+    (event: ReactTouchEvent<HTMLElement>) => {
+      if (controlsLocked || event.touches.length !== 1) {
+        swipeStartRef.current = null
+        return
+      }
+      const target = event.target as HTMLElement | null
+      const ignore = Boolean(
+        target?.closest(
+          'input, select, textarea, [role="slider"], [data-swipe-ignore], .overflow-x-auto',
+        ),
+      )
+      const touch = event.touches[0]
+      swipeStartRef.current = { x: touch.clientX, y: touch.clientY, ignore }
+    },
+    [controlsLocked],
+  )
+
+  const handleSwipeTouchEnd = useCallback(
+    (event: ReactTouchEvent<HTMLElement>) => {
+      const start = swipeStartRef.current
+      swipeStartRef.current = null
+      if (!start || start.ignore) {
+        return
+      }
+      const touch = event.changedTouches[0]
+      if (!touch) {
+        return
+      }
+      const dx = touch.clientX - start.x
+      const dy = touch.clientY - start.y
+      const SWIPE_MIN_PX = 70
+      if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy) * 1.5) {
+        return
+      }
+      const currentIndex = TABS.findIndex((tab) => tab.id === activeTab)
+      if (currentIndex < 0) {
+        return
+      }
+      const nextIndex = dx < 0 ? currentIndex + 1 : currentIndex - 1
+      if (nextIndex < 0 || nextIndex >= TABS.length) {
+        return
+      }
+      handleTabChange(TABS[nextIndex].id)
+    },
+    [activeTab, handleTabChange],
+  )
+
   useLayoutEffect(() => {
     const noteId = toneMixerScrollTargetRef.current
     if (activeTab !== 'tone' || noteId === null) {
@@ -2052,6 +2103,8 @@ function App() {
           className={`landscape:pb-2 max-h-[500px]:pb-2 ${
             activeTab === 'metronome' ? 'pb-32' : 'pb-44'
           }`}
+          onTouchStart={handleSwipeTouchStart}
+          onTouchEnd={handleSwipeTouchEnd}
         >
           <div className="space-y-3" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
             <SectionCard title="Global controls" className="[&>header]:mb-2.5">
@@ -2467,7 +2520,7 @@ function App() {
             className="overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm"
             aria-label="App sections"
           >
-            <div className="flex w-full items-center justify-center gap-1">
+            <div className="flex w-max min-w-full items-center justify-center gap-1 landscape:w-full max-h-[500px]:w-full">
               {TABS.map(({ id, label }) => (
                 <button
                   key={id}

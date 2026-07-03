@@ -212,7 +212,7 @@ export function ShineControls({
         </div>
 
         <div className="rounded-xl border border-white/10 bg-[#292a36] p-2">
-          <div className="flex h-52 items-stretch gap-0.5">
+          <div className="flex h-52 items-stretch gap-0.5" data-swipe-ignore>
             {levels.map((level, index) => (
               <HarmonicBar
                 key={index}
