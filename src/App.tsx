@@ -2049,8 +2049,9 @@ function App() {
                   selectedId={activePresetId}
                   items={presets}
                   onSelect={loadPreset}
+                  appearance="select"
                   openAriaLabel="Open preset list"
-                  triggerClassName="mt-5 flex min-h-0 w-full max-w-full min-w-0 items-center justify-between gap-2 overflow-hidden rounded-md border border-fuchsia-300/50 bg-fuchsia-300/20 px-2 py-1 text-sm font-semibold text-fuchsia-50 shadow-[0_0_18px_rgba(240,171,252,0.16)] transition hover:bg-fuchsia-300/25"
+                  triggerClassName="mt-5"
                 />
               </article>
               <article className="relative min-w-0 overflow-hidden rounded-xl border border-white/10 bg-[#1a1825] p-3">
@@ -2085,8 +2086,9 @@ function App() {
                   selectedId={songLibrary.find((song) => song.name === songName)?.id ?? ''}
                   items={songLibrary}
                   onSelect={loadSongFromLibrary}
+                  appearance="select"
                   openAriaLabel="Open song list"
-                  triggerClassName="mt-5 flex min-h-0 w-full max-w-full min-w-0 items-center justify-between gap-2 overflow-hidden rounded-md border border-white/10 bg-white/10 px-2 py-1 text-sm font-semibold text-white/95 transition hover:bg-white/15"
+                  triggerClassName="mt-5"
                 />
               </article>
             </div>

@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import { ChevronDown } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
@@ -20,7 +21,15 @@ type LibraryPickerMenuProps = {
   openAriaLabel?: string
   inactiveItemClassName?: string
   dropdownPlacement?: DropdownPlacement
+  appearance?: 'compact' | 'select'
 }
+
+const COMPACT_TRIGGER_CLASS =
+  'flex min-h-[40px] w-full min-w-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 transition hover:bg-white/10'
+const SELECT_TRIGGER_CLASS =
+  'flex min-h-[36px] w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 pr-10 text-sm leading-none text-white outline-none transition hover:bg-white/10 focus:border-fuchsia-300/60'
+const COMPACT_ITEM_CLASS = 'block w-full rounded-md px-2 py-1.5 text-left text-sm transition'
+const SELECT_ITEM_CLASS = 'block w-full min-h-[36px] rounded-lg px-3 py-2 text-left text-sm leading-none transition'
 
 export function LibraryPickerMenu({
   selectedId,
@@ -30,12 +39,20 @@ export function LibraryPickerMenu({
   openAriaLabel = 'Open list',
   inactiveItemClassName = 'text-white/80 hover:bg-white/10',
   dropdownPlacement = 'anchor',
+  appearance = 'compact',
 }: LibraryPickerMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownStyle, setDropdownStyle] = useState<Record<string, number>>({})
   const menuRef = useRef<HTMLDivElement | null>(null)
   const selectedName = items.find((item) => item.id === selectedId)?.name ?? '—'
   const selectableItems = items.filter((item) => item.id !== selectedId)
+  const isSelectAppearance = appearance === 'select'
+  const resolvedTriggerClass = clsx(
+    isSelectAppearance ? SELECT_TRIGGER_CLASS : COMPACT_TRIGGER_CLASS,
+    triggerClassName,
+  )
+  const resolvedItemClass = isSelectAppearance ? SELECT_ITEM_CLASS : COMPACT_ITEM_CLASS
+  const chevronSize = isSelectAppearance ? 18 : 12
 
   const updateDropdownPosition = useCallback(() => {
     const container = menuRef.current
@@ -104,10 +121,7 @@ export function LibraryPickerMenu({
     <div className="relative min-w-0" ref={menuRef}>
       <button
         type="button"
-        className={
-          triggerClassName ??
-          'flex min-h-[40px] w-full min-w-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 transition hover:bg-white/10'
-        }
+        className={resolvedTriggerClass}
         onClick={() => setMenuOpen((current) => !current)}
         aria-expanded={menuOpen}
         aria-label={openAriaLabel}
@@ -115,15 +129,21 @@ export function LibraryPickerMenu({
         <span className="min-w-0 flex-1 truncate text-left" title={selectedName}>
           {selectedName}
         </span>
-        <ChevronDown size={12} className="shrink-0" />
+        {!isSelectAppearance && <ChevronDown size={chevronSize} className="shrink-0" />}
       </button>
+      {isSelectAppearance && (
+        <ChevronDown
+          size={chevronSize}
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/70"
+        />
+      )}
       {menuOpen && (
         <div className={DROPDOWN_PANEL_CLASS} style={dropdownStyle}>
           {selectableItems.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                className={`block w-full rounded-md px-2 py-1.5 text-left text-sm transition ${inactiveItemClassName}`}
+                className={`${resolvedItemClass} ${inactiveItemClassName}`}
                 onClick={() => {
                   onSelect(item.id)
                   setMenuOpen(false)
