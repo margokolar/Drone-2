@@ -216,7 +216,7 @@ export function SongList({
                       <ArrowUp size={16} />
                     </button>
                   </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex w-full flex-nowrap items-center gap-1.5">
                     <button
                       type="button"
                       onClick={(event) => {
@@ -245,7 +245,7 @@ export function SongList({
                         event.stopPropagation()
                         onDeleteSong(song.id)
                       }}
-                      className={deleteButtonClass}
+                      className={clsx(deleteButtonClass, 'ml-auto')}
                       aria-label="Delete song"
                       disabled={songLibrary.length <= 1}
                     >

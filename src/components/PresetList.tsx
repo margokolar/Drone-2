@@ -212,7 +212,7 @@ export function PresetList({
                         <ArrowUp size={16} />
                       </button>
                     </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex w-full flex-nowrap items-center gap-1.5">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -241,7 +241,7 @@ export function PresetList({
                           e.stopPropagation()
                           onDeletePreset(preset.id)
                         }}
-                        className={deleteButtonClass}
+                        className={clsx(deleteButtonClass, 'ml-auto')}
                         aria-label="Delete preset"
                       >
                         <Trash2 size={16} />
