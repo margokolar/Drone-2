@@ -1915,20 +1915,20 @@ function App() {
     transportFooterHeight,
     topChromeHeight,
   } = useMobileTransportDock()
-  const useFixedMobileChrome = pinTransportFooter && !iosStandaloneChrome
   const appShellHeightClass = iphone16ProMaxPreview
     ? 'min-h-full'
     : iosStandaloneChrome
-      ? 'h-full overflow-hidden pt-[env(safe-area-inset-top,0px)]'
+      ? 'h-full'
       : pinTransportFooter
         ? 'h-[var(--app-height,100svh)]'
         : 'h-svh md:h-dvh'
-  const pinnedChromeScrollStyle = useFixedMobileChrome
-    ? {
-        paddingTop: topChromeHeight > 0 ? topChromeHeight : undefined,
-        paddingBottom: transportFooterHeight > 0 ? transportFooterHeight : undefined,
-      }
-    : undefined
+  const pinnedChromeScrollStyle =
+    pinTransportFooter
+      ? {
+          paddingTop: topChromeHeight > 0 ? topChromeHeight : undefined,
+          paddingBottom: transportFooterHeight > 0 ? transportFooterHeight : undefined,
+        }
+      : undefined
   const appShell = (
     <div
       className={`flex min-h-0 flex-1 flex-col bg-[#111019] text-[#f2f2f7] ${appShellHeightClass} ${
@@ -1965,7 +1965,7 @@ function App() {
         <div
           id={TONE_STICKY_CHROME_ID}
           className={`sticky top-0 z-40 -mx-3 bg-[#111019] px-3 pb-2 ${
-            useFixedMobileChrome ? 'pt-0' : 'pt-[env(safe-area-inset-top,0px)]'
+            pinTransportFooter ? 'pt-0' : 'pt-[env(safe-area-inset-top,0px)]'
           } ${activeTab === 'tone' ? '' : 'landscape:hidden max-h-[500px]:hidden'}`}
         >
           <header
@@ -1973,8 +1973,10 @@ function App() {
             className={`mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem] ${
               controlsLocked ? 'pointer-events-none' : ''
             } ${
-              useFixedMobileChrome
-                ? 'fixed inset-x-0 top-[var(--app-offset-top,0px)] z-50 px-3 pt-[env(safe-area-inset-top,0px)]'
+              pinTransportFooter
+                ? `fixed inset-x-0 z-50 px-3 pt-[env(safe-area-inset-top,0px)] ${
+                    iosStandaloneChrome ? 'top-0' : 'top-[var(--app-offset-top,0px)]'
+                  }`
                 : ''
             }`}
           >
@@ -2573,8 +2575,12 @@ function App() {
       </div>
       <footer
         ref={transportFooterRef}
-        className={`z-30 shrink-0 bg-[#111019] px-3 pb-[env(safe-area-inset-bottom,0px)] ${
-          useFixedMobileChrome ? 'fixed inset-x-0 bottom-[var(--vv-bottom-inset,0px)]' : ''
+        className={`z-30 bg-[#111019] px-3 pb-[env(safe-area-inset-bottom,0px)] ${
+          pinTransportFooter
+            ? `fixed inset-x-0 ${
+                iosStandaloneChrome ? 'bottom-0' : 'bottom-[var(--vv-bottom-inset,0px)]'
+              }`
+            : 'relative shrink-0'
         }`}
       >
         <div className="mx-auto w-full max-w-[26.5rem] space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-[62.5rem]">
