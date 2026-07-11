@@ -3,7 +3,7 @@ import { isEmbeddedFrame, isIosStandalonePwa } from '../utils/platform'
 
 const MOBILE_MAX_WIDTH_PX = 767
 
-function shouldPinMobileChrome(): boolean {
+function shouldPinTransportFooter(): boolean {
   if (typeof window === 'undefined') {
     return false
   }
@@ -11,44 +11,14 @@ function shouldPinMobileChrome(): boolean {
   return !isEmbeddedFrame() && (narrow || isIosStandalonePwa())
 }
 
-function updateMobileBrowserViewportVars(): void {
-  const viewport = window.visualViewport
-  const height = viewport?.height ?? window.innerHeight
-  const offsetTop = viewport?.offsetTop ?? 0
-  const bottomInset = Math.max(0, window.innerHeight - offsetTop - height)
-
-  document.documentElement.style.setProperty('--app-height', `${height}px`)
-  document.documentElement.style.setProperty('--app-offset-top', `${offsetTop}px`)
-  document.documentElement.style.setProperty('--vv-bottom-inset', `${bottomInset}px`)
-}
-
-function clearMobileViewportVars(): void {
-  document.documentElement.style.removeProperty('--app-height')
-  document.documentElement.style.removeProperty('--app-offset-top')
-  document.documentElement.style.removeProperty('--vv-bottom-inset')
-}
-
-function scheduleIosStandaloneLayoutPasses(run: () => void): void {
-  run()
-  window.requestAnimationFrame(() => {
-    run()
-    window.requestAnimationFrame(run)
-  })
-  window.setTimeout(run, 100)
-  window.setTimeout(run, 300)
-}
-
 export function useMobileTransportDock() {
   const transportFooterRef = useRef<HTMLElement>(null)
-  const topChromeRef = useRef<HTMLElement>(null)
-  const [pinTransportFooter, setPinTransportFooter] = useState(shouldPinMobileChrome)
+  const [pinTransportFooter, setPinTransportFooter] = useState(shouldPinTransportFooter)
   const [transportFooterHeight, setTransportFooterHeight] = useState(0)
-  const [topChromeHeight, setTopChromeHeight] = useState(0)
-  const iosStandaloneChrome = pinTransportFooter && isIosStandalonePwa()
 
   useEffect(() => {
     const updatePin = () => {
-      setPinTransportFooter(shouldPinMobileChrome())
+      setPinTransportFooter(shouldPinTransportFooter())
     }
     updatePin()
     const mediaQuery = window.matchMedia(`(max-width: ${MOBILE_MAX_WIDTH_PX}px)`)
@@ -68,48 +38,31 @@ export function useMobileTransportDock() {
     document.documentElement.classList.add('ios-standalone-pwa')
     document.body.classList.add('ios-standalone-pwa')
 
-    return () => {
-      document.documentElement.classList.remove('ios-standalone-pwa')
-      document.body.classList.remove('ios-standalone-pwa')
-    }
-  }, [])
-
-  useLayoutEffect(() => {
-    if (!pinTransportFooter) {
-      clearMobileViewportVars()
-      return
-    }
-
-    const standalone = isIosStandalonePwa()
     const updateViewport = () => {
-      if (standalone) {
-        clearMobileViewportVars()
-        return
-      }
-      updateMobileBrowserViewportVars()
+      const viewport = window.visualViewport
+      const height = viewport?.height ?? window.innerHeight
+      document.documentElement.style.setProperty('--app-height', `${height}px`)
+      document.documentElement.style.setProperty('--app-offset-top', `${viewport?.offsetTop ?? 0}px`)
     }
 
     updateViewport()
-    if (standalone) {
-      scheduleIosStandaloneLayoutPasses(updateViewport)
-    }
-
     const viewport = window.visualViewport
     viewport?.addEventListener('resize', updateViewport)
     viewport?.addEventListener('scroll', updateViewport)
     window.addEventListener('resize', updateViewport)
     window.addEventListener('orientationchange', updateViewport)
-    window.addEventListener('pageshow', updateViewport)
 
     return () => {
-      clearMobileViewportVars()
+      document.documentElement.classList.remove('ios-standalone-pwa')
+      document.body.classList.remove('ios-standalone-pwa')
+      document.documentElement.style.removeProperty('--app-height')
+      document.documentElement.style.removeProperty('--app-offset-top')
       viewport?.removeEventListener('resize', updateViewport)
       viewport?.removeEventListener('scroll', updateViewport)
       window.removeEventListener('resize', updateViewport)
       window.removeEventListener('orientationchange', updateViewport)
-      window.removeEventListener('pageshow', updateViewport)
     }
-  }, [pinTransportFooter])
+  }, [])
 
   useEffect(() => {
     if (!pinTransportFooter) {
@@ -121,54 +74,19 @@ export function useMobileTransportDock() {
     }
   }, [pinTransportFooter])
 
-  const measureChromeHeights = () => {
-    const footer = transportFooterRef.current
-    if (footer) {
-      setTransportFooterHeight(footer.getBoundingClientRect().height)
-    }
-    const header = topChromeRef.current
-    if (header && pinTransportFooter) {
-      setTopChromeHeight(header.getBoundingClientRect().height)
-    } else {
-      setTopChromeHeight(0)
-    }
-  }
-
   useLayoutEffect(() => {
     const footer = transportFooterRef.current
-    const header = topChromeRef.current
     if (!footer) {
       return
     }
-
-    measureChromeHeights()
-    const observers: ResizeObserver[] = []
-    const footerObserver = new ResizeObserver(measureChromeHeights)
-    footerObserver.observe(footer)
-    observers.push(footerObserver)
-    if (header && pinTransportFooter) {
-      const headerObserver = new ResizeObserver(measureChromeHeights)
-      headerObserver.observe(header)
-      observers.push(headerObserver)
+    const measure = () => {
+      setTransportFooterHeight(footer.getBoundingClientRect().height)
     }
-
-    if (isIosStandalonePwa()) {
-      scheduleIosStandaloneLayoutPasses(measureChromeHeights)
-    }
-
-    return () => {
-      for (const observer of observers) {
-        observer.disconnect()
-      }
-    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(footer)
+    return () => observer.disconnect()
   }, [pinTransportFooter])
 
-  return {
-    pinTransportFooter,
-    iosStandaloneChrome,
-    transportFooterRef,
-    topChromeRef,
-    transportFooterHeight,
-    topChromeHeight,
-  }
+  return { pinTransportFooter, transportFooterRef, transportFooterHeight }
 }
