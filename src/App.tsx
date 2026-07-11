@@ -2652,10 +2652,10 @@ function App() {
             </div>
           </nav>
           <div className="rounded-xl border border-white/10 bg-[#111019]/95 p-2 backdrop-blur-sm">
-              <div className="grid grid-cols-[2.75rem_2.75rem_minmax(0,1fr)_2.75rem_2.75rem] gap-1.5">
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
                 <button
                   type="button"
-                  className="button-safe flex size-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
                   onClick={selectPreviousSong}
                   disabled={!canNavigateSongs}
                   aria-label="Previous song"
@@ -2664,7 +2664,7 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  className="button-safe flex size-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10"
+                  className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10"
                   onClick={selectPreviousPreset}
                   aria-label="Previous preset"
                 >
@@ -2672,16 +2672,16 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  className="button-safe flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-fuchsia-300/60 bg-fuchsia-400/15 px-2 py-3 text-center text-sm font-semibold text-white transition hover:bg-fuchsia-300/25"
+                  className="button-safe inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-fuchsia-300/60 bg-fuchsia-400/15 px-3 py-2 text-sm font-semibold whitespace-nowrap text-white transition hover:bg-fuchsia-300/25"
                   onClick={handleTogglePlay}
                   aria-label={playing ? 'Pause' : 'Play'}
                 >
                   {(playing && <Pause size={22} />) || <Play size={22} />}
-                  <span className="whitespace-nowrap">{playing ? 'Pause' : 'Play'}</span>
+                  <span>{playing ? 'Pause' : 'Play'}</span>
                 </button>
                 <button
                   type="button"
-                  className="button-safe flex size-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10"
+                  className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10"
                   onClick={selectNextPreset}
                   aria-label="Next preset"
                 >
@@ -2689,7 +2689,7 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  className="button-safe flex size-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
                   onClick={selectNextSong}
                   disabled={!canNavigateSongs}
                   aria-label="Next song"
