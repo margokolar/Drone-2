@@ -2142,6 +2142,7 @@ function App() {
                     className="h-1.5 w-full accent-fuchsia-300"
                   />
                 </div>
+                {shine.enabled && (
                 <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                   <div className="mb-1 flex items-center justify-between">
                     <span className="text-xs uppercase tracking-[0.16em] text-white/60">Shine volume</span>
@@ -2158,6 +2159,7 @@ function App() {
                     className="h-1.5 w-full accent-cyan-300"
                   />
                 </div>
+                )}
               </div>
             </SectionCard>
             <SectionCard
