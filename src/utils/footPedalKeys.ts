@@ -13,7 +13,7 @@ export const FOOT_PEDAL_PRESET_KEYS = new Set([
   'Equal',
 ])
 
-/** PT pedal — PageUp/PageDown direct preset prev/next (no double-tap window). */
+/** PT pedal — PageUp next song; PageDown previous preset. */
 export const PT_PEDAL_NEXT_KEYS = new Set(['PageUp'])
 export const PT_PEDAL_PREVIOUS_KEYS = new Set(['PageDown'])
 

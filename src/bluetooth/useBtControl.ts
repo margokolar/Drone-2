@@ -2,6 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { droneEngine } from '../audio/DroneEngine'
 import {
   transportNextPreset,
+  transportNextSong,
   transportPause,
   transportPauseFromRemote,
   transportPlay,
@@ -208,7 +209,7 @@ export function useBtControl({
         event.preventDefault()
         event.stopPropagation()
         void droneEngine.pokeClock()
-        transportNextPreset()
+        transportNextSong()
         return
       }
 

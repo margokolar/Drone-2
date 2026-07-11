@@ -113,6 +113,16 @@ export function transportPreviousPreset(): void {
   useDroneStore.getState().selectPreviousPreset()
 }
 
+export function transportNextSong(): void {
+  recordBleDebug('note', `nextSong ctx=${droneEngine.contextDebugLabel()}`)
+  useDroneStore.getState().selectNextSong()
+}
+
+export function transportPreviousSong(): void {
+  recordBleDebug('note', `prevSong ctx=${droneEngine.contextDebugLabel()}`)
+  useDroneStore.getState().selectPreviousSong()
+}
+
 const MASTER_GAIN_STEP_DB = 2
 
 export function transportVolumeUp(): void {
