@@ -28,16 +28,6 @@ function clearMobileViewportVars(): void {
   document.documentElement.style.removeProperty('--vv-bottom-inset')
 }
 
-function scheduleIosStandaloneLayoutPasses(run: () => void): void {
-  run()
-  window.requestAnimationFrame(() => {
-    run()
-    window.requestAnimationFrame(run)
-  })
-  window.setTimeout(run, 100)
-  window.setTimeout(run, 300)
-}
-
 export function useMobileTransportDock() {
   const transportFooterRef = useRef<HTMLElement>(null)
   const topChromeRef = useRef<HTMLElement>(null)
@@ -90,9 +80,6 @@ export function useMobileTransportDock() {
     }
 
     updateViewport()
-    if (standalone) {
-      scheduleIosStandaloneLayoutPasses(updateViewport)
-    }
 
     const viewport = window.visualViewport
     viewport?.addEventListener('resize', updateViewport)
@@ -135,6 +122,10 @@ export function useMobileTransportDock() {
   }
 
   useLayoutEffect(() => {
+    if (!pinTransportFooter || isIosStandalonePwa()) {
+      return
+    }
+
     const footer = transportFooterRef.current
     const header = topChromeRef.current
     if (!footer) {
@@ -146,14 +137,10 @@ export function useMobileTransportDock() {
     const footerObserver = new ResizeObserver(measureChromeHeights)
     footerObserver.observe(footer)
     observers.push(footerObserver)
-    if (header && pinTransportFooter) {
+    if (header) {
       const headerObserver = new ResizeObserver(measureChromeHeights)
       headerObserver.observe(header)
       observers.push(headerObserver)
-    }
-
-    if (isIosStandalonePwa()) {
-      scheduleIosStandaloneLayoutPasses(measureChromeHeights)
     }
 
     return () => {

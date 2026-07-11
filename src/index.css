@@ -56,8 +56,6 @@ html.ios-standalone-pwa {
 }
 
 body.ios-standalone-pwa {
-  position: fixed;
-  inset: 0;
   width: 100%;
   height: 100%;
   height: -webkit-fill-available;
@@ -68,6 +66,7 @@ body.ios-standalone-pwa {
 html.ios-standalone-pwa #root {
   height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .tabular-nums {
