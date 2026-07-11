@@ -2013,6 +2013,7 @@ function App() {
         </header>
           {activeTab === 'tone' && (
             <div
+              data-library-picker-width
               className={`mx-auto mt-3 grid max-w-[26.5rem] grid-cols-2 gap-3 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem] ${
                 controlsLocked ? 'pointer-events-none' : ''
               }`}

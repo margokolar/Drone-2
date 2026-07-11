@@ -68,6 +68,13 @@ export function LibraryPickerMenu({
     }
     const rect = trigger.getBoundingClientRect()
     const viewportHeight = window.visualViewport?.height ?? window.innerHeight
+    const widthAnchor = isSelectAppearance
+      ? container.closest('[data-library-picker-width]')
+      : null
+    const anchorRect =
+      widthAnchor instanceof HTMLElement ? widthAnchor.getBoundingClientRect() : null
+    const dropdownLeft = anchorRect?.left ?? rect.left
+    const dropdownWidth = anchorRect?.width ?? rect.width
     if (dropdownPlacement === 'viewport') {
       const top = isSelectAppearance ? rect.top : rect.bottom + 4
       setDropdownStyle({
@@ -82,8 +89,8 @@ export function LibraryPickerMenu({
     const top = isSelectAppearance ? rect.top : rect.bottom + 4
     setDropdownStyle({
       top,
-      left: rect.left,
-      width: rect.width,
+      left: dropdownLeft,
+      width: dropdownWidth,
       maxHeight: Math.max(120, viewportHeight - top - VIEWPORT_GUTTER_PX),
     })
   }, [dropdownPlacement, isSelectAppearance])
