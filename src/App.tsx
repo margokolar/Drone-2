@@ -76,7 +76,6 @@ import { useBtControl } from './bluetooth/useBtControl'
 import { BLE_KEYBOARD_FOCUS_ROOT_ID } from './utils/restoreBleKeyboardFocus'
 import { BleDebugOverlay } from './components/BleDebugOverlay'
 import { bleDebugEnabled, recordBleDebug } from './utils/bleDebug'
-import { isIosStandalonePwa } from './utils/platform'
 import { TONE_STICKY_CHROME_ID, scrollToneMixerCardIntoView } from './utils/scrollBelowStickyChrome'
 import { triggerSaveFlash } from './utils/saveFlash'
 
@@ -1908,14 +1907,28 @@ function App() {
       new URLSearchParams(window.location.search).get('device') === 'iphone16pm',
     [],
   )
-  const { pinTransportFooter, transportFooterRef, transportFooterHeight } = useMobileTransportDock()
+  const {
+    pinTransportFooter,
+    iosStandaloneChrome,
+    transportFooterRef,
+    topChromeRef,
+    transportFooterHeight,
+    topChromeHeight,
+  } = useMobileTransportDock()
   const appShellHeightClass = iphone16ProMaxPreview
     ? 'min-h-full'
-    : pinTransportFooter
-      ? isIosStandalonePwa()
-        ? 'h-[var(--app-height,100dvh)]'
-        : 'h-svh'
-      : 'h-svh md:h-dvh'
+    : iosStandaloneChrome
+      ? 'h-full'
+      : pinTransportFooter
+        ? 'h-[var(--app-height,100svh)]'
+        : 'h-svh md:h-dvh'
+  const pinnedChromeScrollStyle =
+    pinTransportFooter
+      ? {
+          paddingTop: topChromeHeight > 0 ? topChromeHeight : undefined,
+          paddingBottom: transportFooterHeight > 0 ? transportFooterHeight : undefined,
+        }
+      : undefined
   const appShell = (
     <div
       className={`flex min-h-0 flex-1 flex-col bg-[#111019] text-[#f2f2f7] ${appShellHeightClass} ${
@@ -1942,11 +1955,7 @@ function App() {
       )}
       <div
         className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain"
-        style={
-          pinTransportFooter && transportFooterHeight > 0
-            ? { paddingBottom: transportFooterHeight }
-            : undefined
-        }
+        style={pinnedChromeScrollStyle}
       >
       <div
         className={`mx-auto w-full max-w-md px-3 pb-5 pt-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
@@ -1955,13 +1964,22 @@ function App() {
       >
         <div
           id={TONE_STICKY_CHROME_ID}
-          className={`sticky top-0 z-50 -mx-3 bg-[#111019] px-3 pb-2 pt-[env(safe-area-inset-top,0px)] ${
-            activeTab === 'tone' ? '' : 'landscape:hidden max-h-[500px]:hidden'
-          }`}
+          className={`sticky top-0 z-40 -mx-3 bg-[#111019] px-3 pb-2 ${
+            pinTransportFooter ? 'pt-0' : 'pt-[env(safe-area-inset-top,0px)]'
+          } ${activeTab === 'tone' ? '' : 'landscape:hidden max-h-[500px]:hidden'}`}
         >
-          <header className={`mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem] ${
-            controlsLocked ? 'pointer-events-none' : ''
-          }`}>
+          <header
+            ref={topChromeRef}
+            className={`mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem] ${
+              controlsLocked ? 'pointer-events-none' : ''
+            } ${
+              pinTransportFooter
+                ? `fixed inset-x-0 z-50 px-3 pt-[env(safe-area-inset-top,0px)] ${
+                    iosStandaloneChrome ? 'top-0' : 'top-[var(--app-offset-top,0px)]'
+                  }`
+                : ''
+            }`}
+          >
             <button
               type="button"
               aria-label={controlsLocked ? 'Menu locked while touch lock is on' : menuLabel}
@@ -2558,7 +2576,11 @@ function App() {
       <footer
         ref={transportFooterRef}
         className={`z-30 bg-[#111019] px-3 pb-[env(safe-area-inset-bottom,0px)] ${
-          pinTransportFooter ? 'fixed inset-x-0 bottom-0' : 'relative shrink-0'
+          pinTransportFooter
+            ? `fixed inset-x-0 ${
+                iosStandaloneChrome ? 'bottom-0' : 'bottom-[var(--vv-bottom-inset,0px)]'
+              }`
+            : 'relative shrink-0'
         }`}
       >
         <div className="mx-auto w-full max-w-[26.5rem] space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-[62.5rem]">

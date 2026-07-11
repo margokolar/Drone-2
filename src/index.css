@@ -48,8 +48,9 @@ body.mobile-transport-docked {
   overscroll-behavior: none;
 }
 
-html.ios-standalone-pwa,
-body.ios-standalone-pwa {
+html.ios-standalone-pwa {
+  height: 100%;
+  height: -webkit-fill-available;
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -58,11 +59,14 @@ body.ios-standalone-pwa {
   position: fixed;
   inset: 0;
   width: 100%;
-  height: var(--app-height, 100dvh);
+  height: 100%;
+  height: -webkit-fill-available;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 html.ios-standalone-pwa #root {
-  height: var(--app-height, 100dvh);
+  height: 100%;
   min-height: 0;
 }
 
