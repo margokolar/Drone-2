@@ -2090,7 +2090,6 @@ function App() {
                   songName={songName}
                   songLibrary={songLibrary}
                   onSaveCurrentSong={saveCurrentSongToLibrary}
-                  onSaveAsNewSong={saveAsNewSong}
                   onLoadSong={loadSongFromLibrary}
                   onMoveSong={moveSongInLibrary}
                   onDeleteSong={deleteSongFromLibrary}

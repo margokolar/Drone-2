@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Check, ChevronDown, Copy, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, ChevronDown, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 const VIEWPORT_GUTTER_PX = 12
@@ -18,7 +18,6 @@ type SongLibraryMenuProps = {
   songName: string
   songLibrary: SongEntry[]
   onSaveCurrentSong: (songName?: string) => void
-  onSaveAsNewSong: (songName?: string) => void
   onLoadSong: (songId: string) => void
   onMoveSong: (songId: string, direction: 'up' | 'down') => void
   onDeleteSong: (songId: string) => void
@@ -30,7 +29,6 @@ export function SongLibraryMenu({
   songName,
   songLibrary,
   onSaveCurrentSong,
-  onSaveAsNewSong,
   onLoadSong,
   onMoveSong,
   onDeleteSong,
@@ -181,17 +179,6 @@ export function SongLibraryMenu({
               <Check size={16} />
             </button>
           </form>
-          <button
-            type="button"
-            className="mb-2 flex min-h-[38px] w-full items-center justify-center gap-2 rounded-md border border-cyan-300/40 bg-cyan-300/10 px-3 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/20"
-            onClick={() => {
-              onSaveAsNewSong(nameDraft.trim() || undefined)
-              setMenuOpen(false)
-            }}
-          >
-            <Copy size={15} />
-            Save as new song
-          </button>
           {songLibrary.map((song) => {
             const isActiveSong = song.name === songName
             const songIndex = songLibrary.findIndex((entry) => entry.id === song.id)
