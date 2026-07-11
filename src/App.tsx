@@ -16,6 +16,8 @@ import {
   Redo2,
   RotateCcw,
   Save,
+  SkipBack,
+  SkipForward,
   StepBack,
   StepForward,
   Undo2,
@@ -498,6 +500,9 @@ function App() {
   const saveAsNewSong = useDroneStore((state) => state.saveAsNewSong)
   const selectNextPreset = useDroneStore((state) => state.selectNextPreset)
   const selectPreviousPreset = useDroneStore((state) => state.selectPreviousPreset)
+  const selectNextSong = useDroneStore((state) => state.selectNextSong)
+  const selectPreviousSong = useDroneStore((state) => state.selectPreviousSong)
+  const canNavigateSongs = songLibrary.length > 1
 
   const selectedOvertoneTone = useMemo(
     () =>
@@ -2630,7 +2635,16 @@ function App() {
             </div>
           </nav>
           <div className="rounded-xl border border-white/10 bg-[#111019]/95 p-2 backdrop-blur-sm">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] gap-1.5">
+                <button
+                  type="button"
+                  className="button-safe flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-2 py-3 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
+                  onClick={selectPreviousSong}
+                  disabled={!canNavigateSongs}
+                  aria-label="Previous song"
+                >
+                  <SkipBack size={22} />
+                </button>
                 <button
                   type="button"
                   className="button-safe flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-2 py-3 text-white transition hover:bg-white/10"
@@ -2657,6 +2671,15 @@ function App() {
                   aria-label="Next preset"
                 >
                   <StepForward size={22} />
+                </button>
+                <button
+                  type="button"
+                  className="button-safe flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-2 py-3 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
+                  onClick={selectNextSong}
+                  disabled={!canNavigateSongs}
+                  aria-label="Next song"
+                >
+                  <SkipForward size={22} />
                 </button>
               </div>
             </div>

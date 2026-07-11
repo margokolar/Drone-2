@@ -138,6 +138,8 @@ type DroneState = {
   saveAsNewSong: (songName?: string) => void
   selectNextPreset: () => void
   selectPreviousPreset: () => void
+  selectNextSong: () => void
+  selectPreviousSong: () => void
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -1185,6 +1187,33 @@ export const useDroneStore = create<DroneState>()(
         set({
           ...applyPresetState(preset),
         })
+      },
+      selectNextSong: () => {
+        const state = get()
+        if (state.songLibrary.length <= 1) {
+          return
+        }
+        const index = state.songLibrary.findIndex((entry) => entry.name === state.songName)
+        const nextIndex = index < 0 ? 0 : (index + 1) % state.songLibrary.length
+        const nextSong = state.songLibrary[nextIndex]
+        if (!nextSong) {
+          return
+        }
+        get().loadSongFromLibrary(nextSong.id)
+      },
+      selectPreviousSong: () => {
+        const state = get()
+        if (state.songLibrary.length <= 1) {
+          return
+        }
+        const index = state.songLibrary.findIndex((entry) => entry.name === state.songName)
+        const nextIndex =
+          index < 0 ? 0 : (index - 1 + state.songLibrary.length) % state.songLibrary.length
+        const previousSong = state.songLibrary[nextIndex]
+        if (!previousSong) {
+          return
+        }
+        get().loadSongFromLibrary(previousSong.id)
       },
     }),
     {
