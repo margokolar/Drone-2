@@ -495,7 +495,6 @@ function App() {
   const loadSongFromLibrary = useDroneStore((state) => state.loadSongFromLibrary)
   const deleteSongFromLibrary = useDroneStore((state) => state.deleteSongFromLibrary)
   const moveSongInLibrary = useDroneStore((state) => state.moveSongInLibrary)
-  const saveCurrentSongToLibrary = useDroneStore((state) => state.saveCurrentSongToLibrary)
   const saveAsNewSong = useDroneStore((state) => state.saveAsNewSong)
   const renameSongInLibrary = useDroneStore((state) => state.renameSongInLibrary)
   const duplicateSongInLibrary = useDroneStore((state) => state.duplicateSongInLibrary)
@@ -2089,10 +2088,7 @@ function App() {
                 <SongLibraryMenu
                   songName={songName}
                   songLibrary={songLibrary}
-                  onSaveCurrentSong={saveCurrentSongToLibrary}
                   onLoadSong={loadSongFromLibrary}
-                  onMoveSong={moveSongInLibrary}
-                  onDeleteSong={deleteSongFromLibrary}
                   triggerClassName="mt-5 flex min-h-0 w-full max-w-full min-w-0 items-center justify-between gap-2 overflow-hidden rounded-md border border-white/10 bg-white/10 px-2 py-1 text-sm font-semibold text-white/95 transition hover:bg-white/15"
                 />
               </article>
