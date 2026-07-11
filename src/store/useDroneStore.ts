@@ -119,6 +119,7 @@ type DroneState = {
   toggleControlsLocked: () => void
   setBtControlMode: (mode: BtControlMode) => void
   saveActivePreset: () => void
+  saveDroneState: () => void
   savePreset: (presetId: string) => void
   saveAsPreset: () => void
   createNewPreset: () => void
@@ -136,6 +137,8 @@ type DroneState = {
   moveSongInLibrary: (songId: string, direction: 'up' | 'down') => void
   saveCurrentSongToLibrary: (songName?: string) => void
   saveAsNewSong: (songName?: string) => void
+  renameSongInLibrary: (songId: string, name: string) => void
+  duplicateSongInLibrary: (songId: string) => void
   selectNextPreset: () => void
   selectPreviousPreset: () => void
   selectNextSong: () => void
@@ -366,6 +369,23 @@ function syncPresetsToCurrentSong(
     activePresetId: state.activePresetId,
   }
   return { songLibrary: nextLibrary }
+}
+
+function applyDroneStateSave(
+  state: DroneState,
+): Pick<DroneState, 'presets'> & Partial<Pick<DroneState, 'songLibrary'>> | null {
+  const target = state.presets.find((preset) => preset.id === state.activePresetId)
+  if (!target) {
+    return null
+  }
+  const updatedPreset = snapshotPresetFromState(state, state.activePresetId, target.name)
+  const presets = state.presets.map((preset) =>
+    preset.id === state.activePresetId ? updatedPreset : preset,
+  )
+  return {
+    presets,
+    ...syncPresetsToCurrentSong({ ...state, presets }),
+  }
 }
 
 function resolveActivePresetId(presets: Preset[], activePresetId: string | undefined): string {
@@ -819,9 +839,10 @@ export const useDroneStore = create<DroneState>()(
       toggleControlsLocked: () => set((state) => ({ controlsLocked: !state.controlsLocked })),
       setBtControlMode: (mode) => set({ btControlMode: mode }),
       saveActivePreset: () => {
-        const { activePresetId } = get()
-        get().savePreset(activePresetId)
+        get().saveDroneState()
       },
+      saveDroneState: () =>
+        set((state) => applyDroneStateSave(state) ?? state),
       savePreset: (presetId) =>
         set((state) => {
           const target = state.presets.find((preset) => preset.id === presetId)
@@ -830,10 +851,13 @@ export const useDroneStore = create<DroneState>()(
           }
           const updatedPreset = snapshotPresetFromState(state, presetId, target.name)
           const presets = state.presets.map((preset) => (preset.id === presetId ? updatedPreset : preset))
-          return {
-            presets,
-            ...syncPresetsToCurrentSong({ ...state, presets }),
+          if (presetId === state.activePresetId) {
+            return {
+              presets,
+              ...syncPresetsToCurrentSong({ ...state, presets }),
+            }
           }
+          return { presets }
         }),
       saveAsPreset: () =>
         set((state) => {
@@ -1108,13 +1132,15 @@ export const useDroneStore = create<DroneState>()(
         }),
       saveCurrentSongToLibrary: (songName) =>
         set((state) => {
-          const resolvedName = songName?.trim() || state.songName || 'My Song'
-          const currentIndex = state.songLibrary.findIndex((entry) => entry.name === state.songName)
+          const saved = applyDroneStateSave(state)
+          const base = saved ? { ...state, ...saved } : state
+          const resolvedName = songName?.trim() || base.songName || 'My Song'
+          const currentIndex = base.songLibrary.findIndex((entry) => entry.name === state.songName)
           const snapshot: Omit<SongEntry, 'id' | 'name'> = {
-            presets: state.presets.map((preset) => duplicatePresetData(preset)),
-            activePresetId: state.activePresetId,
+            presets: base.presets.map((preset) => duplicatePresetData(preset)),
+            activePresetId: base.activePresetId,
           }
-          let nextLibrary = [...state.songLibrary]
+          let nextLibrary = [...base.songLibrary]
           if (currentIndex >= 0) {
             nextLibrary[currentIndex] = {
               ...nextLibrary[currentIndex],
@@ -1138,13 +1164,67 @@ export const useDroneStore = create<DroneState>()(
             }
           }
           return {
+            ...(saved ?? {}),
             songName: resolvedName,
             songLibrary: nextLibrary,
           }
         }),
       saveAsNewSong: (songName) =>
         set((state) => {
-          const baseName = songName?.trim() || `${state.songName || 'Song'} copy`
+          const saved = applyDroneStateSave(state)
+          const base = saved ? { ...state, ...saved } : state
+          const baseName = songName?.trim() || `${base.songName || 'Song'} copy`
+          const existingNames = new Set(base.songLibrary.map((entry) => entry.name))
+          let resolvedName = baseName
+          let collisionIndex = 2
+          while (existingNames.has(resolvedName)) {
+            resolvedName = `${baseName} ${collisionIndex}`
+            collisionIndex += 1
+          }
+          const newSong: SongEntry = {
+            id: `song-${Date.now()}`,
+            name: resolvedName,
+            presets: base.presets.map((preset) => duplicatePresetData(preset)),
+            activePresetId: base.activePresetId,
+          }
+          return {
+            ...(saved ?? {}),
+            songName: resolvedName,
+            songLibrary: [...base.songLibrary, newSong],
+          }
+        }),
+      renameSongInLibrary: (songId, name) =>
+        set((state) => {
+          const trimmed = name.replace(/\s+/g, ' ').trim()
+          if (!trimmed) {
+            return state
+          }
+          const index = state.songLibrary.findIndex((entry) => entry.id === songId)
+          if (index < 0) {
+            return state
+          }
+          const target = state.songLibrary[index]
+          if (target.name === trimmed) {
+            return state
+          }
+          const nextLibrary = [...state.songLibrary]
+          nextLibrary[index] = {
+            ...target,
+            name: trimmed,
+          }
+          const isActiveSong = state.songName === target.name
+          return {
+            songLibrary: nextLibrary,
+            ...(isActiveSong ? { songName: trimmed } : {}),
+          }
+        }),
+      duplicateSongInLibrary: (songId) =>
+        set((state) => {
+          const source = state.songLibrary.find((entry) => entry.id === songId)
+          if (!source) {
+            return state
+          }
+          const baseName = `${source.name} copy`
           const existingNames = new Set(state.songLibrary.map((entry) => entry.name))
           let resolvedName = baseName
           let collisionIndex = 2
@@ -1155,11 +1235,10 @@ export const useDroneStore = create<DroneState>()(
           const newSong: SongEntry = {
             id: `song-${Date.now()}`,
             name: resolvedName,
-            presets: state.presets.map((preset) => duplicatePresetData(preset)),
-            activePresetId: state.activePresetId,
+            presets: source.presets.map((preset) => duplicatePresetData(preset)),
+            activePresetId: source.activePresetId,
           }
           return {
-            songName: resolvedName,
             songLibrary: [...state.songLibrary, newSong],
           }
         }),

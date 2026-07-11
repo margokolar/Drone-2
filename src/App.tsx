@@ -50,6 +50,7 @@ import { OvertoneMidiPanel } from './components/OvertoneMidiPanel'
 import { PartialEditor } from './components/PartialEditor'
 import { TimbreMorphSlider } from './components/TimbreMorphSlider'
 import { PresetList } from './components/PresetList'
+import { SongList } from './components/SongList'
 import { ResettableRangeInput } from './components/ResettableRangeInput'
 import { SectionCard } from './components/SectionCard'
 import { SongLibraryMenu } from './components/SongLibraryMenu'
@@ -96,8 +97,6 @@ const MAX_OVERTONE_HISTORY = 60
 const STORE_STORAGE_KEY = 'bourdon-store-v1'
 const TONE_SET_STORAGE_KEY = 'drone-tone-set-v1'
 const TONE_SET_COLLECTION_STORAGE_KEY = 'drone-tone-sets-v1'
-const SONG_MENU_TRIGGER_CLASS =
-  'flex min-h-[40px] w-full min-w-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-[#252332] px-3 py-2 text-sm text-white/90 transition hover:bg-[#2f2d3c]'
 type OvertoneSnapshot = {
   partials: PartialConfig[]
   timbreBlend: TimbreBlend
@@ -484,7 +483,7 @@ function App() {
   const setMetronomeBpm = useDroneStore((state) => state.setMetronomeBpm)
   const setMetronomeVolumeDb = useDroneStore((state) => state.setMetronomeVolumeDb)
   const setMetronomeMuted = useDroneStore((state) => state.setMetronomeMuted)
-  const saveActivePreset = useDroneStore((state) => state.saveActivePreset)
+  const saveDroneState = useDroneStore((state) => state.saveDroneState)
   const saveAsPreset = useDroneStore((state) => state.saveAsPreset)
   const loadPreset = useDroneStore((state) => state.loadPreset)
   const renamePreset = useDroneStore((state) => state.renamePreset)
@@ -498,6 +497,8 @@ function App() {
   const moveSongInLibrary = useDroneStore((state) => state.moveSongInLibrary)
   const saveCurrentSongToLibrary = useDroneStore((state) => state.saveCurrentSongToLibrary)
   const saveAsNewSong = useDroneStore((state) => state.saveAsNewSong)
+  const renameSongInLibrary = useDroneStore((state) => state.renameSongInLibrary)
+  const duplicateSongInLibrary = useDroneStore((state) => state.duplicateSongInLibrary)
   const selectNextPreset = useDroneStore((state) => state.selectNextPreset)
   const selectPreviousPreset = useDroneStore((state) => state.selectPreviousPreset)
   const selectNextSong = useDroneStore((state) => state.selectNextSong)
@@ -1050,10 +1051,6 @@ function App() {
     })
   }, [])
 
-  const saveOvertoneToActivePreset = useCallback(() => {
-    saveActivePreset()
-  }, [saveActivePreset])
-
   const resetOvertoneBalance = useCallback(() => {
     const current = selectedOvertonePartials
     const resetTarget = buildResetOvertoneBalance(current)
@@ -1119,10 +1116,10 @@ function App() {
         }
       })
       setSelectedOvertonePartials(analyzed)
-      saveActivePreset()
+      saveDroneState()
       setPendingOvertoneAnalysis(null)
     },
-    [pendingOvertoneAnalysis, saveActivePreset, selectedOvertonePartials, setSelectedOvertonePartials],
+    [pendingOvertoneAnalysis, saveDroneState, selectedOvertonePartials, setSelectedOvertonePartials],
   )
 
   const openJblPortableApp = useCallback(() => {
@@ -1911,9 +1908,9 @@ function App() {
   )
   const appShell = (
     <div
-      className={`relative ${
-        iphone16ProMaxPreview ? 'min-h-full min-w-0' : 'min-h-screen'
-      } bg-[#111019] text-[#f2f2f7] ${activeTab === 'metronome' ? 'h-screen overflow-hidden' : ''}`}
+      className={`flex flex-col bg-[#111019] text-[#f2f2f7] ${
+        iphone16ProMaxPreview ? 'min-h-full flex-1' : 'h-dvh'
+      } ${activeTab === 'metronome' ? 'overflow-hidden' : ''}`}
     >
       <div
         id={BLE_KEYBOARD_FOCUS_ROOT_ID}
@@ -1933,6 +1930,7 @@ function App() {
           }}
         />
       )}
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
       <div
         className={`mx-auto w-full max-w-md px-3 pb-5 pt-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
           activeTab === 'overtones' ? 'landscape:pt-0 max-h-[500px]:pt-0' : ''
@@ -2042,9 +2040,9 @@ function App() {
                     className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] text-white/80 transition hover:bg-[#352a48]"
                     onClick={(event) => {
                       triggerSaveFlash(event.currentTarget)
-                      saveActivePreset()
+                      saveDroneState()
                     }}
-                    aria-label="Save current preset"
+                    aria-label="Save drone state"
                   >
                     <Save size={15} />
                   </button>
@@ -2071,9 +2069,9 @@ function App() {
                     className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] text-white/80 transition hover:bg-[#352a48]"
                     onClick={(event) => {
                       triggerSaveFlash(event.currentTarget)
-                      saveCurrentSongToLibrary()
+                      saveDroneState()
                     }}
-                    aria-label="Save current song"
+                    aria-label="Save drone state"
                   >
                     <Save size={15} />
                   </button>
@@ -2106,7 +2104,7 @@ function App() {
 
         <main
           className={`landscape:pb-2 max-h-[500px]:pb-2 ${
-            activeTab === 'metronome' ? 'pb-32' : 'pb-44'
+            activeTab === 'metronome' ? 'pb-4' : 'pb-3'
           }`}
           onTouchStart={handleSwipeTouchStart}
           onTouchEnd={handleSwipeTouchEnd}
@@ -2289,9 +2287,9 @@ function App() {
                           className={overtoneIconButtonClass('portrait-solo')}
                           onClick={(event) => {
                             triggerSaveFlash(event.currentTarget)
-                            saveOvertoneToActivePreset()
+                            saveDroneState()
                           }}
-                          aria-label="Save overtone changes to current preset"
+                          aria-label="Save drone state"
                         >
                           <Save size={16} />
                         </button>
@@ -2454,32 +2452,52 @@ function App() {
           >
             <SectionCard
               title="Presets"
-              rightSlot={
-                <SongLibraryMenu
-                  songName={songName}
-                  songLibrary={songLibrary}
-                  onSaveCurrentSong={saveCurrentSongToLibrary}
-                  onSaveAsNewSong={saveAsNewSong}
-                  onLoadSong={loadSongFromLibrary}
-                  onMoveSong={moveSongInLibrary}
-                  onDeleteSong={deleteSongFromLibrary}
-                  triggerClassName={`${SONG_MENU_TRIGGER_CLASS} w-auto max-w-full px-4`}
-                  dropdownPlacement="anchor"
-                />
+              titleAddon={
+                <button
+                  type="button"
+                  className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-fuchsia-300/50 bg-fuchsia-300/20 text-fuchsia-100 transition hover:bg-fuchsia-300/30"
+                  onClick={(event) => {
+                    triggerSaveFlash(event.currentTarget)
+                    saveDroneState()
+                  }}
+                  aria-label="Save drone state"
+                >
+                  <Save size={15} />
+                </button>
               }
             >
-              <PresetList
-                presets={presets}
-                activePresetId={activePresetId}
-                onLoadPreset={(presetId) => {
-                  loadPreset(presetId)
-                }}
-                onSavePreset={saveActivePreset}
-                onRenamePreset={renamePreset}
-                onDuplicatePreset={duplicatePreset}
-                onDeletePreset={deletePreset}
-                onMovePreset={movePreset}
-              />
+              <div className="grid min-w-0 grid-cols-2 gap-3">
+                <section className="min-w-0">
+                  <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
+                    Presets
+                  </h3>
+                  <PresetList
+                    presets={presets}
+                    activePresetId={activePresetId}
+                    onLoadPreset={(presetId) => {
+                      loadPreset(presetId)
+                    }}
+                    onRenamePreset={renamePreset}
+                    onDuplicatePreset={duplicatePreset}
+                    onDeletePreset={deletePreset}
+                    onMovePreset={movePreset}
+                  />
+                </section>
+                <section className="min-w-0">
+                  <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
+                    Songs
+                  </h3>
+                  <SongList
+                    songName={songName}
+                    songLibrary={songLibrary}
+                    onLoadSong={loadSongFromLibrary}
+                    onRenameSong={renameSongInLibrary}
+                    onDuplicateSong={duplicateSongInLibrary}
+                    onDeleteSong={deleteSongFromLibrary}
+                    onMoveSong={moveSongInLibrary}
+                  />
+                </section>
+              </div>
             </SectionCard>
           </div>
           <div
@@ -2514,12 +2532,13 @@ function App() {
               {...shine}
               tonalCenter={tonalCenter}
               onTonalCenterChange={setTonalCenter}
-              onSavePreset={saveActivePreset}
+              onSaveDroneState={saveDroneState}
             />
           </div>
         </main>
       </div>
-      <div className="fixed bottom-0 left-0 right-0 z-30 px-3 pb-2">
+      </div>
+      <footer className="z-30 shrink-0 bg-[#111019] px-3 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-1">
         <div className="mx-auto w-full max-w-[26.5rem] space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-[62.5rem]">
           <nav
             className="overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm"
@@ -2548,9 +2567,9 @@ function App() {
                     className={overtoneIconButtonClass('landscape-inline')}
                     onClick={(event) => {
                       triggerSaveFlash(event.currentTarget)
-                      saveOvertoneToActivePreset()
+                      saveDroneState()
                     }}
-                    aria-label="Save overtone changes to current preset"
+                    aria-label="Save drone state"
                   >
                     <Save size={16} />
                   </button>
@@ -2635,10 +2654,10 @@ function App() {
             </div>
           </nav>
           <div className="rounded-xl border border-white/10 bg-[#111019]/95 p-2 backdrop-blur-sm">
-              <div className="grid grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] gap-1.5">
+              <div className="grid grid-cols-[2.75rem_2.75rem_minmax(0,1fr)_2.75rem_2.75rem] gap-1.5">
                 <button
                   type="button"
-                  className="button-safe flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-2 py-3 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="button-safe flex size-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
                   onClick={selectPreviousSong}
                   disabled={!canNavigateSongs}
                   aria-label="Previous song"
@@ -2647,7 +2666,7 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  className="button-safe flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-2 py-3 text-white transition hover:bg-white/10"
+                  className="button-safe flex size-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10"
                   onClick={selectPreviousPreset}
                   aria-label="Previous preset"
                 >
@@ -2655,18 +2674,16 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  className="button-safe flex min-h-[44px] min-w-0 flex-nowrap items-center justify-center gap-2 overflow-hidden rounded-xl border border-fuchsia-300/60 bg-fuchsia-400/15 px-2 py-3 text-center font-semibold text-white transition hover:bg-fuchsia-300/25"
+                  className="button-safe flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-fuchsia-300/60 bg-fuchsia-400/15 px-2 py-3 text-center text-sm font-semibold text-white transition hover:bg-fuchsia-300/25"
                   onClick={handleTogglePlay}
                   aria-label={playing ? 'Pause' : 'Play'}
                 >
                   {(playing && <Pause size={22} />) || <Play size={22} />}
-                  <span className="inline-block w-14 text-center whitespace-nowrap">
-                    {playing ? 'Pause' : 'Play'}
-                  </span>
+                  <span className="whitespace-nowrap">{playing ? 'Pause' : 'Play'}</span>
                 </button>
                 <button
                   type="button"
-                  className="button-safe flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-2 py-3 text-white transition hover:bg-white/10"
+                  className="button-safe flex size-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10"
                   onClick={selectNextPreset}
                   aria-label="Next preset"
                 >
@@ -2674,7 +2691,7 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  className="button-safe flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-2 py-3 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="button-safe flex size-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
                   onClick={selectNextSong}
                   disabled={!canNavigateSongs}
                   aria-label="Next song"
@@ -2684,7 +2701,7 @@ function App() {
               </div>
             </div>
         </div>
-      </div>
+      </footer>
       {(menuOpen) && (
         <>
           <button
@@ -3230,7 +3247,7 @@ function App() {
       >
         <div
           ref={previewScrollRef}
-          className="relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain"
+          className="flex h-full min-h-0 w-full flex-col overflow-hidden"
         >
           {appShell}
         </div>

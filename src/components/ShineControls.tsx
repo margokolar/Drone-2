@@ -9,7 +9,7 @@ import { TONAL_CENTERS, type TonalCenter } from '../music/notes'
 type ShineControlsProps = ShineState & {
   tonalCenter: TonalCenter
   onTonalCenterChange: (value: TonalCenter) => void
-  onSavePreset: () => void
+  onSaveDroneState: () => void
 }
 
 type HarmonicBarProps = {
@@ -128,7 +128,7 @@ export function ShineControls({
   setOctaveIndex,
   tonalCenter,
   onTonalCenterChange,
-  onSavePreset,
+  onSaveDroneState,
 }: ShineControlsProps) {
   const allAuto = autos.every(Boolean)
   const allBumps = autos.some(Boolean) && autos.every((autoOn, index) => (autoOn ? bumps[index] : true))
@@ -201,10 +201,10 @@ export function ShineControls({
               className="button-safe flex min-w-[3.5rem] items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] px-2.5 py-1.5 text-xs text-white/80 transition hover:bg-[#352a48]"
               onClick={(event) => {
                 triggerSaveFlash(event.currentTarget)
-                onSavePreset()
+                onSaveDroneState()
               }}
-              aria-label="Save current preset"
-              title="Save preset"
+              aria-label="Save drone state"
+              title="Save drone state"
             >
               <Save size={16} />
             </button>

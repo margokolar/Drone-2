@@ -1,15 +1,13 @@
 import clsx from 'clsx'
-import { ArrowDown, ArrowUp, Check, Copy, Pencil, Save, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Copy, Pencil, Trash2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { Preset } from '../presets/defaultPresets'
-import { triggerSaveFlash } from '../utils/saveFlash'
 
 type PresetListProps = {
   presets: Preset[]
   activePresetId: string
   onLoadPreset: (presetId: string) => void
-  onSavePreset: () => void
   onRenamePreset: (presetId: string, name: string) => void
   onDuplicatePreset: (presetId: string) => void
   onDeletePreset: (presetId: string) => void
@@ -20,7 +18,6 @@ export function PresetList({
   presets,
   activePresetId,
   onLoadPreset,
-  onSavePreset,
   onRenamePreset,
   onDuplicatePreset,
   onDeletePreset,
@@ -97,8 +94,6 @@ export function PresetList({
               ? 'border-red-300/55 bg-[#2a2238] text-red-200 hover:bg-red-300/20'
               : 'border-red-300/40 bg-red-300/10 text-red-100 hover:bg-red-300/20',
           )
-          const saveButtonClass =
-            'flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-fuchsia-300/50 bg-fuchsia-300/20 p-1.5 text-fuchsia-100 transition hover:bg-fuchsia-300/30'
           return (
             <article
               key={preset.id}
@@ -170,25 +165,12 @@ export function PresetList({
                       />
                     </form>
                   ) : (
-                    <div className="flex min-h-8 w-full min-w-0 items-center justify-between gap-3">
-                      <div className="text-safe min-w-0 flex-1 truncate text-sm font-semibold text-white">
-                        {preset.name}
-                      </div>
-                      <div className="shrink-0 text-right text-xs text-white/60">
-                        <span className="uppercase">{preset.tuningSystemId}</span>
-                        {preset.tuningSystemId !== 'equal' ? (
-                          <>
-                            <span className="mx-1 text-white/35">•</span>
-                            <span>Center {preset.tonalCenter.toUpperCase()}</span>
-                          </>
-                        ) : null}
-                      </div>
-                    </div>
+                    <div className="text-safe min-w-0 truncate text-sm font-semibold text-white">{preset.name}</div>
                   )}
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {(isEditing) ? (
+              <div className="flex flex-col gap-1.5">
+                {isEditing ? (
                   <button
                     type="button"
                     onPointerDown={(event) => {
@@ -206,75 +188,65 @@ export function PresetList({
                   </button>
                 ) : (
                   <>
-                    {isActive && (
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <button
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation()
-                          triggerSaveFlash(event.currentTarget)
-                          onSavePreset()
+                          startEditing(preset)
                         }}
-                        className={saveButtonClass}
-                        aria-label="Save current settings to preset"
+                        className={toolButtonClass}
+                        aria-label="Edit preset title"
                       >
-                        <Save size={16} />
+                        <Pencil size={16} />
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        startEditing(preset)
-                      }}
-                      className={toolButtonClass}
-                      aria-label="Edit preset title"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onMovePreset(preset.id, 'up')
-                      }}
-                      className={toolButtonClass}
-                      aria-label="Move preset up"
-                    >
-                      <ArrowUp size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onMovePreset(preset.id, 'down')
-                      }}
-                      className={toolButtonClass}
-                      aria-label="Move preset down"
-                    >
-                      <ArrowDown size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onDuplicatePreset(preset.id)
-                      }}
-                      className={toolButtonClass}
-                      aria-label="Duplicate preset"
-                    >
-                      <Copy size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onDeletePreset(preset.id)
-                      }}
-                      className={deleteButtonClass}
-                      aria-label="Delete preset"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onMovePreset(preset.id, 'up')
+                        }}
+                        className={toolButtonClass}
+                        aria-label="Move preset up"
+                      >
+                        <ArrowUp size={16} />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onDuplicatePreset(preset.id)
+                        }}
+                        className={toolButtonClass}
+                        aria-label="Duplicate preset"
+                      >
+                        <Copy size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onMovePreset(preset.id, 'down')
+                        }}
+                        className={toolButtonClass}
+                        aria-label="Move preset down"
+                      >
+                        <ArrowDown size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onDeletePreset(preset.id)
+                        }}
+                        className={deleteButtonClass}
+                        aria-label="Delete preset"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </>
                 )}
               </div>
