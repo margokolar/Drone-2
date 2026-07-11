@@ -1908,8 +1908,8 @@ function App() {
   )
   const appShell = (
     <div
-      className={`flex flex-col bg-[#111019] text-[#f2f2f7] ${
-        iphone16ProMaxPreview ? 'min-h-full flex-1' : 'h-dvh'
+      className={`flex min-h-0 flex-1 flex-col bg-[#111019] text-[#f2f2f7] ${
+        iphone16ProMaxPreview ? 'min-h-full' : 'h-svh md:h-dvh'
       } ${activeTab === 'metronome' ? 'overflow-hidden' : ''}`}
     >
       <div
@@ -2538,7 +2538,7 @@ function App() {
         </main>
       </div>
       </div>
-      <footer className="z-30 shrink-0 bg-[#111019] px-3 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-1">
+      <footer className="z-30 shrink-0 bg-[#111019] px-3 pb-[env(safe-area-inset-bottom,0px)]">
         <div className="mx-auto w-full max-w-[26.5rem] space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-[62.5rem]">
           <nav
             className="overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm"
