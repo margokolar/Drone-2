@@ -53,7 +53,7 @@ import { PresetList } from './components/PresetList'
 import { SongList } from './components/SongList'
 import { ResettableRangeInput } from './components/ResettableRangeInput'
 import { SectionCard } from './components/SectionCard'
-import { SongLibraryMenu } from './components/SongLibraryMenu'
+import { LibraryPickerMenu } from './components/LibraryPickerMenu'
 import { ToneMixer, TONE_MIXER_SECTION_ID, toneMixerCardElementId } from './components/ToneMixer'
 import { TopControls } from './components/TopControls'
 import { ShineControls } from './components/ShineControls'
@@ -2018,20 +2018,9 @@ function App() {
               }`}
             >
               <article className="relative min-w-0 overflow-hidden rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
-                <button
-                  type="button"
-                  className="absolute inset-0 rounded-xl transition hover:bg-fuchsia-300/10"
-                  onClick={() => setActiveTab('presets')}
-                  aria-label="Open presets"
-                />
-                <div className="pointer-events-none relative min-w-0">
-                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
-                    Preset
-                  </h2>
-                  <p className="mt-5 truncate rounded-md border border-fuchsia-300/50 bg-fuchsia-300/20 px-2 py-1 text-sm font-extrabold text-fuchsia-50 shadow-[0_0_18px_rgba(240,171,252,0.16)]">
-                    {presets.find((preset) => preset.id === activePresetId)?.name ?? 'Preset'}
-                  </p>
-                </div>
+                <h2 className="mb-2 pr-[4.25rem] text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
+                  Preset
+                </h2>
                 <div className="absolute right-2 top-2 z-10 flex gap-1">
                   <button
                     type="button"
@@ -2056,6 +2045,13 @@ function App() {
                     <Copy size={15} />
                   </button>
                 </div>
+                <LibraryPickerMenu
+                  selectedId={activePresetId}
+                  items={presets}
+                  onSelect={loadPreset}
+                  openAriaLabel="Open preset list"
+                  triggerClassName="mt-5 flex min-h-0 w-full max-w-full min-w-0 items-center justify-between gap-2 overflow-hidden rounded-md border border-fuchsia-300/50 bg-fuchsia-300/20 px-2 py-1 text-sm font-semibold text-fuchsia-50 shadow-[0_0_18px_rgba(240,171,252,0.16)] transition hover:bg-fuchsia-300/25"
+                />
               </article>
               <article className="relative min-w-0 overflow-hidden rounded-xl border border-white/10 bg-[#1a1825] p-3">
                 <h2 className="mb-2 pr-[4.25rem] text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
@@ -2085,10 +2081,11 @@ function App() {
                     <Copy size={15} />
                   </button>
                 </div>
-                <SongLibraryMenu
-                  songName={songName}
-                  songLibrary={songLibrary}
-                  onLoadSong={loadSongFromLibrary}
+                <LibraryPickerMenu
+                  selectedId={songLibrary.find((song) => song.name === songName)?.id ?? ''}
+                  items={songLibrary}
+                  onSelect={loadSongFromLibrary}
+                  openAriaLabel="Open song list"
                   triggerClassName="mt-5 flex min-h-0 w-full max-w-full min-w-0 items-center justify-between gap-2 overflow-hidden rounded-md border border-white/10 bg-white/10 px-2 py-1 text-sm font-semibold text-white/95 transition hover:bg-white/15"
                 />
               </article>

@@ -2,37 +2,40 @@ import { ChevronDown } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 const VIEWPORT_GUTTER_PX = 12
-const VIEWPORT_DROPDOWN_CLASS =
+const DROPDOWN_PANEL_CLASS =
   'fixed z-[60] overflow-y-auto rounded-lg border border-white/10 bg-[#1a1825] p-2 shadow-xl'
-const ANCHOR_DROPDOWN_CLASS =
-  'absolute right-0 top-full z-[60] overflow-y-auto rounded-lg border border-white/10 bg-[#1a1825] p-2 shadow-xl'
 
 type DropdownPlacement = 'viewport' | 'anchor'
 
-type SongEntry = {
+type PickerItem = {
   id: string
   name: string
 }
 
-type SongLibraryMenuProps = {
-  songName: string
-  songLibrary: SongEntry[]
-  onLoadSong: (songId: string) => void
+type LibraryPickerMenuProps = {
+  selectedId: string
+  items: PickerItem[]
+  onSelect: (id: string) => void
   triggerClassName?: string
+  openAriaLabel?: string
+  inactiveItemClassName?: string
   dropdownPlacement?: DropdownPlacement
 }
 
-export function SongLibraryMenu({
-  songName,
-  songLibrary,
-  onLoadSong,
+export function LibraryPickerMenu({
+  selectedId,
+  items,
+  onSelect,
   triggerClassName,
-  dropdownPlacement = 'viewport',
-}: SongLibraryMenuProps) {
+  openAriaLabel = 'Open list',
+  inactiveItemClassName = 'text-white/80 hover:bg-white/10',
+  dropdownPlacement = 'anchor',
+}: LibraryPickerMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownStyle, setDropdownStyle] = useState<Record<string, number>>({})
   const menuRef = useRef<HTMLDivElement | null>(null)
-  const usesViewportDropdown = dropdownPlacement === 'viewport'
+  const selectedName = items.find((item) => item.id === selectedId)?.name ?? '—'
+  const selectableItems = items.filter((item) => item.id !== selectedId)
 
   const updateDropdownPosition = useCallback(() => {
     const container = menuRef.current
@@ -44,9 +47,9 @@ export function SongLibraryMenu({
       return
     }
     const rect = trigger.getBoundingClientRect()
+    const top = rect.bottom + 4
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight
     if (dropdownPlacement === 'viewport') {
-      const top = rect.bottom + 4
-      const viewportHeight = window.visualViewport?.height ?? window.innerHeight
       setDropdownStyle({
         top,
         left: VIEWPORT_GUTTER_PX,
@@ -56,12 +59,11 @@ export function SongLibraryMenu({
       return
     }
 
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.visualViewport?.height ?? window.innerHeight
-    const width = Math.min(288, viewportWidth - VIEWPORT_GUTTER_PX * 2)
     setDropdownStyle({
-      width,
-      maxHeight: Math.max(120, viewportHeight - rect.bottom - VIEWPORT_GUTTER_PX),
+      top,
+      left: rect.left,
+      width: rect.width,
+      maxHeight: Math.max(120, viewportHeight - top - VIEWPORT_GUTTER_PX),
     })
   }, [dropdownPlacement])
 
@@ -108,36 +110,28 @@ export function SongLibraryMenu({
         }
         onClick={() => setMenuOpen((current) => !current)}
         aria-expanded={menuOpen}
-        aria-label="Open song list"
+        aria-label={openAriaLabel}
       >
-        <span className="min-w-0 flex-1 truncate text-left" title={songName}>
-          {songName}
+        <span className="min-w-0 flex-1 truncate text-left" title={selectedName}>
+          {selectedName}
         </span>
         <ChevronDown size={12} className="shrink-0" />
       </button>
       {menuOpen && (
-        <div
-          className={usesViewportDropdown ? VIEWPORT_DROPDOWN_CLASS : ANCHOR_DROPDOWN_CLASS}
-          style={dropdownStyle}
-        >
-          {songLibrary.map((song) => {
-            const isActiveSong = song.name === songName
-            return (
+        <div className={DROPDOWN_PANEL_CLASS} style={dropdownStyle}>
+          {selectableItems.map((item) => (
               <button
-                key={song.id}
+                key={item.id}
                 type="button"
-                className={`block w-full rounded-md px-2 py-1.5 text-left text-sm transition ${
-                  isActiveSong ? 'bg-fuchsia-300/20 text-fuchsia-100' : 'text-white/80 hover:bg-white/10'
-                }`}
+                className={`block w-full rounded-md px-2 py-1.5 text-left text-sm transition ${inactiveItemClassName}`}
                 onClick={() => {
-                  onLoadSong(song.id)
+                  onSelect(item.id)
                   setMenuOpen(false)
                 }}
               >
-                <span className="block truncate">{song.name}</span>
+                <span className="block truncate">{item.name}</span>
               </button>
-            )
-          })}
+            ))}
         </div>
       )}
     </div>
