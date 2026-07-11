@@ -37,10 +37,10 @@ const COMPACT_TRIGGER_CLASS =
   'flex min-h-[40px] w-full min-w-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 transition hover:bg-white/10'
 /** Same text size as TopControls select; tighter padding so long names fit on narrow cards. */
 const SELECT_TRIGGER_CLASS =
-  'flex min-h-[36px] w-full min-w-0 items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-2 py-1.5 text-sm leading-none text-white outline-none transition hover:bg-white/10 focus:border-fuchsia-300/60'
+  'flex min-h-[40px] w-full min-w-0 items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-2 py-2 text-base leading-none text-white outline-none transition hover:bg-white/10 focus:border-fuchsia-300/60'
 const COMPACT_ITEM_CLASS = 'block w-full rounded-md px-2 py-1.5 text-left text-sm transition'
 const SELECT_ITEM_CLASS =
-  'flex w-full min-h-[36px] items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-left text-sm leading-none transition'
+  'flex w-full min-h-[40px] items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-left text-base leading-none transition'
 
 export function LibraryPickerMenu({
   selectedId,
@@ -64,7 +64,7 @@ export function LibraryPickerMenu({
     triggerClassName,
   )
   const resolvedItemClass = isSelectAppearance ? SELECT_ITEM_CLASS : COMPACT_ITEM_CLASS
-  const chevronSize = isSelectAppearance ? 14 : 12
+  const chevronSize = isSelectAppearance ? 16 : 12
 
   const updateDropdownPosition = useCallback(() => {
     const container = menuRef.current
@@ -214,7 +214,7 @@ export function LibraryPickerMenu({
               >
                 {isSelectAppearance && (
                   <Check
-                    size={14}
+                    size={16}
                     strokeWidth={2.5}
                     className={clsx('shrink-0', isSelected ? 'text-white' : 'text-transparent')}
                     aria-hidden={!isSelected}
