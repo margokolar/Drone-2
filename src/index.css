@@ -43,29 +43,6 @@ select {
   min-height: 100dvh;
 }
 
-body.mobile-transport-docked {
-  overflow: hidden;
-  overscroll-behavior: none;
-}
-
-html.ios-standalone-pwa,
-body.ios-standalone-pwa {
-  overflow: hidden;
-  overscroll-behavior: none;
-}
-
-body.ios-standalone-pwa {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: var(--app-height, 100dvh);
-}
-
-html.ios-standalone-pwa #root {
-  height: var(--app-height, 100dvh);
-  min-height: 0;
-}
-
 .tabular-nums {
   font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
   font-variant-numeric: tabular-nums;

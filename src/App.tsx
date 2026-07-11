@@ -58,7 +58,6 @@ import { ToneMixer, TONE_MIXER_SECTION_ID, toneMixerCardElementId } from './comp
 import { TopControls } from './components/TopControls'
 import { ShineControls } from './components/ShineControls'
 import { useAudioEngine } from './hooks/useAudioEngine'
-import { useMobileTransportDock } from './hooks/useMobileTransportDock'
 import { useMetronome } from './hooks/useMetronome'
 import { useOvertoneMidi } from './hooks/useOvertoneMidi'
 import { DEFAULT_SHINE_VOLUME, useShine } from './hooks/useShine'
@@ -76,7 +75,6 @@ import { useBtControl } from './bluetooth/useBtControl'
 import { BLE_KEYBOARD_FOCUS_ROOT_ID } from './utils/restoreBleKeyboardFocus'
 import { BleDebugOverlay } from './components/BleDebugOverlay'
 import { bleDebugEnabled, recordBleDebug } from './utils/bleDebug'
-import { isIosStandalonePwa } from './utils/platform'
 import { TONE_STICKY_CHROME_ID, scrollToneMixerCardIntoView } from './utils/scrollBelowStickyChrome'
 import { triggerSaveFlash } from './utils/saveFlash'
 
@@ -1908,19 +1906,11 @@ function App() {
       new URLSearchParams(window.location.search).get('device') === 'iphone16pm',
     [],
   )
-  const { pinTransportFooter, transportFooterRef, transportFooterHeight } = useMobileTransportDock()
-  const appShellHeightClass = iphone16ProMaxPreview
-    ? 'min-h-full'
-    : pinTransportFooter
-      ? isIosStandalonePwa()
-        ? 'h-[var(--app-height,100dvh)]'
-        : 'h-svh'
-      : 'h-svh md:h-dvh'
   const appShell = (
     <div
-      className={`flex min-h-0 flex-1 flex-col bg-[#111019] text-[#f2f2f7] ${appShellHeightClass} ${
-        activeTab === 'metronome' ? 'overflow-hidden' : ''
-      }`}
+      className={`flex min-h-0 flex-1 flex-col bg-[#111019] text-[#f2f2f7] ${
+        iphone16ProMaxPreview ? 'min-h-full' : 'h-svh md:h-dvh'
+      } ${activeTab === 'metronome' ? 'overflow-hidden' : ''}`}
     >
       <div
         id={BLE_KEYBOARD_FOCUS_ROOT_ID}
@@ -1940,14 +1930,7 @@ function App() {
           }}
         />
       )}
-      <div
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain"
-        style={
-          pinTransportFooter && transportFooterHeight > 0
-            ? { paddingBottom: transportFooterHeight }
-            : undefined
-        }
-      >
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
       <div
         className={`mx-auto w-full max-w-md px-3 pb-5 pt-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
           activeTab === 'overtones' ? 'landscape:pt-0 max-h-[500px]:pt-0' : ''
@@ -2555,12 +2538,7 @@ function App() {
         </main>
       </div>
       </div>
-      <footer
-        ref={transportFooterRef}
-        className={`z-30 bg-[#111019] px-3 pb-[env(safe-area-inset-bottom,0px)] ${
-          pinTransportFooter ? 'fixed inset-x-0 bottom-0' : 'relative shrink-0'
-        }`}
-      >
+      <footer className="z-30 shrink-0 bg-[#111019] px-3 pb-[env(safe-area-inset-bottom,0px)]">
         <div className="mx-auto w-full max-w-[26.5rem] space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-[62.5rem]">
           <nav
             className="overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm"
