@@ -35,12 +35,12 @@ type LibraryPickerMenuProps = {
 
 const COMPACT_TRIGGER_CLASS =
   'flex min-h-[40px] w-full min-w-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 transition hover:bg-white/10'
-/** Same text size as TopControls select; tighter padding so long names fit on narrow cards. */
+/** Same closed-control feel as TopControls; open menu uses larger native-select-like type. */
 const SELECT_TRIGGER_CLASS =
   'flex min-h-[40px] w-full min-w-0 items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-2 py-2 text-base leading-none text-white outline-none transition hover:bg-white/10 focus:border-fuchsia-300/60'
 const COMPACT_ITEM_CLASS = 'block w-full rounded-md px-2 py-1.5 text-left text-sm transition'
 const SELECT_ITEM_CLASS =
-  'flex w-full min-h-[40px] items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-left text-base leading-none transition'
+  'flex w-full min-h-[48px] items-center gap-3 whitespace-nowrap rounded-lg px-4 py-3 text-left text-xl leading-none transition'
 
 export function LibraryPickerMenu({
   selectedId,
@@ -214,7 +214,7 @@ export function LibraryPickerMenu({
               >
                 {isSelectAppearance && (
                   <Check
-                    size={16}
+                    size={20}
                     strokeWidth={2.5}
                     className={clsx('shrink-0', isSelected ? 'text-white' : 'text-transparent')}
                     aria-hidden={!isSelected}
