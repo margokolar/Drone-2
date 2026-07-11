@@ -1,10 +1,12 @@
 import clsx from 'clsx'
-import { ChevronDown } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 const VIEWPORT_GUTTER_PX = 12
-const DROPDOWN_PANEL_CLASS =
+const COMPACT_DROPDOWN_PANEL_CLASS =
   'fixed z-[60] overflow-y-auto rounded-lg border border-white/10 bg-[#1a1825] p-2 shadow-xl'
+const SELECT_DROPDOWN_PANEL_CLASS =
+  'fixed z-[60] overflow-y-auto rounded-xl border border-white/15 bg-[#1d1b2a] py-1 shadow-xl'
 
 type DropdownPlacement = 'viewport' | 'anchor'
 
@@ -29,7 +31,8 @@ const COMPACT_TRIGGER_CLASS =
 const SELECT_TRIGGER_CLASS =
   'flex min-h-[36px] w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 pr-10 text-sm leading-none text-white outline-none transition hover:bg-white/10 focus:border-fuchsia-300/60'
 const COMPACT_ITEM_CLASS = 'block w-full rounded-md px-2 py-1.5 text-left text-sm transition'
-const SELECT_ITEM_CLASS = 'block w-full min-h-[36px] rounded-lg px-3 py-2 text-left text-sm leading-none transition'
+const SELECT_ITEM_CLASS =
+  'flex w-full min-h-[36px] items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm leading-none transition'
 
 export function LibraryPickerMenu({
   selectedId,
@@ -45,8 +48,8 @@ export function LibraryPickerMenu({
   const [dropdownStyle, setDropdownStyle] = useState<Record<string, number>>({})
   const menuRef = useRef<HTMLDivElement | null>(null)
   const selectedName = items.find((item) => item.id === selectedId)?.name ?? '—'
-  const selectableItems = items.filter((item) => item.id !== selectedId)
   const isSelectAppearance = appearance === 'select'
+  const listItems = isSelectAppearance ? items : items.filter((item) => item.id !== selectedId)
   const resolvedTriggerClass = clsx(
     isSelectAppearance ? SELECT_TRIGGER_CLASS : COMPACT_TRIGGER_CLASS,
     triggerClassName,
@@ -64,9 +67,9 @@ export function LibraryPickerMenu({
       return
     }
     const rect = trigger.getBoundingClientRect()
-    const top = rect.bottom + 4
     const viewportHeight = window.visualViewport?.height ?? window.innerHeight
     if (dropdownPlacement === 'viewport') {
+      const top = isSelectAppearance ? rect.top : rect.bottom + 4
       setDropdownStyle({
         top,
         left: VIEWPORT_GUTTER_PX,
@@ -76,13 +79,14 @@ export function LibraryPickerMenu({
       return
     }
 
+    const top = isSelectAppearance ? rect.top : rect.bottom + 4
     setDropdownStyle({
       top,
       left: rect.left,
       width: rect.width,
       maxHeight: Math.max(120, viewportHeight - top - VIEWPORT_GUTTER_PX),
     })
-  }, [dropdownPlacement])
+  }, [dropdownPlacement, isSelectAppearance])
 
   useLayoutEffect(() => {
     if (!menuOpen) {
@@ -121,7 +125,7 @@ export function LibraryPickerMenu({
     <div className="relative min-w-0" ref={menuRef}>
       <button
         type="button"
-        className={resolvedTriggerClass}
+        className={clsx(resolvedTriggerClass, menuOpen && isSelectAppearance && 'invisible')}
         onClick={() => setMenuOpen((current) => !current)}
         aria-expanded={menuOpen}
         aria-label={openAriaLabel}
@@ -134,24 +138,50 @@ export function LibraryPickerMenu({
       {isSelectAppearance && (
         <ChevronDown
           size={chevronSize}
-          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/70"
+          className={clsx(
+            'pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/70',
+            menuOpen && 'invisible',
+          )}
         />
       )}
       {menuOpen && (
-        <div className={DROPDOWN_PANEL_CLASS} style={dropdownStyle}>
-          {selectableItems.map((item) => (
+        <div
+          className={isSelectAppearance ? SELECT_DROPDOWN_PANEL_CLASS : COMPACT_DROPDOWN_PANEL_CLASS}
+          style={dropdownStyle}
+        >
+          {listItems.map((item) => {
+            const isSelected = item.id === selectedId
+            return (
               <button
                 key={item.id}
                 type="button"
-                className={`${resolvedItemClass} ${inactiveItemClassName}`}
+                className={clsx(
+                  resolvedItemClass,
+                  isSelectAppearance
+                    ? isSelected
+                      ? 'text-white'
+                      : 'text-white hover:bg-white/10'
+                    : inactiveItemClassName,
+                )}
                 onClick={() => {
-                  onSelect(item.id)
+                  if (!isSelected) {
+                    onSelect(item.id)
+                  }
                   setMenuOpen(false)
                 }}
               >
-                <span className="block truncate">{item.name}</span>
+                {isSelectAppearance && (
+                  <Check
+                    size={14}
+                    strokeWidth={2.5}
+                    className={clsx('shrink-0', isSelected ? 'text-white' : 'text-transparent')}
+                    aria-hidden={!isSelected}
+                  />
+                )}
+                <span className="min-w-0 flex-1 truncate">{item.name}</span>
               </button>
-            ))}
+            )
+          })}
         </div>
       )}
     </div>
