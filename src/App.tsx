@@ -2107,7 +2107,7 @@ function App() {
           onTouchEnd={handleSwipeTouchEnd}
         >
           <div className="space-y-3" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
-            <SectionCard title="Global controls" className="[&>header]:mb-2.5">
+            <SectionCard title="Global controls" className="[&>header]:hidden">
               <div className="space-y-3">
                 <TopControls
                   referenceA4Hz={referenceA4Hz}

@@ -123,11 +123,6 @@ select {
   padding-block: var(--tone-mixer-gap);
 }
 
-.tone-mixer-value-row--after-fader {
-  min-height: auto;
-  padding-top: 0;
-}
-
 .tone-mixer-fader-slot {
   box-sizing: border-box;
   display: flex;

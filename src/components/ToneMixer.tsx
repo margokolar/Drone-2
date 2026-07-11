@@ -247,28 +247,21 @@ export function ToneMixer({
                 <ToneGainFader tone={tone} strictSolo={strictSolo} onToneGain={onToneGain} />
               )}
             </div>
-            {spatialExpanded ? (
-              <div className="tone-mixer-pan grid w-full grid-cols-[1fr_auto] items-center gap-1.5 border-t border-white/10 pt-2 text-xs">
-                <span className="text-white/60">Pan</span>
-                <span className="tabular-nums text-white/70">{tone.pan.toFixed(2)}</span>
-                <ResettableRangeInput
-                  min={-1}
-                  max={1}
-                  step={0.01}
-                  value={tone.pan}
-                  onChange={(event) => onTonePan(tone.noteId, Number(event.target.value))}
-                  onReset={() => onTonePan(tone.noteId, DEFAULT_TONE_PAN)}
-                  aria-label={`${getTonePageLabel(tone.noteId)} pan. Double-click or double-tap to reset to default.`}
-                  className={`col-span-2 h-2 w-full ${accentClassName}`}
-                />
-              </div>
-            ) : null}
-            <div
-              className={clsx(
-                'tone-mixer-value-row',
-                !spatialExpanded && 'tone-mixer-value-row--after-fader',
-              )}
-            >
+            <div className="tone-mixer-pan grid w-full grid-cols-[1fr_auto] items-center gap-1.5 border-t border-white/10 pt-2 text-xs">
+              <span className="text-white/60">Pan</span>
+              <span className="tabular-nums text-white/70">{tone.pan.toFixed(2)}</span>
+              <ResettableRangeInput
+                min={-1}
+                max={1}
+                step={0.01}
+                value={tone.pan}
+                onChange={(event) => onTonePan(tone.noteId, Number(event.target.value))}
+                onReset={() => onTonePan(tone.noteId, DEFAULT_TONE_PAN)}
+                aria-label={`${getTonePageLabel(tone.noteId)} pan. Double-click or double-tap to reset to default.`}
+                className={`col-span-2 h-2 w-full ${accentClassName}`}
+              />
+            </div>
+            <div className="tone-mixer-value-row">
               <span className="tone-mixer-hz tabular-nums text-[10px] leading-tight text-white/55">
                 {formatToneFrequencyHz(toneFrequencyHz)}
               </span>
