@@ -16,6 +16,7 @@ const SELECT_DROPDOWN_PANEL_CLASS =
   'fixed z-[60] w-max overflow-y-auto rounded-xl border border-white/15 bg-[#1d1b2a] py-1 shadow-xl'
 
 type DropdownPlacement = 'viewport' | 'anchor'
+type DropdownAlign = 'start' | 'end'
 
 type PickerItem = {
   id: string
@@ -30,6 +31,7 @@ type LibraryPickerMenuProps = {
   openAriaLabel?: string
   inactiveItemClassName?: string
   dropdownPlacement?: DropdownPlacement
+  dropdownAlign?: DropdownAlign
   appearance?: 'compact' | 'select'
 }
 
@@ -50,6 +52,7 @@ export function LibraryPickerMenu({
   openAriaLabel = 'Open list',
   inactiveItemClassName = 'text-white/80 hover:bg-white/10',
   dropdownPlacement = 'anchor',
+  dropdownAlign = 'start',
   appearance = 'compact',
 }: LibraryPickerMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -94,9 +97,21 @@ export function LibraryPickerMenu({
 
     if (isSelectAppearance) {
       // Native <select> menus size to content, not the closed control width.
+      if (dropdownAlign === 'end') {
+        setDropdownStyle({
+          top,
+          right: VIEWPORT_GUTTER_PX,
+          left: 'auto',
+          minWidth: rect.width,
+          maxWidth,
+          maxHeight: Math.max(120, viewportHeight - top - VIEWPORT_GUTTER_PX),
+        })
+        return
+      }
       setDropdownStyle({
         top,
         left: rect.left,
+        right: 'auto',
         minWidth: rect.width,
         maxWidth,
         maxHeight: Math.max(120, viewportHeight - top - VIEWPORT_GUTTER_PX),
@@ -110,7 +125,7 @@ export function LibraryPickerMenu({
       width: rect.width,
       maxHeight: Math.max(120, viewportHeight - top - VIEWPORT_GUTTER_PX),
     })
-  }, [dropdownPlacement, isSelectAppearance])
+  }, [dropdownPlacement, isSelectAppearance, dropdownAlign])
 
   useLayoutEffect(() => {
     if (!menuOpen) {
@@ -126,7 +141,12 @@ export function LibraryPickerMenu({
   }, [menuOpen, updateDropdownPosition])
 
   useLayoutEffect(() => {
-    if (!menuOpen || !isSelectAppearance || dropdownPlacement !== 'anchor') {
+    if (
+      !menuOpen ||
+      !isSelectAppearance ||
+      dropdownPlacement !== 'anchor' ||
+      dropdownAlign !== 'start'
+    ) {
       return
     }
     const panel = dropdownRef.current
@@ -146,7 +166,7 @@ export function LibraryPickerMenu({
     if (left !== panelRect.left) {
       setDropdownStyle((current) => ({ ...current, left }))
     }
-  }, [menuOpen, isSelectAppearance, dropdownPlacement, listItems])
+  }, [menuOpen, isSelectAppearance, dropdownPlacement, dropdownAlign, listItems])
 
   useEffect(() => {
     if (!menuOpen) {

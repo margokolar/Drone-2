@@ -2087,6 +2087,7 @@ function App() {
                   items={songLibrary}
                   onSelect={loadSongFromLibrary}
                   appearance="select"
+                  dropdownAlign="end"
                   openAriaLabel="Open song list"
                   triggerClassName="mt-5"
                 />
