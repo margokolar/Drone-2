@@ -1,12 +1,19 @@
 import clsx from 'clsx'
 import { Check, ChevronDown } from 'lucide-react'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
 
 const VIEWPORT_GUTTER_PX = 12
 const COMPACT_DROPDOWN_PANEL_CLASS =
   'fixed z-[60] overflow-y-auto rounded-lg border border-white/10 bg-[#1a1825] p-2 shadow-xl'
 const SELECT_DROPDOWN_PANEL_CLASS =
-  'fixed z-[60] overflow-y-auto rounded-xl border border-white/15 bg-[#1d1b2a] py-1 shadow-xl'
+  'fixed z-[60] w-max overflow-y-auto rounded-xl border border-white/15 bg-[#1d1b2a] py-1 shadow-xl'
 
 type DropdownPlacement = 'viewport' | 'anchor'
 
@@ -28,12 +35,12 @@ type LibraryPickerMenuProps = {
 
 const COMPACT_TRIGGER_CLASS =
   'flex min-h-[40px] w-full min-w-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 transition hover:bg-white/10'
-/** Matches TopControls tuning system / tonal center select. */
+/** Same text size as TopControls select; tighter padding so long names fit on narrow cards. */
 const SELECT_TRIGGER_CLASS =
-  'flex min-h-[36px] w-full min-w-0 items-center rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 pr-10 text-sm leading-none text-white outline-none transition hover:bg-white/10 focus:border-fuchsia-300/60'
+  'flex min-h-[36px] w-full min-w-0 items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-2 py-1.5 text-sm leading-none text-white outline-none transition hover:bg-white/10 focus:border-fuchsia-300/60'
 const COMPACT_ITEM_CLASS = 'block w-full rounded-md px-2 py-1.5 text-left text-sm transition'
 const SELECT_ITEM_CLASS =
-  'flex w-full min-h-[36px] items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm leading-none transition'
+  'flex w-full min-h-[36px] items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-left text-sm leading-none transition'
 
 export function LibraryPickerMenu({
   selectedId,
@@ -46,8 +53,9 @@ export function LibraryPickerMenu({
   appearance = 'compact',
 }: LibraryPickerMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const [dropdownStyle, setDropdownStyle] = useState<Record<string, number>>({})
+  const [dropdownStyle, setDropdownStyle] = useState<CSSProperties>({})
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const dropdownRef = useRef<HTMLDivElement | null>(null)
   const selectedName = items.find((item) => item.id === selectedId)?.name ?? '—'
   const isSelectAppearance = appearance === 'select'
   const listItems = isSelectAppearance ? items : items.filter((item) => item.id !== selectedId)
@@ -56,7 +64,7 @@ export function LibraryPickerMenu({
     triggerClassName,
   )
   const resolvedItemClass = isSelectAppearance ? SELECT_ITEM_CLASS : COMPACT_ITEM_CLASS
-  const chevronSize = isSelectAppearance ? 18 : 12
+  const chevronSize = isSelectAppearance ? 14 : 12
 
   const updateDropdownPosition = useCallback(() => {
     const container = menuRef.current
@@ -68,6 +76,7 @@ export function LibraryPickerMenu({
       return
     }
     const rect = trigger.getBoundingClientRect()
+    const viewportWidth = window.visualViewport?.width ?? window.innerWidth
     const viewportHeight = window.visualViewport?.height ?? window.innerHeight
     if (dropdownPlacement === 'viewport') {
       const top = isSelectAppearance ? rect.top : rect.bottom + 4
@@ -81,6 +90,20 @@ export function LibraryPickerMenu({
     }
 
     const top = isSelectAppearance ? rect.top : rect.bottom + 4
+    const maxWidth = Math.max(rect.width, viewportWidth - VIEWPORT_GUTTER_PX * 2)
+
+    if (isSelectAppearance) {
+      // Native <select> menus size to content, not the closed control width.
+      setDropdownStyle({
+        top,
+        left: rect.left,
+        minWidth: rect.width,
+        maxWidth,
+        maxHeight: Math.max(120, viewportHeight - top - VIEWPORT_GUTTER_PX),
+      })
+      return
+    }
+
     setDropdownStyle({
       top,
       left: rect.left,
@@ -101,6 +124,29 @@ export function LibraryPickerMenu({
       window.removeEventListener('scroll', updateDropdownPosition, true)
     }
   }, [menuOpen, updateDropdownPosition])
+
+  useLayoutEffect(() => {
+    if (!menuOpen || !isSelectAppearance || dropdownPlacement !== 'anchor') {
+      return
+    }
+    const panel = dropdownRef.current
+    const container = menuRef.current
+    const trigger = container?.querySelector('button')
+    if (!(panel instanceof HTMLElement) || !(trigger instanceof HTMLElement)) {
+      return
+    }
+    const triggerRect = trigger.getBoundingClientRect()
+    const panelRect = panel.getBoundingClientRect()
+    const viewportWidth = window.visualViewport?.width ?? window.innerWidth
+    const maxRight = viewportWidth - VIEWPORT_GUTTER_PX
+    let left = triggerRect.left
+    if (left + panelRect.width > maxRight) {
+      left = Math.max(VIEWPORT_GUTTER_PX, maxRight - panelRect.width)
+    }
+    if (left !== panelRect.left) {
+      setDropdownStyle((current) => ({ ...current, left }))
+    }
+  }, [menuOpen, isSelectAppearance, dropdownPlacement, listItems])
 
   useEffect(() => {
     if (!menuOpen) {
@@ -134,19 +180,14 @@ export function LibraryPickerMenu({
         <span className="min-w-0 flex-1 truncate text-left" title={selectedName}>
           {selectedName}
         </span>
-        {!isSelectAppearance && <ChevronDown size={chevronSize} className="shrink-0" />}
-      </button>
-      {isSelectAppearance && (
         <ChevronDown
           size={chevronSize}
-          className={clsx(
-            'pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/70',
-            menuOpen && 'invisible',
-          )}
+          className={clsx('shrink-0 text-white/70', menuOpen && isSelectAppearance && 'invisible')}
         />
-      )}
+      </button>
       {menuOpen && (
         <div
+          ref={dropdownRef}
           className={isSelectAppearance ? SELECT_DROPDOWN_PANEL_CLASS : COMPACT_DROPDOWN_PANEL_CLASS}
           style={dropdownStyle}
         >
@@ -179,7 +220,9 @@ export function LibraryPickerMenu({
                     aria-hidden={!isSelected}
                   />
                 )}
-                <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                <span className={clsx(isSelectAppearance ? 'shrink-0' : 'min-w-0 flex-1 truncate')}>
+                  {item.name}
+                </span>
               </button>
             )
           })}
