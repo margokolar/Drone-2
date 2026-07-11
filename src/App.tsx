@@ -1908,9 +1908,9 @@ function App() {
   )
   const appShell = (
     <div
-      className={`flex flex-col bg-[#111019] text-[#f2f2f7] ${
-        iphone16ProMaxPreview ? 'min-h-full flex-1' : 'h-dvh'
-      } ${activeTab === 'metronome' ? 'overflow-hidden' : ''}`}
+      className={`relative ${
+        iphone16ProMaxPreview ? 'min-h-full min-w-0' : 'min-h-screen'
+      } bg-[#111019] text-[#f2f2f7] ${activeTab === 'metronome' ? 'h-screen overflow-hidden' : ''}`}
     >
       <div
         id={BLE_KEYBOARD_FOCUS_ROOT_ID}
@@ -1930,7 +1930,6 @@ function App() {
           }}
         />
       )}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
       <div
         className={`mx-auto w-full max-w-md px-3 pb-5 pt-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
           activeTab === 'overtones' ? 'landscape:pt-0 max-h-[500px]:pt-0' : ''
@@ -2104,7 +2103,7 @@ function App() {
 
         <main
           className={`landscape:pb-2 max-h-[500px]:pb-2 ${
-            activeTab === 'metronome' ? 'pb-4' : 'pb-3'
+            activeTab === 'metronome' ? 'pb-32' : 'pb-44'
           }`}
           onTouchStart={handleSwipeTouchStart}
           onTouchEnd={handleSwipeTouchEnd}
@@ -2537,8 +2536,7 @@ function App() {
           </div>
         </main>
       </div>
-      </div>
-      <footer className="z-30 shrink-0 bg-[#111019] px-3 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-1">
+      <div className="fixed bottom-0 left-0 right-0 z-30 px-3 pb-2">
         <div className="mx-auto w-full max-w-[26.5rem] space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-[62.5rem]">
           <nav
             className="overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm"
@@ -2701,7 +2699,7 @@ function App() {
               </div>
             </div>
         </div>
-      </footer>
+      </div>
       {(menuOpen) && (
         <>
           <button
@@ -3247,7 +3245,7 @@ function App() {
       >
         <div
           ref={previewScrollRef}
-          className="flex h-full min-h-0 w-full flex-col overflow-hidden"
+          className="relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain"
         >
           {appShell}
         </div>
