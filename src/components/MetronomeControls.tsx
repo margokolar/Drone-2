@@ -131,7 +131,7 @@ export function MetronomeControls({
                 min={30}
                 max={220}
                 decimals={0}
-                className="w-[3.75rem] max-w-full rounded-md border border-white/15 bg-white/10 px-1.5 py-1 text-center tabular-nums text-3xl text-white/90 outline-none transition focus:border-fuchsia-300/60"
+                className="box-border flex min-h-11 w-[4.75rem] max-w-full items-center justify-center rounded-md border border-white/15 bg-white/10 px-1 py-1 text-center tabular-nums text-3xl leading-none text-white/90 outline-none transition focus:border-fuchsia-300/60"
                 ariaLabel="Tempo BPM"
               />
               <button
@@ -145,7 +145,7 @@ export function MetronomeControls({
               <span>BPM</span>
               <button
                 type="button"
-                className="flex h-8 items-center rounded-md border border-white/15 bg-white/10 px-2.5 text-xs font-medium text-white/85 transition hover:bg-white/15"
+                className="flex min-h-11 items-center rounded-md border border-white/15 bg-white/10 px-3 text-sm font-medium text-white/85 transition hover:bg-white/15"
                 onClick={handleTapTempo}
                 aria-label="Tap tempo"
               >
