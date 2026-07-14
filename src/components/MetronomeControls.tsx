@@ -114,44 +114,46 @@ export function MetronomeControls({
 
       <div className="space-y-3">
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span className="text-white/70">Tempo</span>
-            <div className="flex flex-wrap items-center gap-2 text-white/85">
-              <button
-                type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/10 text-sm text-white/90 transition hover:bg-white/15"
-                onClick={() => onBpmChange(Math.round(bpm) - 1)}
-                aria-label="Decrease tempo by 1 BPM"
-              >
-                -
-              </button>
-              <NumericValueField
-                value={bpm}
-                onCommit={onBpmChange}
-                min={30}
-                max={220}
-                decimals={0}
-                className="box-border flex min-h-11 w-[4.75rem] max-w-full items-center justify-center rounded-md border border-white/15 bg-white/10 px-1 py-1 text-center tabular-nums text-3xl leading-none text-white/90 outline-none transition focus:border-fuchsia-300/60"
-                ariaLabel="Tempo BPM"
-              />
-              <button
-                type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/10 text-sm text-white/90 transition hover:bg-white/15"
-                onClick={() => onBpmChange(Math.round(bpm) + 1)}
-                aria-label="Increase tempo by 1 BPM"
-              >
-                +
-              </button>
-              <span>BPM</span>
-              <button
-                type="button"
-                className="flex min-h-11 items-center rounded-md border border-white/15 bg-white/10 px-3 text-sm font-medium text-white/85 transition hover:bg-white/15"
-                onClick={handleTapTempo}
-                aria-label="Tap tempo"
-              >
-                Tap
-              </button>
+          <div className="mb-2 grid grid-cols-4 items-center gap-2 text-sm">
+            <div className="col-span-3 flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <span className="text-white/70">Tempo</span>
+              <div className="flex flex-wrap items-center gap-2 text-white/85">
+                <button
+                  type="button"
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/10 text-sm text-white/90 transition hover:bg-white/15"
+                  onClick={() => onBpmChange(Math.round(bpm) - 1)}
+                  aria-label="Decrease tempo by 1 BPM"
+                >
+                  -
+                </button>
+                <NumericValueField
+                  value={bpm}
+                  onCommit={onBpmChange}
+                  min={30}
+                  max={220}
+                  decimals={0}
+                  className="box-border flex min-h-11 w-[4.75rem] max-w-full items-center justify-center rounded-md border border-white/15 bg-white/10 px-1 py-1 text-center tabular-nums text-3xl leading-none text-white/90 outline-none transition focus:border-fuchsia-300/60"
+                  ariaLabel="Tempo BPM"
+                />
+                <button
+                  type="button"
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/10 text-sm text-white/90 transition hover:bg-white/15"
+                  onClick={() => onBpmChange(Math.round(bpm) + 1)}
+                  aria-label="Increase tempo by 1 BPM"
+                >
+                  +
+                </button>
+                <span>BPM</span>
+              </div>
             </div>
+            <button
+              type="button"
+              className="flex min-h-11 w-full items-center justify-center rounded-md border border-white/15 bg-white/10 px-2 text-sm font-medium text-white/85 transition hover:bg-white/15"
+              onClick={handleTapTempo}
+              aria-label="Tap tempo"
+            >
+              Tap
+            </button>
           </div>
           <ResettableRangeInput
             min={30}
