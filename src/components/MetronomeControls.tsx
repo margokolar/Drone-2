@@ -6,6 +6,10 @@ import { NumericValueField } from './NumericValueField'
 import { ResettableRangeInput } from './ResettableRangeInput'
 
 const TEMPO_PRESETS = Array.from({ length: 12 }, (_, index) => 40 + index * 10)
+const TAP_TEMPO_RESET_MS = 2000
+const TAP_TEMPO_MIN_BPM = 30
+const TAP_TEMPO_MAX_BPM = 220
+const TAP_TEMPO_HISTORY_LIMIT = 8
 
 type MetronomeControlsProps = {
   enabled: boolean
@@ -30,6 +34,31 @@ export function MetronomeControls({
 }: MetronomeControlsProps) {
   const [beatFlash, setBeatFlash] = useState(false)
   const beatFlashTimeoutRef = useRef<number | null>(null)
+  const tapTimesRef = useRef<number[]>([])
+
+  const handleTapTempo = () => {
+    const now = performance.now()
+    const previousTaps = tapTimesRef.current
+    const recentTaps =
+      previousTaps.length > 0 && now - previousTaps[previousTaps.length - 1] > TAP_TEMPO_RESET_MS
+        ? []
+        : previousTaps
+    const nextTaps = [...recentTaps, now].slice(-TAP_TEMPO_HISTORY_LIMIT)
+    tapTimesRef.current = nextTaps
+    if (nextTaps.length < 2) {
+      return
+    }
+    const intervals: number[] = []
+    for (let index = 1; index < nextTaps.length; index += 1) {
+      intervals.push(nextTaps[index] - nextTaps[index - 1])
+    }
+    const averageMs = intervals.reduce((sum, value) => sum + value, 0) / intervals.length
+    if (averageMs <= 0) {
+      return
+    }
+    const nextBpm = Math.round(60_000 / averageMs)
+    onBpmChange(Math.min(TAP_TEMPO_MAX_BPM, Math.max(TAP_TEMPO_MIN_BPM, nextBpm)))
+  }
 
   useEffect(() => {
     if (!enabled) {
@@ -102,7 +131,7 @@ export function MetronomeControls({
                 min={30}
                 max={220}
                 decimals={0}
-                className="w-28 max-w-full rounded-md border border-white/15 bg-white/10 px-2 py-1 text-right tabular-nums text-3xl text-white/90 outline-none transition focus:border-fuchsia-300/60"
+                className="w-[3.75rem] max-w-full rounded-md border border-white/15 bg-white/10 px-1.5 py-1 text-center tabular-nums text-3xl text-white/90 outline-none transition focus:border-fuchsia-300/60"
                 ariaLabel="Tempo BPM"
               />
               <button
@@ -114,6 +143,14 @@ export function MetronomeControls({
                 +
               </button>
               <span>BPM</span>
+              <button
+                type="button"
+                className="flex h-8 items-center rounded-md border border-white/15 bg-white/10 px-2.5 text-xs font-medium text-white/85 transition hover:bg-white/15"
+                onClick={handleTapTempo}
+                aria-label="Tap tempo"
+              >
+                Tap
+              </button>
             </div>
           </div>
           <ResettableRangeInput
