@@ -1299,91 +1299,95 @@ export const useDroneStore = create<DroneState>()(
       name: 'bourdon-store-v1',
       version: 16,
       migrate: (persistedState) => {
-        const typed = persistedState as Partial<DroneState> | undefined
-        if (!typed) {
+        try {
+          const typed = persistedState as Partial<DroneState> | undefined
+          if (!typed) {
+            return persistedState
+          }
+          const incomingPartials = normalizePartials(typed.partials ?? [])
+          const incomingTimbre = normalizeTimbreBlend(typed.timbreBlend ?? DEFAULT_TIMBRE_BLEND)
+          const migratedPresets = (typed.presets ?? []).map((preset) =>
+            duplicatePresetData({
+              ...preset,
+              baseOctave: clamp(
+                preset.baseOctave ?? 3,
+                MIN_BASE_OCTAVE,
+                MAX_BASE_OCTAVE,
+              ),
+              partials: normalizePartials(preset.partials ?? incomingPartials),
+              timbreBlend: normalizeTimbreBlend(preset.timbreBlend ?? incomingTimbre),
+              tones: migrateTones(
+                preset.tones ?? [],
+                preset.partials ?? incomingPartials,
+                normalizeTimbreBlend(preset.timbreBlend ?? incomingTimbre),
+              ),
+            }),
+          )
+          const resolvedActivePresetId = resolveActivePresetId(
+            migratedPresets.length ? migratedPresets : DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset)),
+            typed.activePresetId,
+          )
+          const migratedTones = migrateTones(
+            typed.tones ?? INITIAL_PRESET.tones,
+            incomingPartials,
+            incomingTimbre,
+          )
+          return {
+            ...typed,
+            presets: migratedPresets,
+            activePresetId: resolvedActivePresetId,
+            partials: incomingPartials,
+            timbreBlend: incomingTimbre,
+            tones: migratedTones,
+            shine: normalizeShine(typed.shine),
+            baseOctave: clamp(typed.baseOctave ?? 3, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
+            songName: typed.songName ?? 'My Song',
+            songLibrary:
+              typed.songLibrary?.map((song) => ({
+                ...song,
+                presets: (song.presets ?? []).map((preset) => duplicatePresetData(preset)),
+              })) ?? [
+                {
+                  id: INITIAL_SONG_ID,
+                  name: typed.songName ?? 'My Song',
+                  presets: migratedPresets.length
+                    ? migratedPresets.map((preset) => duplicatePresetData(preset))
+                    : DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset)),
+                  activePresetId: typed.activePresetId ?? INITIAL_PRESET.id,
+                },
+              ],
+            metronomeEnabled: typed.metronomeEnabled ?? false,
+            metronomeBpm: typed.metronomeBpm ?? 72,
+            metronomeVolumeDb: typed.metronomeVolumeDb ?? -15,
+            metronomeMuted: typed.metronomeMuted ?? false,
+            harmonicTimbreEnabled: typed.harmonicTimbreEnabled ?? true,
+            entryGlideEnabled: typed.entryGlideEnabled ?? true,
+            entryGlideLowestCents: clamp(
+              -(typed.entryGlideLowestCents ?? DEFAULT_ENTRY_GLIDE_LOWEST_CENTS),
+              -50,
+              50,
+            ),
+            entryGlideLowestSeconds: clamp(
+              typed.entryGlideLowestSeconds ?? DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS,
+              0,
+              4,
+            ),
+            entryGlideHighestCents: clamp(
+              -(typed.entryGlideHighestCents ?? DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS),
+              -50,
+              50,
+            ),
+            entryGlideHighestSeconds: clamp(
+              typed.entryGlideHighestSeconds ?? DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS,
+              0,
+              4,
+            ),
+            globalOvertoneEditEnabled: typed.globalOvertoneEditEnabled ?? false,
+            controlsLocked: typed.controlsLocked ?? false,
+            btControlMode: typed.btControlMode === 'speaker' ? 'speaker' : 'pedal',
+          }
+        } catch {
           return persistedState
-        }
-        const incomingPartials = normalizePartials(typed.partials ?? [])
-        const incomingTimbre = normalizeTimbreBlend(typed.timbreBlend ?? DEFAULT_TIMBRE_BLEND)
-        const migratedPresets = (typed.presets ?? []).map((preset) =>
-          duplicatePresetData({
-            ...preset,
-            baseOctave: clamp(
-              preset.baseOctave ?? 3,
-              MIN_BASE_OCTAVE,
-              MAX_BASE_OCTAVE,
-            ),
-            partials: normalizePartials(preset.partials ?? incomingPartials),
-            timbreBlend: normalizeTimbreBlend(preset.timbreBlend ?? incomingTimbre),
-            tones: migrateTones(
-              preset.tones ?? [],
-              preset.partials ?? incomingPartials,
-              normalizeTimbreBlend(preset.timbreBlend ?? incomingTimbre),
-            ),
-          }),
-        )
-        const resolvedActivePresetId = resolveActivePresetId(
-          migratedPresets.length ? migratedPresets : DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset)),
-          typed.activePresetId,
-        )
-        const migratedTones = migrateTones(
-          typed.tones ?? INITIAL_PRESET.tones,
-          incomingPartials,
-          incomingTimbre,
-        )
-        return {
-          ...typed,
-          presets: migratedPresets,
-          activePresetId: resolvedActivePresetId,
-          partials: incomingPartials,
-          timbreBlend: incomingTimbre,
-          tones: migratedTones,
-          shine: normalizeShine(typed.shine),
-          baseOctave: clamp(typed.baseOctave ?? 3, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
-          songName: typed.songName ?? 'My Song',
-          songLibrary:
-            typed.songLibrary?.map((song) => ({
-              ...song,
-              presets: song.presets.map((preset) => duplicatePresetData(preset)),
-            })) ?? [
-              {
-                id: INITIAL_SONG_ID,
-                name: typed.songName ?? 'My Song',
-                presets: migratedPresets.length
-                  ? migratedPresets.map((preset) => duplicatePresetData(preset))
-                  : DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset)),
-                activePresetId: typed.activePresetId ?? INITIAL_PRESET.id,
-              },
-            ],
-          metronomeEnabled: typed.metronomeEnabled ?? false,
-          metronomeBpm: typed.metronomeBpm ?? 72,
-          metronomeVolumeDb: typed.metronomeVolumeDb ?? -15,
-          metronomeMuted: typed.metronomeMuted ?? false,
-          harmonicTimbreEnabled: typed.harmonicTimbreEnabled ?? true,
-          entryGlideEnabled: typed.entryGlideEnabled ?? true,
-          entryGlideLowestCents: clamp(
-            -(typed.entryGlideLowestCents ?? DEFAULT_ENTRY_GLIDE_LOWEST_CENTS),
-            -50,
-            50,
-          ),
-          entryGlideLowestSeconds: clamp(
-            typed.entryGlideLowestSeconds ?? DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS,
-            0,
-            4,
-          ),
-          entryGlideHighestCents: clamp(
-            -(typed.entryGlideHighestCents ?? DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS),
-            -50,
-            50,
-          ),
-          entryGlideHighestSeconds: clamp(
-            typed.entryGlideHighestSeconds ?? DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS,
-            0,
-            4,
-          ),
-          globalOvertoneEditEnabled: typed.globalOvertoneEditEnabled ?? false,
-          controlsLocked: typed.controlsLocked ?? false,
-          btControlMode: typed.btControlMode === 'speaker' ? 'speaker' : 'pedal',
         }
       },
       partialize: (state) => ({

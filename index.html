@@ -10,6 +10,72 @@
     <meta name="apple-mobile-web-app-title" content="Drone 2" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180.png" />
     <title>Drone 2</title>
+    <style>
+      html,
+      body,
+      #root {
+        margin: 0;
+        min-height: 100%;
+        background: #111019;
+      }
+    </style>
+    <script>
+      ;(function () {
+        var reloadKey = 'drone-boot-reload'
+        function clearAndReload() {
+          if (sessionStorage.getItem(reloadKey) === '1') {
+            return
+          }
+          sessionStorage.setItem(reloadKey, '1')
+          var done = function () {
+            location.reload()
+          }
+          if (!('serviceWorker' in navigator)) {
+            done()
+            return
+          }
+          navigator.serviceWorker
+            .getRegistrations()
+            .then(function (regs) {
+              return Promise.all(regs.map(function (reg) { return reg.unregister() }))
+            })
+            .then(function () {
+              if (!('caches' in window)) {
+                done()
+                return
+              }
+              return caches.keys().then(function (keys) {
+                return Promise.all(keys.map(function (key) { return caches.delete(key) }))
+              })
+            })
+            .then(done)
+            .catch(done)
+        }
+        window.addEventListener('error', function (event) {
+          var message = String((event && event.message) || '')
+          var source = String((event && event.filename) || '')
+          if (
+            /Loading chunk|Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(
+              message,
+            ) ||
+            /\/assets\/index-.*\.js$/i.test(source)
+          ) {
+            clearAndReload()
+          }
+        })
+        window.addEventListener('unhandledrejection', function (event) {
+          var reason = event && event.reason
+          var message = String((reason && reason.message) || reason || '')
+          if (
+            /Loading chunk|Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(
+              message,
+            )
+          ) {
+            clearAndReload()
+          }
+        })
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
