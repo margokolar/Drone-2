@@ -1,0 +1,44 @@
+---
+description: iOS (Capacitor) workflow for this repo — how to build and deploy to the iPhone
+alwaysApply: true
+---
+
+# iOS / Capacitor workflow
+
+This repo is a React+Vite PWA **and** a Capacitor iOS app. The web/Vercel build is
+unchanged; Capacitor adds `capacitor.config.ts` and the `ios/` Xcode project
+(committed to git). Full plan and future backlog: `docs/capacitor-ios-plan.md`.
+
+## Facts
+
+- App name: **Bourdon**, bundle ID: **`com.margokolar.bourdon`**, web dir: `dist`
+- Capacitor 8, iOS platform uses **SPM** (no CocoaPods)
+- `xcode-select` points to CommandLineTools on this Mac; always set
+  `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` for `xcodebuild`/`xcrun`
+  (the deploy script does this itself)
+- Signing: **free Apple ID (Personal Team)** for now — installs expire after 7 days;
+  re-running the deploy refreshes them. No Apple Developer Program yet, so no
+  TestFlight and no `xcodebuild archive` for distribution.
+- The signing team was selected manually in Xcode once; do not change signing
+  settings in `project.pbxproj` without being asked.
+
+## Commands
+
+- `npm run ios` — full deploy: web build → `cap sync ios` → `xcodebuild` → install +
+  launch on the connected iPhone (`scripts/ios-deploy.sh`). Phone must be plugged in
+  (or Wi-Fi paired) and unlocked.
+- `npm run ios:sync` — web build + `cap sync ios` only (after web-code changes)
+- `npm run ios:open` — open the Xcode project (rarely needed)
+- After changing anything under `ios/` native config or adding Capacitor plugins,
+  run `npx cap sync ios`.
+
+## Rules
+
+- Web-only changes still get verified with `npm run dev` / `npm run build`; only
+  deploy to the phone when the user wants to test on the phone.
+- Do not add native plugins, MIDI, or live-audio work unless the user asks — that is
+  future backlog (Phases 2–5 in the plan doc).
+- Never commit `ios/App/App/public` or `ios/DerivedData` (already gitignored).
+- The user (Margo) is non-technical: he should never need to open Xcode. If a deploy
+  fails, diagnose and fix it via CLI; explain in plain Estonian what he must do on
+  the phone (e.g. trust dialogs), if anything.

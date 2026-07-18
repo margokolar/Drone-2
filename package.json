@@ -8,9 +8,15 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "ios": "bash scripts/ios-deploy.sh",
+    "ios:open": "cap open ios",
+    "ios:sync": "npm run build && cap sync ios"
   },
   "dependencies": {
+    "@capacitor/cli": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
+    "@capacitor/ios": "^8.4.2",
     "@fontsource/noto-music": "^5.2.8",
     "clsx": "^2.1.1",
     "lucide-react": "^0.563.0",
