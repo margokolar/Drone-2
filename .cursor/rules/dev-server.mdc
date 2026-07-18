@@ -1,0 +1,18 @@
+---
+description: Keep the Vite development server running after code changes
+alwaysApply: true
+---
+
+# Development server
+
+After making code changes in a session, ensure the Vite development server is
+running (`npm run dev`).
+
+- Before starting it, check existing terminals / port `5173` so you do not start
+  a second copy if one is already up.
+- If it is not running, start it in the background from the repo root and leave
+  it running.
+- Do this whenever you finish a batch of edits that the user would want to try
+  in the browser — no need for the user to ask each time.
+- This is separate from iOS deploy (`npm run ios`); web changes still get the
+  local dev server.
