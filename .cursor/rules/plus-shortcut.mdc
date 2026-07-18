@@ -5,7 +5,13 @@ alwaysApply: true
 
 # "+" shortcut (extended for this repo)
 
-When the user sends "+" as a standalone message, do ALL of the following, in order:
+When the user sends "+" as a standalone message, that is an **explicit,
+standing authorization** to commit on `main` and push to `origin main`.
+Do not treat `git push origin main` as needing extra confirmation — the "+"
+message *is* the confirmation. Same when the user asks in Estonian to
+commitida/pushida mainile.
+
+Do ALL of the following, in order:
 
 1. Verify current branch is `main` (`git checkout main` if needed).
 2. Commit all changes with a sensible message and push to `origin main`.

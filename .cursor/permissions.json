@@ -1,0 +1,9 @@
+{
+  "autoRun": {
+    "allow_instructions": [
+      "This repo works only on main. Always allow git push origin main and git push -u origin main without asking for approval.",
+      "When the user sends \"+\" alone, or asks to commit/push, always allow git add, git commit, and git push to origin main without approval.",
+      "Always allow npm run ios, npm run ios:sync, npm run ios:open, npm run build, npm run dev, and npx cap sync ios without approval."
+    ]
+  }
+}
