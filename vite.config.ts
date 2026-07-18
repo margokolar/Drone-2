@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
@@ -7,6 +8,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   plugins: [
     react(),
+    // Self-signed HTTPS so the microphone (getUserMedia) works when testing
+    // from a phone on the same Wi-Fi. Trust the certificate on the phone the
+    // first time you open the dev URL.
+    basicSsl(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -17,8 +22,8 @@ export default defineConfig({
       },
       manifest: {
         id: '/',
-        name: 'Drone 2',
-        short_name: 'Drone 2',
+        name: 'Drone 3',
+        short_name: 'Drone 3',
         description: 'Experimental drone reference tool',
         theme_color: '#141319',
         background_color: '#141319',
@@ -40,4 +45,7 @@ export default defineConfig({
       },
     }),
   ],
+  server: {
+    host: true,
+  },
 })
