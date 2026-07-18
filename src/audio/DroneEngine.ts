@@ -235,8 +235,8 @@ export class DroneEngine {
    * AudioContext reports "running" but the hardware clock is stalled after the
    * PWA returns from background (bugs.webkit.org/show_bug.cgi?id=263627).
    */
-  async kickContext(): Promise<void> {
-    if (this.shouldPlay) {
+  async kickContext(allowWhilePlaying = false): Promise<void> {
+    if (this.shouldPlay && !allowWhilePlaying) {
       return
     }
     const context = this.context
@@ -270,7 +270,7 @@ export class DroneEngine {
         // iOS may reject until a gesture; visibility/focus retries will run again.
       }
       if ((context.state as string) === 'interrupted') {
-        await this.kickContext()
+        await this.kickContext(true)
       }
     }
     if (context.state !== 'running') {
@@ -300,9 +300,6 @@ export class DroneEngine {
    * interrupted context is resumed synchronously within the calling gesture.
    */
   async pokeClock(): Promise<void> {
-    if (this.shouldPlay) {
-      return
-    }
     const context = this.context
     if (!context) {
       return
@@ -320,12 +317,12 @@ export class DroneEngine {
         // iOS may reject until the next gesture; retried then.
       }
       if ((context.state as string) === 'interrupted') {
-        await this.kickContext()
+        await this.kickContext(true)
       }
       this.lastClock = { wall: Date.now(), ctx: context.currentTime }
       return
     }
-    if (previous.wall > 0) {
+    if (!this.shouldPlay && previous.wall > 0) {
       const wallDelta = (wallNow - previous.wall) / 1000
       const ctxDelta = ctxNow - previous.ctx
       if (wallDelta > 0.25 && ctxDelta < wallDelta * 0.5) {
