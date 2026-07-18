@@ -1,0 +1,23 @@
+---
+description: What the "+" shortcut message means in this repo
+alwaysApply: true
+---
+
+# "+" shortcut (extended for this repo)
+
+When the user sends "+" as a standalone message, do ALL of the following, in order:
+
+1. Verify current branch is `main` (`git checkout main` if needed).
+2. Commit all changes with a sensible message and push to `origin main`.
+3. Build and deploy the iOS app: run `npm run ios`.
+   - If an iPhone is reachable (cable or Wi-Fi pairing), this installs and
+     launches the app on it.
+   - If no phone is reachable, the script still builds the app and exits
+     successfully — tell the user (in Estonian) that the app was built but not
+     installed, and that they should plug in / wake the phone and send "+"
+     again (or just ask) to install.
+4. Report briefly in Estonian what was pushed and whether the app reached the
+   phone.
+
+If the iOS build fails, still complete the push, then diagnose and fix the
+build. Never leave the working tree uncommitted after a "+".

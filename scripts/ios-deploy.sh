@@ -41,18 +41,21 @@ EOF
 )
 rm -f "$DEVICE_JSON"
 
-if [ -z "$UDID" ]; then
-  echo "ERROR: No connected iPhone found."
-  echo "Plug the iPhone in with a cable (or ensure Wi-Fi pairing) and unlock it."
-  exit 1
+if [ -n "$UDID" ]; then
+  DESTINATION="id=$UDID"
+  echo "    Device: $UDID"
+else
+  # No phone reachable: still produce a full device build so it is ready to
+  # install the next time the phone shows up.
+  DESTINATION="generic/platform=iOS"
+  echo "    No iPhone reachable - building only (install will be skipped)."
 fi
-echo "    Device: $UDID"
 
 echo "==> Building iOS app (xcodebuild)"
 xcodebuild \
   -project ios/App/App.xcodeproj \
   -scheme App \
-  -destination "id=$UDID" \
+  -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA" \
   -allowProvisioningUpdates \
   build
@@ -61,6 +64,14 @@ APP_PATH="$DERIVED_DATA/Build/Products/Debug-iphoneos/App.app"
 if [ ! -d "$APP_PATH" ]; then
   echo "ERROR: Built app not found at $APP_PATH"
   exit 1
+fi
+
+if [ -z "$UDID" ]; then
+  echo "==> Done (build only). App is ready at:"
+  echo "    $APP_PATH"
+  echo "    Connect the iPhone (cable or same Wi-Fi after pairing) and re-run"
+  echo "    'npm run ios' to install it."
+  exit 0
 fi
 
 echo "==> Installing on device"

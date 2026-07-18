@@ -26,7 +26,8 @@ unchanged; Capacitor adds `capacitor.config.ts` and the `ios/` Xcode project
 
 - `npm run ios` — full deploy: web build → `cap sync ios` → `xcodebuild` → install +
   launch on the connected iPhone (`scripts/ios-deploy.sh`). Phone must be plugged in
-  (or Wi-Fi paired) and unlocked.
+  (or Wi-Fi paired) and unlocked. If no phone is reachable, the script builds the
+  app anyway and skips the install (exit 0).
 - `npm run ios:sync` — web build + `cap sync ios` only (after web-code changes)
 - `npm run ios:open` — open the Xcode project (rarely needed)
 - After changing anything under `ios/` native config or adding Capacitor plugins,
