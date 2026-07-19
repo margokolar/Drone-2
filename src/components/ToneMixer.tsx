@@ -5,6 +5,7 @@ import type { ToneConfig, TimbreBlend } from '../audio/types'
 import { getTonePageLabel, type NoteId, type TonalCenter } from '../music/notes'
 import { getFrequency, type TuningSystemId } from '../music/tuning'
 import {
+  DEFAULT_SHINE_VOLUME,
   DEFAULT_TONE_DETUNE_CENTS,
   DEFAULT_TONE_PAN,
   MAX_TONE_DETUNE_CENTS,
@@ -131,12 +132,75 @@ type ToneMixerProps = {
   tuningSystemId: TuningSystemId
   tonalCenter: TonalCenter
   fallbackTimbreBlend: TimbreBlend
+  shineEnabled: boolean
+  shineVolume: number
+  onShineVolume: (volume: number) => void
   onToneGain: (noteId: NoteId, gainDb: number) => void
+
   onTonePan: (noteId: NoteId, pan: number) => void
   onToneDetune: (noteId: NoteId, detuneCents: number) => void
   onToneTimbreValue: (noteId: NoteId, key: 'sine' | 'saw' | 'square', value: number) => void
   onToggleToneSolo: (noteId: NoteId) => void
   onEditOvertones: (noteId: NoteId) => void
+}
+
+function BusGainChannel({
+  label,
+  valueLabel,
+  min,
+  max,
+  step,
+  value,
+  onChange,
+  onReset,
+  ariaLabel,
+  accentClassName,
+  spatialExpanded,
+}: {
+  label: string
+  valueLabel: string
+  min: number
+  max: number
+  step: number
+  value: number
+  onChange: (value: number) => void
+  onReset: () => void
+  ariaLabel: string
+  accentClassName: string
+  spatialExpanded: boolean
+}) {
+  return (
+    <article
+      className={clsx(
+        'tone-mixer-channel flex shrink-0 flex-col items-center gap-0 rounded-xl border border-white/10 bg-white/[0.03] px-2 py-2',
+        spatialExpanded && 'tone-mixer-channel--expanded',
+      )}
+    >
+      <div className="flex h-9 w-full items-center justify-center rounded-lg border border-white/15 bg-white/5 px-1 text-center text-[10px] font-semibold uppercase tracking-[0.1em] text-white/75">
+        {label}
+      </div>
+      <div className="tone-mixer-value-row">
+        <span className="tabular-nums text-[11px] leading-none text-white/75">{valueLabel}</span>
+      </div>
+      <div className="tone-mixer-fader-slot">
+        <div className="tone-mixer-fader-vertical tone-mixer-fader-vertical--gain">
+          <ResettableRangeInput
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(Number(event.target.value))}
+            onReset={onReset}
+            aria-label={ariaLabel}
+            className={`tone-mixer-fader-vertical-input tone-mixer-fader-vertical-input--gain ${accentClassName}`}
+          />
+        </div>
+      </div>
+      <div className="tone-mixer-pan min-h-[3.25rem] w-full border-t border-white/10 pt-2" aria-hidden />
+      <div className="tone-mixer-value-row" aria-hidden />
+      <div className="h-8 w-8" aria-hidden />
+    </article>
+  )
 }
 
 export function ToneMixer({
@@ -148,6 +212,9 @@ export function ToneMixer({
   tuningSystemId,
   tonalCenter,
   fallbackTimbreBlend,
+  shineEnabled,
+  shineVolume,
+  onShineVolume,
   onToneGain,
   onTonePan,
   onToneDetune,
@@ -156,9 +223,33 @@ export function ToneMixer({
   onEditOvertones,
 }: ToneMixerProps) {
   if (tones.length === 0) {
+    if (!shineEnabled) {
+      return (
+        <div className="rounded-xl border border-dashed border-white/15 p-3 text-sm text-white/60">
+          Enable tones from the note grid to edit individual gain, detune, and pan.
+        </div>
+      )
+    }
     return (
-      <div className="rounded-xl border border-dashed border-white/15 p-3 text-sm text-white/60">
-        Enable tones from the note grid to edit individual gain, detune, and pan.
+      <div className="space-y-2">
+        <div className="rounded-xl border border-dashed border-white/15 p-3 text-sm text-white/60">
+          Enable tones from the note grid to edit individual gain, detune, and pan.
+        </div>
+        <div className="hide-scrollbar flex items-start justify-end gap-2 overflow-x-auto rounded-xl border border-white/10 bg-white/5 p-3">
+          <BusGainChannel
+            label="Shine"
+            valueLabel={`${Math.round(shineVolume * 100)}%`}
+            min={0}
+            max={1}
+            step={0.01}
+            value={shineVolume}
+            onChange={onShineVolume}
+            onReset={() => onShineVolume(DEFAULT_SHINE_VOLUME)}
+            ariaLabel="Shine volume (obeys the global master gain). Double-click or double-tap to reset to 60%."
+            accentClassName="accent-cyan-300"
+            spatialExpanded={spatialExpanded}
+          />
+        </div>
       </div>
     )
   }
@@ -278,6 +369,21 @@ export function ToneMixer({
           </article>
         )
       })}
+      {shineEnabled && (
+        <BusGainChannel
+          label="Shine"
+          valueLabel={`${Math.round(shineVolume * 100)}%`}
+          min={0}
+          max={1}
+          step={0.01}
+          value={shineVolume}
+          onChange={onShineVolume}
+          onReset={() => onShineVolume(DEFAULT_SHINE_VOLUME)}
+          ariaLabel="Shine volume (obeys the global master gain). Double-click or double-tap to reset to 60%."
+          accentClassName="accent-cyan-300"
+          spatialExpanded={spatialExpanded}
+        />
+      )}
     </div>
   )
 }

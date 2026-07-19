@@ -62,7 +62,7 @@ import { useAddFollower } from './hooks/useAddFollower'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useMetronome } from './hooks/useMetronome'
 import { useOvertoneMidi } from './hooks/useOvertoneMidi'
-import { DEFAULT_SHINE_VOLUME, useShine } from './hooks/useShine'
+import { useShine } from './hooks/useShine'
 import {
   getTonePageLabel,
   NOTE_IDS,
@@ -2167,24 +2167,6 @@ function App() {
                     className="h-1.5 w-full accent-fuchsia-300"
                   />
                 </div>
-                {shine.enabled && (
-                <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className="text-xs uppercase tracking-[0.16em] text-white/60">Shine volume</span>
-                    <span className="text-xs tabular-nums text-white/70">{Math.round(shine.volume * 100)}%</span>
-                  </div>
-                  <ResettableRangeInput
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={shine.volume}
-                    onChange={(event) => shine.setVolume(Number(event.target.value))}
-                    onReset={() => shine.setVolume(DEFAULT_SHINE_VOLUME)}
-                    aria-label="Shine volume (obeys the global master gain). Double-click or double-tap to reset to 60%."
-                    className="h-1.5 w-full accent-cyan-300"
-                  />
-                </div>
-                )}
               </div>
             </SectionCard>
             <SectionCard
@@ -2225,6 +2207,9 @@ function App() {
                 tuningSystemId={tuningSystemId}
                 tonalCenter={tonalCenter}
                 fallbackTimbreBlend={timbreBlend}
+                shineEnabled={shine.enabled}
+                shineVolume={shine.volume}
+                onShineVolume={shine.setVolume}
                 onToneGain={setToneGain}
                 onTonePan={setTonePan}
                 onToneDetune={setToneDetune}

@@ -11,7 +11,7 @@ unchanged; Capacitor adds `capacitor.config.ts` and the `ios/` Xcode project
 
 ## Facts
 
-- App name: **Bourdon**, bundle ID: **`com.margokolar.bourdon`**, web dir: `dist`
+- App name: **Drone**, bundle ID: **`com.margokolar.bourdon`**, web dir: `dist`
 - Capacitor 8, iOS platform uses **SPM** (no CocoaPods)
 - `xcode-select` points to CommandLineTools on this Mac; always set
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` for `xcodebuild`/`xcrun`
