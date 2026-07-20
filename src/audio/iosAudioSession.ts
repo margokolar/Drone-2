@@ -1,6 +1,7 @@
 /**
  * iOS WKWebView audio focus via `navigator.audioSession`.
- * `ambient` mixes with other apps (e.g. Just Keys); `playback` is exclusive.
+ * Use `playback` so audio works with the silent switch and Web Audio stays audible.
+ * Native AVAudioSession uses mixWithOthers separately when available.
  */
 
 export type IosAudioSessionType =
@@ -29,7 +30,7 @@ export function setIosAudioSessionType(type: IosAudioSessionType): void {
   }
 }
 
-/** Mixable session so Drone can play alongside Just Keys (and other ambient audio). */
+/** Claim a playback session so iOS routes Web Audio (and ignores silent switch). */
 export function claimMixableAudioSession(): void {
-  setIosAudioSessionType('ambient')
+  setIosAudioSessionType('playback')
 }

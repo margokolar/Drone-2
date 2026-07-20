@@ -152,8 +152,7 @@ export function useAddFollower(): AddFollowerState {
     mediaStreamRef.current = null
     samplesRef.current = null
     releaseOutput()
-    // Kick iOS out of play-and-record, then restore mixable ambient so Drone
-    // can play alongside Just Keys again.
+    // Kick iOS out of play-and-record, then restore playback (+ native mix).
     setIosAudioSessionType('playback')
     setIosAudioSessionType('auto')
     claimMixableAudioSession()
