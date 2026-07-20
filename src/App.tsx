@@ -35,6 +35,7 @@ import {
   type TouchEvent as ReactTouchEvent,
 } from 'react'
 import { metronomeEngine } from './audio/MetronomeEngine'
+import { claimMixableAudioSession } from './audio/iosAudioSession'
 import {
   transportPresetPedalPress,
   transportTogglePlay,
@@ -1695,28 +1696,7 @@ function App() {
   const shine = useShine(referenceA4Hz, SEMITONES_FROM_C[tonalCenter], masterGainDb, playing)
 
   useEffect(() => {
-    const navigatorWithAudioSession = navigator as Navigator & {
-      audioSession?: { type: string }
-    }
-    const audioSession = navigatorWithAudioSession.audioSession
-    if (!audioSession) {
-      return
-    }
-
-    const previousType = audioSession.type
-    try {
-      audioSession.type = 'playback'
-    } catch {
-      return
-    }
-
-    return () => {
-      try {
-        audioSession.type = previousType
-      } catch {
-        // Ignore browsers that expose the API but reject writes.
-      }
-    }
+    claimMixableAudioSession()
   }, [])
 
   useEffect(() => {

@@ -4,24 +4,14 @@ import { addEngine, DEFAULT_ADD_OUTPUT_GAIN_DB } from '../audio/AddEngine'
 import { trackLivePitch } from '../audio/livePitch'
 import { dbToGain } from '../audio/audioMath'
 import {
+  claimMixableAudioSession,
+  setIosAudioSessionType,
+} from '../audio/iosAudioSession'
+import {
   applyHarmonicMultiplier,
   DEFAULT_ADD_HARMONIC_RATIO,
 } from '../music/harmonicSeries'
 import { AudioSession } from '../native/audioSession'
-
-type AudioSessionType =
-  | 'auto'
-  | 'playback'
-  | 'transient'
-  | 'transient-solo'
-  | 'play-and-record'
-
-type NavigatorWithAudioSession = Navigator & {
-  audioSession?: {
-    type: AudioSessionType
-    state?: string
-  }
-}
 
 /**
  * iOS Safari does not route Web Audio (`AudioContext`) output to Bluetooth
@@ -61,24 +51,6 @@ function createSilentRouteAudioUrl(): string {
     view.setInt16(44 + i * 2, sample, true)
   }
   return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }))
-}
-
-/**
- * iOS Safari exposes `navigator.audioSession`. If the session type is left as
- * `playback` (which a playback-only Web Audio AudioContext can set), capture
- * fails with "AudioSession category is not compatible with audio capture"
- * (InvalidStateError). Force a capture-compatible category before getUserMedia.
- */
-function setIosAudioSessionType(type: AudioSessionType): void {
-  const audioSession = (navigator as NavigatorWithAudioSession).audioSession
-  if (!audioSession) {
-    return
-  }
-  try {
-    audioSession.type = type
-  } catch {
-    // Some browsers throw if the type cannot be applied; ignore.
-  }
 }
 
 const ANALYSIS_FFT_SIZE = 8192
@@ -180,10 +152,11 @@ export function useAddFollower(): AddFollowerState {
     mediaStreamRef.current = null
     samplesRef.current = null
     releaseOutput()
-    // Restore hi-fi output routing: playback -> auto "kicks" iOS out of the
-    // degraded play-and-record route back to A2DP.
+    // Kick iOS out of play-and-record, then restore mixable ambient so Drone
+    // can play alongside Just Keys again.
     setIosAudioSessionType('playback')
     setIosAudioSessionType('auto')
+    claimMixableAudioSession()
     if (Capacitor.isNativePlatform()) {
       void AudioSession.configurePlayback().catch(() => {})
     }
