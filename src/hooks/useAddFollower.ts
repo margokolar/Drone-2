@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { addEngine, DEFAULT_ADD_OUTPUT_GAIN_DB } from '../audio/AddEngine'
 import { trackLivePitch } from '../audio/livePitch'
 import { dbToGain } from '../audio/audioMath'
@@ -6,6 +7,7 @@ import {
   applyHarmonicMultiplier,
   DEFAULT_ADD_HARMONIC_RATIO,
 } from '../music/harmonicSeries'
+import { AudioSession } from '../native/audioSession'
 
 type AudioSessionType =
   | 'auto'
@@ -182,6 +184,9 @@ export function useAddFollower(): AddFollowerState {
     // degraded play-and-record route back to A2DP.
     setIosAudioSessionType('playback')
     setIosAudioSessionType('auto')
+    if (Capacitor.isNativePlatform()) {
+      void AudioSession.configurePlayback().catch(() => {})
+    }
     setListening(false)
   }, [releaseOutput])
 
@@ -310,6 +315,9 @@ export function useAddFollower(): AddFollowerState {
       // user can manually re-route output via Control Center if the speaker
       // supports the hands-free (HFP) profile.
       setIosAudioSessionType('play-and-record')
+      if (Capacitor.isNativePlatform()) {
+        void AudioSession.configurePlayAndRecord().catch(() => {})
+      }
 
       const audioContext = addEngine.ensureContext()
       const source = audioContext.createMediaStreamSource(stream)

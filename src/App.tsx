@@ -72,6 +72,7 @@ import {
 import { getFrequency, findLowestEnabledToneNoteId, findHighestEnabledToneNoteId } from './music/tuning'
 import { createDefaultPartials, DEFAULT_MASTER_GAIN_DB, type Preset } from './presets/defaultPresets'
 import { useDroneStore } from './store/useDroneStore'
+import { startNativeAudioSessionGuard } from './native/startNativeAudioSessionGuard'
 import { BtControlMenuSection } from './bluetooth/BtControlMenuSection'
 import { useBtControl } from './bluetooth/useBtControl'
 import { BLE_KEYBOARD_FOCUS_ROOT_ID } from './utils/restoreBleKeyboardFocus'
@@ -1715,6 +1716,22 @@ function App() {
       } catch {
         // Ignore browsers that expose the API but reject writes.
       }
+    }
+  }, [])
+
+  useEffect(() => {
+    let disposed = false
+    let cleanup: (() => void) | undefined
+    void startNativeAudioSessionGuard().then((stop) => {
+      if (disposed) {
+        stop()
+        return
+      }
+      cleanup = stop
+    })
+    return () => {
+      disposed = true
+      cleanup?.()
     }
   }, [])
 
