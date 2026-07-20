@@ -2903,7 +2903,8 @@ function App() {
                   Drone 3 v{APP_VERSION}
                 </div>
                 <p>Professional drone reference for tuning and intonation practice.</p>
-                <p className="mt-2 text-xs text-white/55">(c) Margo Kõlar</p>
+                <p className="mt-2 text-xs text-white/55">© Margo Kõlar</p>
+                <p className="mt-1 text-[11px] text-white/40">Apache License 2.0</p>
               </div>
             </div>
           </aside>
