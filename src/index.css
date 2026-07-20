@@ -170,3 +170,16 @@ select {
 .tone-mixer-pan {
   margin-bottom: 0;
 }
+
+.shine-octave-select {
+  text-align: center;
+  text-align-last: center;
+}
+
+/* iOS WKWebView leaves the selected value slightly left of center. */
+@supports (-webkit-touch-callout: none) {
+  .shine-octave-select {
+    padding-left: 0.2rem;
+    text-indent: 0.15rem;
+  }
+}
