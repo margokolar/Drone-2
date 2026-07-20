@@ -87,8 +87,8 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'overtones', label: 'Timbre' },
   { id: 'presets', label: 'Presets' },
   { id: 'metronome', label: 'Click' },
-  { id: 'add', label: 'ADD' },
   { id: 'shine', label: 'Shine' },
+  { id: 'add', label: 'Mic' },
 ]
 const APP_VERSION = '3.0'
 const DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS = 800
@@ -2209,7 +2209,14 @@ function App() {
                 fallbackTimbreBlend={timbreBlend}
                 shineEnabled={shine.enabled}
                 shineVolume={shine.volume}
+                shineAutos={shine.autos}
+                shineBumps={shine.bumps}
+                shineOctaveIndex={shine.octaveIndex}
+                onShineToggle={shine.toggleRunning}
                 onShineVolume={shine.setVolume}
+                onShineAllAuto={shine.setAllAuto}
+                onShineAllBumps={shine.setAllBumps}
+                onShineOctaveIndex={shine.setOctaveIndex}
                 onToneGain={setToneGain}
                 onTonePan={setTonePan}
                 onToneDetune={setToneDetune}
@@ -2665,7 +2672,7 @@ function App() {
             </div>
           </nav>
           <div className="rounded-xl border border-white/10 bg-[#111019]/95 p-2 backdrop-blur-sm">
-              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto_minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)_auto] gap-1.5">
                 <button
                   type="button"
                   className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
@@ -2692,12 +2699,6 @@ function App() {
                   {(playing && <Pause size={22} />) || <Play size={22} />}
                   <span>{playing ? 'Pause' : 'Play'}</span>
                 </button>
-                <AddMicToolbarButton
-                  listening={addFollower.listening}
-                  micError={addFollower.micError}
-                  startListening={addFollower.startListening}
-                  stopListening={addFollower.stopListening}
-                />
                 <button
                   type="button"
                   className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10"
@@ -2715,6 +2716,12 @@ function App() {
                 >
                   <SkipForward size={22} />
                 </button>
+                <AddMicToolbarButton
+                  listening={addFollower.listening}
+                  micError={addFollower.micError}
+                  startListening={addFollower.startListening}
+                  stopListening={addFollower.stopListening}
+                />
               </div>
             </div>
         </div>

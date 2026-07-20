@@ -8,7 +8,7 @@ const REFINE_STEP_HZ = 0.25
 const REFINE_RADIUS_HZ = 4
 const TRACK_BAND_CENTS = 45
 const TRACK_STEP_CENTS = 4
-const STABLE_DEADBAND_CENTS = 12
+const STABLE_DEADBAND_CENTS = 4
 const MAX_TRACK_JUMP_CENTS = 55
 const MIN_HARMONIC_SCORE = -28
 // Fundamentals carry the perceptual pitch and are usually the spectral peak on
