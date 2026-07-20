@@ -265,19 +265,15 @@ function ShineMixerChannel({
           000.0 Hz
         </span>
       </div>
-      <select
-        value={octaveIndex}
-        onChange={(event) => onOctaveIndex(Number(event.target.value))}
-        aria-label="Shine octave"
+      <button
+        type="button"
+        className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-xs font-semibold tabular-nums leading-none text-white/80 transition hover:bg-white/10"
+        onClick={() => onOctaveIndex((octaveIndex + 1) % SHINE_OCTAVE_LABELS.length)}
+        aria-label={`Shine octave ${SHINE_OCTAVE_LABELS[octaveIndex]}. Tap to cycle.`}
         title="Octave"
-        className="button-safe h-8 w-8 shrink-0 appearance-none rounded-lg border border-white/15 bg-white/5 text-center text-xs font-semibold text-white/80 transition hover:bg-white/10"
       >
-        {SHINE_OCTAVE_LABELS.map((label, index) => (
-          <option key={label} value={index}>
-            {label}
-          </option>
-        ))}
-      </select>
+        {SHINE_OCTAVE_LABELS[octaveIndex]}
+      </button>
     </article>
   )
 }
