@@ -179,7 +179,7 @@ select {
 /* iOS WKWebView leaves the selected value slightly left of center. */
 @supports (-webkit-touch-callout: none) {
   .shine-octave-select {
-    padding-left: 0.2rem;
-    text-indent: 0.15rem;
+    padding-left: 0.1rem;
+    text-indent: 0.08rem;
   }
 }
