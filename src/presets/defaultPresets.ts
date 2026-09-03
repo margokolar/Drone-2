@@ -56,6 +56,8 @@ export function createDefaultShine(): ShineConfig {
 export type Preset = {
   id: string
   name: string
+  /** When false, prev/next preset navigation skips this preset. Defaults to true. */
+  enabled?: boolean
   tuningSystemId: TuningSystemId
   tonalCenter: TonalCenter
   baseOctave: number

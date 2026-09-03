@@ -507,7 +507,10 @@ function App() {
   const selectPreviousPreset = useDroneStore((state) => state.selectPreviousPreset)
   const selectNextSong = useDroneStore((state) => state.selectNextSong)
   const selectPreviousSong = useDroneStore((state) => state.selectPreviousSong)
-  const canNavigateSongs = songLibrary.length > 1
+  const togglePresetNavigationEnabled = useDroneStore((state) => state.togglePresetNavigationEnabled)
+  const toggleSongNavigationEnabled = useDroneStore((state) => state.toggleSongNavigationEnabled)
+  const canNavigatePresets = presets.filter((preset) => preset.enabled !== false).length > 1
+  const canNavigateSongs = songLibrary.filter((song) => song.enabled !== false).length > 1
 
   const selectedOvertoneTone = useMemo(
     () =>
@@ -2497,6 +2500,7 @@ function App() {
                     onDuplicatePreset={duplicatePreset}
                     onDeletePreset={deletePreset}
                     onMovePreset={movePreset}
+                    onToggleNavigationEnabled={togglePresetNavigationEnabled}
                   />
                 </section>
                 <section className="min-w-0">
@@ -2511,6 +2515,7 @@ function App() {
                     onDuplicateSong={duplicateSongInLibrary}
                     onDeleteSong={deleteSongFromLibrary}
                     onMoveSong={moveSongInLibrary}
+                    onToggleNavigationEnabled={toggleSongNavigationEnabled}
                   />
                 </section>
               </div>
@@ -2681,8 +2686,9 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10"
+                  className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
                   onClick={selectPreviousPreset}
+                  disabled={!canNavigatePresets}
                   aria-label="Previous preset"
                 >
                   <StepBack size={22} />
@@ -2698,8 +2704,9 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10"
+                  className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
                   onClick={selectNextPreset}
+                  disabled={!canNavigatePresets}
                   aria-label="Next preset"
                 >
                   <StepForward size={22} />

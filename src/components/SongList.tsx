@@ -6,6 +6,7 @@ import { flushSync } from 'react-dom'
 type SongEntry = {
   id: string
   name: string
+  enabled?: boolean
 }
 
 type SongListProps = {
@@ -16,6 +17,7 @@ type SongListProps = {
   onDuplicateSong: (songId: string) => void
   onDeleteSong: (songId: string) => void
   onMoveSong: (songId: string, direction: 'up' | 'down') => void
+  onToggleNavigationEnabled: (songId: string) => void
 }
 
 export function SongList({
@@ -26,6 +28,7 @@ export function SongList({
   onDuplicateSong,
   onDeleteSong,
   onMoveSong,
+  onToggleNavigationEnabled,
 }: SongListProps) {
   const [editingSongId, setEditingSongId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
@@ -84,6 +87,7 @@ export function SongList({
     <div className="space-y-1.5">
       {songLibrary.map((song) => {
         const isActive = song.name === songName
+        const isNavigationEnabled = song.enabled !== false
         const isEditing = editingSongId === song.id
         const toolButtonClass = clsx(
           'flex min-h-9 min-w-9 items-center justify-center rounded-lg border p-1.5 transition',
@@ -101,14 +105,17 @@ export function SongList({
         return (
           <article
             key={song.id}
-            className={`rounded-xl border px-3 py-2 transition ${
+            className={clsx(
+              'rounded-xl border px-3 py-2 transition',
               isActive
                 ? 'border-cyan-300/70 bg-cyan-300/20 shadow-[0_0_18px_rgba(103,232,249,0.14)]'
-                : 'border-white/10 bg-white/5 hover:bg-white/10'
-            } ${!isEditing ? 'cursor-pointer' : ''}`}
+                : 'border-white/10 bg-white/5 hover:bg-white/10',
+              !isNavigationEnabled && 'opacity-55',
+              !isEditing && 'cursor-pointer',
+            )}
             onClick={!isEditing ? () => onLoadSong(song.id) : undefined}
           >
-            <div className="mb-1.5 flex min-h-8 items-center">
+            <div className="mb-1.5 flex min-h-8 items-center gap-2">
               <div className="flex min-w-0 flex-1 items-center">
                 {isEditing ? (
                   <form
@@ -172,6 +179,29 @@ export function SongList({
                   <div className="text-safe min-w-0 truncate text-sm font-semibold text-white">{song.name}</div>
                 )}
               </div>
+              {!isEditing && (
+                <button
+                  type="button"
+                  className={clsx(
+                    'shrink-0 rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition',
+                    isNavigationEnabled
+                      ? 'border-cyan-300/50 bg-cyan-300/15 text-cyan-100 hover:bg-cyan-300/25'
+                      : 'border-white/15 bg-white/5 text-white/55 hover:bg-white/10',
+                  )}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onToggleNavigationEnabled(song.id)
+                  }}
+                  aria-pressed={isNavigationEnabled}
+                  aria-label={
+                    isNavigationEnabled
+                      ? 'Disable song in prev/next navigation'
+                      : 'Enable song in prev/next navigation'
+                  }
+                >
+                  {isNavigationEnabled ? 'On' : 'Off'}
+                </button>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               {isEditing ? (

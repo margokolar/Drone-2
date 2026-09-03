@@ -29,6 +29,8 @@ import {
 type SongEntry = {
   id: string
   name: string
+  /** When false, prev/next song navigation skips this song. Defaults to true. */
+  enabled?: boolean
   presets: Preset[]
   activePresetId: string
 }
@@ -128,6 +130,8 @@ type DroneState = {
   duplicatePreset: (presetId: string) => void
   deletePreset: (presetId: string) => void
   movePreset: (presetId: string, direction: 'up' | 'down') => void
+  setPresetNavigationEnabled: (presetId: string, enabled: boolean) => void
+  togglePresetNavigationEnabled: (presetId: string) => void
   importSong: (songPresets: Preset[], activePresetId?: string, songName?: string) => void
   importSongLibrary: (
     songs: Array<{ id?: string; name?: string; presets?: Preset[]; activePresetId?: string }>,
@@ -135,6 +139,8 @@ type DroneState = {
   loadSongFromLibrary: (songId: string) => void
   deleteSongFromLibrary: (songId: string) => void
   moveSongInLibrary: (songId: string, direction: 'up' | 'down') => void
+  setSongNavigationEnabled: (songId: string, enabled: boolean) => void
+  toggleSongNavigationEnabled: (songId: string) => void
   saveCurrentSongToLibrary: (songName?: string) => void
   saveAsNewSong: (songName?: string) => void
   renameSongInLibrary: (songId: string, name: string) => void
@@ -153,6 +159,58 @@ function clamp(value: number, min: number, max: number): number {
     return max
   }
   return value
+}
+
+function isNavigationEnabled(item: { enabled?: boolean }): boolean {
+  return item.enabled !== false
+}
+
+function getEnabledPresets(presets: Preset[]): Preset[] {
+  return presets.filter(isNavigationEnabled)
+}
+
+function getEnabledSongs(songs: SongEntry[]): SongEntry[] {
+  return songs.filter(isNavigationEnabled)
+}
+
+function selectNextInRing<T>(
+  items: T[],
+  activeKey: string,
+  getKey: (item: T) => string,
+): T | undefined {
+  if (items.length <= 1) {
+    return undefined
+  }
+  const index = items.findIndex((item) => getKey(item) === activeKey)
+  const nextIndex = index >= 0 ? (index + 1) % items.length : 0
+  return items[nextIndex]
+}
+
+function selectPreviousInRing<T>(
+  items: T[],
+  activeKey: string,
+  getKey: (item: T) => string,
+): T | undefined {
+  if (items.length <= 1) {
+    return undefined
+  }
+  const index = items.findIndex((item) => getKey(item) === activeKey)
+  const nextIndex = index >= 0 ? (index - 1 + items.length) % items.length : 0
+  return items[nextIndex]
+}
+
+function normalizePresetNavigationEnabled(preset: Preset): Preset {
+  return {
+    ...preset,
+    enabled: isNavigationEnabled(preset),
+  }
+}
+
+function normalizeSongNavigationEnabled(song: SongEntry): SongEntry {
+  return {
+    ...song,
+    enabled: isNavigationEnabled(song),
+  }
 }
 
 function normalizeBooleanArray(source: unknown, fallback: boolean): boolean[] {
@@ -180,13 +238,13 @@ function normalizeShine(shine: ShineConfig | undefined): ShineConfig {
 function duplicatePresetData(preset: Preset): Preset {
   const partials = normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial })))
   const timbreBlend = normalizeTimbreBlend(preset.timbreBlend ?? DEFAULT_TIMBRE_BLEND)
-  return {
+  return normalizePresetNavigationEnabled({
     ...preset,
     tones: migrateTones(preset.tones, partials, timbreBlend),
     partials,
     timbreBlend,
     shine: normalizeShine(preset.shine),
-  }
+  })
 }
 
 function applyPresetState(preset: Preset): Pick<
@@ -1244,37 +1302,42 @@ export const useDroneStore = create<DroneState>()(
         }),
       selectNextPreset: () => {
         const state = get()
-        if (state.presets.length === 0) {
+        const enabledPresets = getEnabledPresets(state.presets)
+        const nextPreset = selectNextInRing(
+          enabledPresets,
+          state.activePresetId,
+          (preset) => preset.id,
+        )
+        if (!nextPreset) {
           return
         }
-        const index = state.presets.findIndex((preset) => preset.id === state.activePresetId)
-        const nextIndex = index < 0 ? 0 : (index + 1) % state.presets.length
-        const preset = state.presets[nextIndex]
         set({
-          ...applyPresetState(preset),
+          ...applyPresetState(nextPreset),
         })
       },
       selectPreviousPreset: () => {
         const state = get()
-        if (state.presets.length === 0) {
+        const enabledPresets = getEnabledPresets(state.presets)
+        const previousPreset = selectPreviousInRing(
+          enabledPresets,
+          state.activePresetId,
+          (preset) => preset.id,
+        )
+        if (!previousPreset) {
           return
         }
-        const index = state.presets.findIndex((preset) => preset.id === state.activePresetId)
-        const nextIndex =
-          index < 0 ? 0 : (index - 1 + state.presets.length) % state.presets.length
-        const preset = state.presets[nextIndex]
         set({
-          ...applyPresetState(preset),
+          ...applyPresetState(previousPreset),
         })
       },
       selectNextSong: () => {
         const state = get()
-        if (state.songLibrary.length <= 1) {
-          return
-        }
-        const index = state.songLibrary.findIndex((entry) => entry.name === state.songName)
-        const nextIndex = index < 0 ? 0 : (index + 1) % state.songLibrary.length
-        const nextSong = state.songLibrary[nextIndex]
+        const enabledSongs = getEnabledSongs(state.songLibrary)
+        const nextSong = selectNextInRing(
+          enabledSongs,
+          state.songName,
+          (song) => song.name,
+        )
         if (!nextSong) {
           return
         }
@@ -1282,22 +1345,75 @@ export const useDroneStore = create<DroneState>()(
       },
       selectPreviousSong: () => {
         const state = get()
-        if (state.songLibrary.length <= 1) {
-          return
-        }
-        const index = state.songLibrary.findIndex((entry) => entry.name === state.songName)
-        const nextIndex =
-          index < 0 ? 0 : (index - 1 + state.songLibrary.length) % state.songLibrary.length
-        const previousSong = state.songLibrary[nextIndex]
+        const enabledSongs = getEnabledSongs(state.songLibrary)
+        const previousSong = selectPreviousInRing(
+          enabledSongs,
+          state.songName,
+          (song) => song.name,
+        )
         if (!previousSong) {
           return
         }
         get().loadSongFromLibrary(previousSong.id)
       },
+      setPresetNavigationEnabled: (presetId, enabled) =>
+        set((state) => {
+          if (!enabled && getEnabledPresets(state.presets).length <= 1) {
+            return state
+          }
+          return {
+            presets: state.presets.map((preset) =>
+              preset.id === presetId ? { ...preset, enabled } : preset,
+            ),
+          }
+        }),
+      togglePresetNavigationEnabled: (presetId) =>
+        set((state) => {
+          const preset = state.presets.find((entry) => entry.id === presetId)
+          if (!preset) {
+            return state
+          }
+          const nextEnabled = !isNavigationEnabled(preset)
+          if (!nextEnabled && getEnabledPresets(state.presets).length <= 1) {
+            return state
+          }
+          return {
+            presets: state.presets.map((entry) =>
+              entry.id === presetId ? { ...entry, enabled: nextEnabled } : entry,
+            ),
+          }
+        }),
+      setSongNavigationEnabled: (songId, enabled) =>
+        set((state) => {
+          if (!enabled && getEnabledSongs(state.songLibrary).length <= 1) {
+            return state
+          }
+          return {
+            songLibrary: state.songLibrary.map((song) =>
+              song.id === songId ? { ...song, enabled } : song,
+            ),
+          }
+        }),
+      toggleSongNavigationEnabled: (songId) =>
+        set((state) => {
+          const song = state.songLibrary.find((entry) => entry.id === songId)
+          if (!song) {
+            return state
+          }
+          const nextEnabled = !isNavigationEnabled(song)
+          if (!nextEnabled && getEnabledSongs(state.songLibrary).length <= 1) {
+            return state
+          }
+          return {
+            songLibrary: state.songLibrary.map((entry) =>
+              entry.id === songId ? { ...entry, enabled: nextEnabled } : entry,
+            ),
+          }
+        }),
     }),
     {
       name: 'bourdon-store-v1',
-      version: 16,
+      version: 17,
       migrate: (persistedState) => {
         try {
           const typed = persistedState as Partial<DroneState> | undefined
@@ -1309,6 +1425,7 @@ export const useDroneStore = create<DroneState>()(
           const migratedPresets = (typed.presets ?? []).map((preset) =>
             duplicatePresetData({
               ...preset,
+              enabled: preset.enabled ?? true,
               baseOctave: clamp(
                 preset.baseOctave ?? 3,
                 MIN_BASE_OCTAVE,
@@ -1343,10 +1460,13 @@ export const useDroneStore = create<DroneState>()(
             baseOctave: clamp(typed.baseOctave ?? 3, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
             songName: typed.songName ?? 'My Song',
             songLibrary:
-              typed.songLibrary?.map((song) => ({
-                ...song,
-                presets: (song.presets ?? []).map((preset) => duplicatePresetData(preset)),
-              })) ?? [
+              typed.songLibrary?.map((song) =>
+                normalizeSongNavigationEnabled({
+                  ...song,
+                  enabled: song.enabled ?? true,
+                  presets: (song.presets ?? []).map((preset) => duplicatePresetData(preset)),
+                }),
+              ) ?? [
                 {
                   id: INITIAL_SONG_ID,
                   name: typed.songName ?? 'My Song',

@@ -12,6 +12,7 @@ type PresetListProps = {
   onDuplicatePreset: (presetId: string) => void
   onDeletePreset: (presetId: string) => void
   onMovePreset: (presetId: string, direction: 'up' | 'down') => void
+  onToggleNavigationEnabled: (presetId: string) => void
 }
 
 export function PresetList({
@@ -22,6 +23,7 @@ export function PresetList({
   onDuplicatePreset,
   onDeletePreset,
   onMovePreset,
+  onToggleNavigationEnabled,
 }: PresetListProps) {
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
@@ -81,6 +83,7 @@ export function PresetList({
       <div className="space-y-1.5">
         {presets.map((preset) => {
           const isActive = preset.id === activePresetId
+          const isNavigationEnabled = preset.enabled !== false
           const isEditing = editingPresetId === preset.id
           const toolButtonClass = clsx(
             'flex min-h-9 min-w-9 items-center justify-center rounded-lg border p-1.5 transition',
@@ -97,14 +100,17 @@ export function PresetList({
           return (
             <article
               key={preset.id}
-              className={`rounded-xl border px-3 py-2 transition ${
+              className={clsx(
+                'rounded-xl border px-3 py-2 transition',
                 isActive
                   ? 'border-fuchsia-300/70 bg-fuchsia-300/20 shadow-[0_0_18px_rgba(240,171,252,0.16)]'
-                  : 'border-white/10 bg-white/5 hover:bg-white/10'
-              } ${!isEditing ? 'cursor-pointer' : ''}`}
+                  : 'border-white/10 bg-white/5 hover:bg-white/10',
+                !isNavigationEnabled && 'opacity-55',
+                !isEditing && 'cursor-pointer',
+              )}
               onClick={!isEditing ? () => onLoadPreset(preset.id) : undefined}
             >
-              <div className="mb-1.5 flex min-h-8 items-center">
+              <div className="mb-1.5 flex min-h-8 items-center gap-2">
                 <div className="flex min-w-0 flex-1 items-center">
                   {(isEditing) ? (
                     <form
@@ -168,6 +174,29 @@ export function PresetList({
                     <div className="text-safe min-w-0 truncate text-sm font-semibold text-white">{preset.name}</div>
                   )}
                 </div>
+                {!isEditing && (
+                  <button
+                    type="button"
+                    className={clsx(
+                      'shrink-0 rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition',
+                      isNavigationEnabled
+                        ? 'border-fuchsia-300/50 bg-fuchsia-300/15 text-fuchsia-100 hover:bg-fuchsia-300/25'
+                        : 'border-white/15 bg-white/5 text-white/55 hover:bg-white/10',
+                    )}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onToggleNavigationEnabled(preset.id)
+                    }}
+                    aria-pressed={isNavigationEnabled}
+                    aria-label={
+                      isNavigationEnabled
+                        ? 'Disable preset in prev/next navigation'
+                        : 'Enable preset in prev/next navigation'
+                    }
+                  >
+                    {isNavigationEnabled ? 'On' : 'Off'}
+                  </button>
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 {isEditing ? (
