@@ -65,6 +65,8 @@ type DroneState = {
   metronomeBpm: number
   metronomeVolumeDb: number
   metronomeMuted: boolean
+  /** When false, Mic tab and transport mic control are hidden. */
+  micFeaturesEnabled: boolean
   controlsLocked: boolean
   btControlMode: BtControlMode
   setPlaying: (playing: boolean) => void
@@ -117,6 +119,7 @@ type DroneState = {
   setMetronomeBpm: (bpm: number) => void
   setMetronomeVolumeDb: (db: number) => void
   setMetronomeMuted: (muted: boolean) => void
+  setMicFeaturesEnabled: (enabled: boolean) => void
   setControlsLocked: (locked: boolean) => void
   toggleControlsLocked: () => void
   setBtControlMode: (mode: BtControlMode) => void
@@ -488,6 +491,7 @@ export const useDroneStore = create<DroneState>()(
       metronomeBpm: 72,
       metronomeVolumeDb: -15,
       metronomeMuted: false,
+      micFeaturesEnabled: true,
       controlsLocked: false,
       btControlMode: 'pedal',
       setPlaying: (playing) => set({ playing }),
@@ -893,6 +897,7 @@ export const useDroneStore = create<DroneState>()(
       setMetronomeBpm: (bpm) => set({ metronomeBpm: clamp(bpm, 30, 220) }),
       setMetronomeVolumeDb: (db) => set({ metronomeVolumeDb: clamp(db, -40, 0) }),
       setMetronomeMuted: (muted) => set({ metronomeMuted: muted }),
+      setMicFeaturesEnabled: (enabled) => set({ micFeaturesEnabled: enabled }),
       setControlsLocked: (locked) => set({ controlsLocked: locked }),
       toggleControlsLocked: () => set((state) => ({ controlsLocked: !state.controlsLocked })),
       setBtControlMode: (mode) => set({ btControlMode: mode }),
@@ -1413,7 +1418,7 @@ export const useDroneStore = create<DroneState>()(
     }),
     {
       name: 'bourdon-store-v1',
-      version: 17,
+      version: 18,
       migrate: (persistedState) => {
         try {
           const typed = persistedState as Partial<DroneState> | undefined
@@ -1480,6 +1485,7 @@ export const useDroneStore = create<DroneState>()(
             metronomeBpm: typed.metronomeBpm ?? 72,
             metronomeVolumeDb: typed.metronomeVolumeDb ?? -15,
             metronomeMuted: typed.metronomeMuted ?? false,
+            micFeaturesEnabled: typed.micFeaturesEnabled ?? true,
             harmonicTimbreEnabled: typed.harmonicTimbreEnabled ?? true,
             entryGlideEnabled: typed.entryGlideEnabled ?? true,
             entryGlideLowestCents: clamp(
@@ -1535,6 +1541,7 @@ export const useDroneStore = create<DroneState>()(
         metronomeBpm: state.metronomeBpm,
         metronomeVolumeDb: state.metronomeVolumeDb,
         metronomeMuted: state.metronomeMuted,
+        micFeaturesEnabled: state.micFeaturesEnabled,
         controlsLocked: state.controlsLocked,
         btControlMode: state.btControlMode,
       }),

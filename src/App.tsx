@@ -43,6 +43,7 @@ import {
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
 import { AddFollowerControls, AddMicToolbarButton } from './components/AddFollowerControls'
+import { MicMenuSection } from './components/MicMenuSection'
 import { MetronomeControls } from './components/MetronomeControls'
 import { NoteSelector } from './components/NoteSelector'
 import { OvertoneBars } from './components/OvertoneBars'
@@ -449,6 +450,7 @@ function App() {
   const metronomeBpm = useDroneStore((state) => state.metronomeBpm)
   const metronomeVolumeDb = useDroneStore((state) => state.metronomeVolumeDb)
   const metronomeMuted = useDroneStore((state) => state.metronomeMuted)
+  const micFeaturesEnabled = useDroneStore((state) => state.micFeaturesEnabled)
   const controlsLocked = useDroneStore((state) => state.controlsLocked)
 
   const nudgeReferenceA4Hz = useDroneStore((state) => state.nudgeReferenceA4Hz)
@@ -511,6 +513,10 @@ function App() {
   const toggleSongNavigationEnabled = useDroneStore((state) => state.toggleSongNavigationEnabled)
   const canNavigatePresets = presets.filter((preset) => preset.enabled !== false).length > 1
   const canNavigateSongs = songLibrary.filter((song) => song.enabled !== false).length > 1
+  const visibleTabs = useMemo(
+    () => (micFeaturesEnabled ? TABS : TABS.filter((tab) => tab.id !== 'add')),
+    [micFeaturesEnabled],
+  )
 
   const selectedOvertoneTone = useMemo(
     () =>
@@ -1690,6 +1696,13 @@ function App() {
   useAudioEngine(runtimeConfig, playing)
 
   const addFollower = useAddFollower()
+  useEffect(() => {
+    if (micFeaturesEnabled) {
+      return
+    }
+    addFollower.stopListening()
+    setActiveTab((tab) => (tab === 'add' ? 'tone' : tab))
+  }, [addFollower.stopListening, micFeaturesEnabled])
   useMetronome({
     enabled: metronomeEnabled,
     bpm: metronomeBpm,
@@ -1808,17 +1821,17 @@ function App() {
       if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy) * 1.5) {
         return
       }
-      const currentIndex = TABS.findIndex((tab) => tab.id === activeTab)
+      const currentIndex = visibleTabs.findIndex((tab) => tab.id === activeTab)
       if (currentIndex < 0) {
         return
       }
       const nextIndex = dx < 0 ? currentIndex + 1 : currentIndex - 1
-      if (nextIndex < 0 || nextIndex >= TABS.length) {
+      if (nextIndex < 0 || nextIndex >= visibleTabs.length) {
         return
       }
-      handleTabChange(TABS[nextIndex].id)
+      handleTabChange(visibleTabs[nextIndex].id)
     },
-    [activeTab, handleTabChange],
+    [activeTab, handleTabChange, visibleTabs],
   )
 
   useLayoutEffect(() => {
@@ -1925,7 +1938,7 @@ function App() {
       {bleDebugEnabled() && (
         <BleDebugOverlay getAnchorPaused={() => mediaAnchorRef.current?.paused ?? null} />
       )}
-      {addFollower.micError && !addFollower.listening && (
+      {micFeaturesEnabled && addFollower.micError && !addFollower.listening && (
         <div
           role="alert"
           className="fixed left-1/2 top-2 z-[130] flex max-w-[calc(100vw-1.5rem)] w-[22rem] max-w-full -translate-x-1/2 items-start gap-2 rounded-xl border border-rose-300/40 bg-rose-950/95 px-3 py-2 text-xs text-rose-50 shadow-lg backdrop-blur"
@@ -2565,7 +2578,7 @@ function App() {
             aria-label="App sections"
           >
             <div className="flex w-max min-w-full items-center justify-center gap-1 landscape:w-full max-h-[500px]:w-full">
-              {TABS.map(({ id, label }) => (
+              {visibleTabs.map(({ id, label }) => (
                 <button
                   key={id}
                   type="button"
@@ -2674,7 +2687,13 @@ function App() {
             </div>
           </nav>
           <div className="rounded-xl border border-white/10 bg-[#111019]/95 p-2 backdrop-blur-sm">
-              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)_auto] gap-1.5">
+              <div
+                className={`grid gap-1.5 ${
+                  micFeaturesEnabled
+                    ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)_auto]'
+                    : 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)]'
+                }`}
+              >
                 <button
                   type="button"
                   className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
@@ -2720,12 +2739,14 @@ function App() {
                 >
                   <SkipForward size={22} />
                 </button>
-                <AddMicToolbarButton
-                  listening={addFollower.listening}
-                  micError={addFollower.micError}
-                  startListening={addFollower.startListening}
-                  stopListening={addFollower.stopListening}
-                />
+                {micFeaturesEnabled ? (
+                  <AddMicToolbarButton
+                    listening={addFollower.listening}
+                    micError={addFollower.micError}
+                    startListening={addFollower.startListening}
+                    stopListening={addFollower.stopListening}
+                  />
+                ) : null}
               </div>
             </div>
         </div>
@@ -2904,6 +2925,9 @@ function App() {
                 <Menu size={20} />
                 MIDI
               </button>
+              <div data-keep-menu-open>
+                <MicMenuSection />
+              </div>
               <div className="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/70">
                 <div className="mb-1 flex items-center gap-2 text-white/80">
                   <Info size={14} />
