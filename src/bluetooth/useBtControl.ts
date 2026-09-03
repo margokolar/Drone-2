@@ -217,7 +217,7 @@ export function useBtControl({
         event.preventDefault()
         event.stopPropagation()
         void droneEngine.pokeClock()
-        transportPreviousPreset()
+        transportPreviousPreset(latestRuntimeConfigRef.current)
         return
       }
 
@@ -286,14 +286,14 @@ export function useBtControl({
         recordBleDebug('mediasession', 'pedal nexttrack')
         runMediaSessionAction(() => {
           void droneEngine.pokeClock()
-          transportNextPreset()
+          transportNextPreset(latestRuntimeConfigRef.current)
         })
       })
       setActionHandler('previoustrack', () => {
         recordBleDebug('mediasession', 'pedal previoustrack')
         runMediaSessionAction(() => {
           void droneEngine.pokeClock()
-          transportPreviousPreset()
+          transportPreviousPreset(latestRuntimeConfigRef.current)
         })
       })
     }
@@ -335,14 +335,14 @@ export function useBtControl({
         recordBleDebug('mediasession', 'speaker nexttrack')
         runMediaSessionAction(() => {
           void droneEngine.pokeClock()
-          transportNextPreset()
+          transportNextPreset(latestRuntimeConfigRef.current)
         })
       })
       setActionHandler('previoustrack', () => {
         recordBleDebug('mediasession', 'speaker previoustrack')
         runMediaSessionAction(() => {
           void droneEngine.pokeClock()
-          transportPreviousPreset()
+          transportPreviousPreset(latestRuntimeConfigRef.current)
         })
       })
     }
@@ -466,7 +466,7 @@ export function useBtControl({
           event.preventDefault()
           event.stopPropagation()
           void droneEngine.pokeClock()
-          transportPreviousPreset()
+          transportPreviousPreset(latestRuntimeConfigRef.current)
           return
         }
 
@@ -478,7 +478,7 @@ export function useBtControl({
           event.preventDefault()
           event.stopPropagation()
           void droneEngine.pokeClock()
-          transportNextPreset()
+          transportNextPreset(latestRuntimeConfigRef.current)
           return
         }
 

@@ -33,6 +33,120 @@ const DEFAULT_ENTRY_GLIDE: EntryGlideParams = {
   seconds: 2,
 }
 
+const MIN_AUDIBLE_GAIN = 0.0001
+const FADE_CURVE_STEPS = 64
+
+function buildFadeInCurve(targetGain: number): Float32Array {
+  const curve = new Float32Array(FADE_CURVE_STEPS)
+  const target = Math.max(MIN_AUDIBLE_GAIN, targetGain)
+  for (let index = 0; index < FADE_CURVE_STEPS; index += 1) {
+    const progress = index / (FADE_CURVE_STEPS - 1)
+    const shaped = Math.sin((progress * Math.PI) / 2)
+    curve[index] = Math.max(MIN_AUDIBLE_GAIN, target * shaped)
+  }
+  return curve
+}
+
+function buildFadeOutCurve(startGain: number): Float32Array {
+  const curve = new Float32Array(FADE_CURVE_STEPS)
+  const start = Math.max(MIN_AUDIBLE_GAIN, startGain)
+  for (let index = 0; index < FADE_CURVE_STEPS; index += 1) {
+    const progress = index / (FADE_CURVE_STEPS - 1)
+    const shaped = Math.cos((progress * Math.PI) / 2)
+    curve[index] = Math.max(MIN_AUDIBLE_GAIN, start * shaped)
+  }
+  return curve
+}
+
+function scheduleSmoothMasterFadeIn(
+  param: AudioParam,
+  targetGain: number,
+  now: number,
+  duration: number,
+): void {
+  param.cancelScheduledValues(now)
+  param.setValueAtTime(MIN_AUDIBLE_GAIN, now)
+  param.setValueCurveAtTime(buildFadeInCurve(targetGain), now, duration)
+}
+
+function scheduleSmoothMasterFadeOut(
+  param: AudioParam,
+  startGain: number,
+  now: number,
+  duration: number,
+): void {
+  const start = Math.max(MIN_AUDIBLE_GAIN, startGain)
+  param.cancelScheduledValues(now)
+  param.setValueAtTime(start, now)
+  param.setValueCurveAtTime(buildFadeOutCurve(start), now, duration)
+}
+
+function scheduleSmoothVoiceFadeIn(
+  param: AudioParam,
+  targetGain: number,
+  now: number,
+  duration: number,
+): void {
+  const target = Math.max(MIN_AUDIBLE_GAIN, targetGain)
+  param.cancelScheduledValues(now)
+  if (duration <= 0) {
+    param.setValueAtTime(target, now)
+    return
+  }
+  param.setValueAtTime(MIN_AUDIBLE_GAIN, now)
+  param.setValueCurveAtTime(buildFadeInCurve(target), now, duration)
+}
+
+function scheduleSmoothVoiceFadeOut(
+  param: AudioParam,
+  now: number,
+  duration: number,
+): void {
+  param.cancelScheduledValues(now)
+  const start = Math.max(MIN_AUDIBLE_GAIN, param.value)
+  if (duration <= 0) {
+    param.setValueAtTime(MIN_AUDIBLE_GAIN, now)
+    return
+  }
+  param.setValueAtTime(start, now)
+  param.setValueCurveAtTime(buildFadeOutCurve(start), now, duration)
+}
+
+function scheduleSmoothGainCrossfade(
+  param: AudioParam,
+  targetGain: number,
+  now: number,
+  duration: number,
+): void {
+  param.cancelScheduledValues(now)
+  const start = Math.max(MIN_AUDIBLE_GAIN, param.value)
+  const target = Math.max(MIN_AUDIBLE_GAIN, targetGain)
+  if (duration <= 0 || Math.abs(Math.log(start / target)) < 0.001) {
+    param.setValueAtTime(target, now)
+    return
+  }
+  if (duration <= PARAM_SMOOTH_SECONDS + 0.01) {
+    param.setValueAtTime(start, now)
+    param.exponentialRampToValueAtTime(target, now + duration)
+    return
+  }
+  const curve = new Float32Array(FADE_CURVE_STEPS)
+  for (let index = 0; index < FADE_CURVE_STEPS; index += 1) {
+    const progress = index / (FADE_CURVE_STEPS - 1)
+    const shaped = (1 - Math.cos((progress * Math.PI) / 2)) / 2
+    curve[index] = Math.max(MIN_AUDIBLE_GAIN, start * (1 - shaped) + target * shaped)
+  }
+  param.setValueAtTime(start, now)
+  param.setValueCurveAtTime(curve, now, duration)
+}
+
+type VoiceTransitionTiming = {
+  attackSeconds: number
+  updateSeconds: number
+  rebuildReleaseSeconds: number
+  releaseSeconds: number
+}
+
 export class DroneEngine {
   private context: AudioContext | null = null
   private masterGain: GainNode | null = null
@@ -41,6 +155,10 @@ export class DroneEngine {
   private shouldPlay = false
   private lastClock = { wall: 0, ctx: 0 }
   private gesturePlaybackPending = false
+  private pendingPresetTransition = false
+  private playbackFadeInSeconds = 0
+  private playbackFadeOutSeconds = 0
+  private presetCrossfadeSeconds = 0
 
   setPlaybackIntent(shouldPlay: boolean): void {
     this.shouldPlay = shouldPlay
@@ -57,6 +175,33 @@ export class DroneEngine {
     }
     this.gesturePlaybackPending = false
     return true
+  }
+
+  /** Next sync while playing applies preset crossfade timings to changing tones. */
+  markPresetTransition(): void {
+    this.pendingPresetTransition = true
+  }
+
+  clearPresetTransition(): void {
+    this.pendingPresetTransition = false
+  }
+
+  private consumePresetTransition(): boolean {
+    if (!this.pendingPresetTransition) {
+      return false
+    }
+    this.pendingPresetTransition = false
+    return true
+  }
+
+  private resolveVoiceTransitionTiming(): VoiceTransitionTiming {
+    const usePresetCrossfade = this.consumePresetTransition() && this.presetCrossfadeSeconds > 0
+    return {
+      attackSeconds: usePresetCrossfade ? this.presetCrossfadeSeconds : ATTACK_SECONDS,
+      updateSeconds: usePresetCrossfade ? this.presetCrossfadeSeconds : PARAM_SMOOTH_SECONDS,
+      rebuildReleaseSeconds: usePresetCrossfade ? this.presetCrossfadeSeconds : REBUILD_RELEASE_SECONDS,
+      releaseSeconds: usePresetCrossfade ? this.presetCrossfadeSeconds : RELEASE_SECONDS,
+    }
   }
 
   /**
@@ -127,6 +272,7 @@ export class DroneEngine {
    */
   ensureRunning(config: DroneRuntimeConfig): void {
     this.prepareContext()
+    this.updateFadeSettings(config)
     if (!this.shouldPlay) {
       return
     }
@@ -155,8 +301,15 @@ export class DroneEngine {
     if (!this.masterGain) {
       return
     }
+    this.updateFadeSettings(config)
+    const masterTarget = dbToGain(config.masterGainDb)
+    const fadeInSeconds = this.playbackFadeInSeconds
     this.masterGain.gain.cancelScheduledValues(now)
-    this.masterGain.gain.setValueAtTime(dbToGain(config.masterGainDb), now)
+    if (fadeInSeconds > 0) {
+      scheduleSmoothMasterFadeIn(this.masterGain.gain, masterTarget, now, fadeInSeconds)
+    } else {
+      this.masterGain.gain.setValueAtTime(masterTarget, now)
+    }
 
     for (const [noteId, voice] of this.voiceMap.entries()) {
       const toneConfig = config.tones.find((tone) => tone.noteId === noteId && tone.enabled)
@@ -350,20 +503,49 @@ export class DroneEngine {
     return `${this.context.state}@${this.context.currentTime.toFixed(2)}`
   }
 
+  setPlaybackFadeSettings(
+    fadeInSeconds: number,
+    fadeOutSeconds: number,
+    presetCrossfadeSeconds = 0,
+  ): void {
+    this.playbackFadeInSeconds = Math.max(0, fadeInSeconds)
+    this.playbackFadeOutSeconds = Math.max(0, fadeOutSeconds)
+    this.presetCrossfadeSeconds = Math.max(0, presetCrossfadeSeconds)
+  }
+
   private forceMute(now: number): void {
     if (!this.masterGain) {
       return
     }
     this.masterGain.gain.cancelScheduledValues(now)
     this.masterGain.gain.setValueAtTime(0.0001, now)
+    this.muteVoicesAt(now, 0.0001)
+  }
+
+  private muteVoicesAt(now: number, gain: number): void {
     for (const voice of this.voiceMap.values()) {
       voice.outputGain.gain.cancelScheduledValues(now)
-      voice.outputGain.gain.setValueAtTime(0.0001, now)
+      voice.outputGain.gain.setValueAtTime(gain, now)
       for (const bundle of voice.oscillators) {
         bundle.gainNode.gain.cancelScheduledValues(now)
-        bundle.gainNode.gain.setValueAtTime(0.0001, now)
+        bundle.gainNode.gain.setValueAtTime(gain, now)
       }
     }
+  }
+
+  private scheduleAudibleFadeOut(now: number, fadeOutSeconds: number): void {
+    if (!this.masterGain) {
+      return
+    }
+    const startGain = this.masterGain.gain.value
+    scheduleSmoothMasterFadeOut(this.masterGain.gain, startGain, now, fadeOutSeconds)
+    this.muteVoicesAt(now + fadeOutSeconds, MIN_AUDIBLE_GAIN)
+  }
+
+  private updateFadeSettings(config: DroneRuntimeConfig): void {
+    this.playbackFadeInSeconds = Math.max(0, config.playbackFadeInSeconds ?? 0)
+    this.playbackFadeOutSeconds = Math.max(0, config.playbackFadeOutSeconds ?? 0)
+    this.presetCrossfadeSeconds = Math.max(0, config.presetCrossfadeSeconds ?? 0)
   }
 
   stop(): void {
@@ -390,10 +572,14 @@ export class DroneEngine {
       voice.entryGlideEndTime = null
     }
     const now = this.context.currentTime
-    this.forceMute(now)
+    if (this.playbackFadeOutSeconds > 0) {
+      this.scheduleAudibleFadeOut(now, this.playbackFadeOutSeconds)
+    } else {
+      this.forceMute(now)
+    }
     if (needsIosMediaRemoteIntegration()) {
       void this.pokeClock().then(() => {
-        if (!this.shouldPlay && this.context && this.masterGain) {
+        if (!this.shouldPlay && this.context && this.masterGain && this.playbackFadeOutSeconds <= 0) {
           this.forceMute(this.context.currentTime)
         }
       })
@@ -408,6 +594,7 @@ export class DroneEngine {
     if (!this.context || !this.masterGain) {
       return
     }
+    this.updateFadeSettings(config)
     const now = this.context.currentTime
     if (!this.started || !this.shouldPlay) {
       this.started = false
@@ -415,12 +602,24 @@ export class DroneEngine {
       return
     }
     const masterTarget = dbToGain(config.masterGainDb)
-    this.masterGain.gain.cancelScheduledValues(now)
-    this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now)
-    this.masterGain.gain.linearRampToValueAtTime(
-      this.started ? masterTarget : 0.0001,
-      now + PARAM_SMOOTH_SECONDS,
-    )
+    const isAudiblyMuted = this.masterGain.gain.value < 0.002
+    if (isAudiblyMuted && this.playbackFadeInSeconds > 0) {
+      scheduleSmoothMasterFadeIn(
+        this.masterGain.gain,
+        masterTarget,
+        now,
+        this.playbackFadeInSeconds,
+      )
+    } else {
+      this.masterGain.gain.cancelScheduledValues(now)
+      this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now)
+      this.masterGain.gain.linearRampToValueAtTime(
+        this.started ? masterTarget : MIN_AUDIBLE_GAIN,
+        now + PARAM_SMOOTH_SECONDS,
+      )
+    }
+
+    const voiceTransition = this.resolveVoiceTransitionTiming()
 
     const targetNotes = new Set<string>()
     for (const toneConfig of config.tones) {
@@ -428,12 +627,12 @@ export class DroneEngine {
         continue
       }
       targetNotes.add(toneConfig.noteId)
-      this.upsertVoice(config, toneConfig, now, forceRebuild)
+      this.upsertVoice(config, toneConfig, now, forceRebuild, voiceTransition)
     }
 
     for (const [noteId, voice] of this.voiceMap.entries()) {
       if (!targetNotes.has(noteId)) {
-        this.fadeAndStopVoice(voice, RELEASE_SECONDS)
+        this.fadeAndStopVoice(voice, voiceTransition.releaseSeconds)
         this.voiceMap.delete(noteId)
       }
     }
@@ -457,25 +656,25 @@ export class DroneEngine {
     toneConfig: ToneConfig,
     now: number,
     forceRebuild: boolean,
+    transition: VoiceTransitionTiming,
   ): void {
     const existing = this.voiceMap.get(toneConfig.noteId)
     const tonePartials = toneConfig.partials ?? config.partials
     const needsRebuild = forceRebuild || this.voiceNeedsRebuild(existing, tonePartials)
 
     if (needsRebuild && existing) {
-      // Keep rebuild crossfades short so rapid undo/reset cycles do not stack
-      // overlapping timbres from old and new overtone structures.
-      this.fadeAndStopVoice(existing, REBUILD_RELEASE_SECONDS)
+      // Keep rebuild crossfades short unless a preset transition requests longer overlap.
+      this.fadeAndStopVoice(existing, transition.rebuildReleaseSeconds)
       this.voiceMap.delete(toneConfig.noteId)
     }
 
     const liveVoice = this.voiceMap.get(toneConfig.noteId)
     if (!liveVoice) {
-      const created = this.createVoice(config, toneConfig, now)
+      const created = this.createVoice(config, toneConfig, now, transition.attackSeconds)
       this.voiceMap.set(toneConfig.noteId, created)
       return
     }
-    this.updateVoice(config, liveVoice, toneConfig, now)
+    this.updateVoice(config, liveVoice, toneConfig, now, transition.updateSeconds)
   }
 
   private voiceNeedsRebuild(voice: ToneVoice | undefined, partials: PartialConfig[]): boolean {
@@ -530,6 +729,7 @@ export class DroneEngine {
     config: DroneRuntimeConfig,
     toneConfig: ToneConfig,
     now: number,
+    attackSeconds: number,
   ): ToneVoice {
     if (!this.context || !this.masterGain) {
       throw new Error('Audio graph is not initialized')
@@ -589,19 +789,31 @@ export class DroneEngine {
     }
 
     outputGain.gain.cancelScheduledValues(now)
-    outputGain.gain.setValueAtTime(0.0001, now)
-    outputGain.gain.exponentialRampToValueAtTime(
-      Math.max(0.0001, toneGain),
-      now + ATTACK_SECONDS,
-    )
+    if (attackSeconds > ATTACK_SECONDS + 0.01) {
+      scheduleSmoothVoiceFadeIn(outputGain.gain, toneGain, now, attackSeconds)
+    } else if (this.playbackFadeInSeconds > 0) {
+      outputGain.gain.setValueAtTime(Math.max(MIN_AUDIBLE_GAIN, toneGain), now)
+    } else {
+      outputGain.gain.setValueAtTime(MIN_AUDIBLE_GAIN, now)
+      outputGain.gain.exponentialRampToValueAtTime(
+        Math.max(MIN_AUDIBLE_GAIN, toneGain),
+        now + attackSeconds,
+      )
+    }
 
     for (const bundle of oscillators) {
       bundle.gainNode.gain.cancelScheduledValues(now)
-      bundle.gainNode.gain.setValueAtTime(0.0001, now)
-      bundle.gainNode.gain.exponentialRampToValueAtTime(
-        Math.max(0.0001, bundle.waveGain),
-        now + ATTACK_SECONDS,
-      )
+      if (attackSeconds > ATTACK_SECONDS + 0.01) {
+        scheduleSmoothVoiceFadeIn(bundle.gainNode.gain, bundle.waveGain, now, attackSeconds)
+      } else if (this.playbackFadeInSeconds > 0) {
+        bundle.gainNode.gain.setValueAtTime(Math.max(MIN_AUDIBLE_GAIN, bundle.waveGain), now)
+      } else {
+        bundle.gainNode.gain.setValueAtTime(MIN_AUDIBLE_GAIN, now)
+        bundle.gainNode.gain.exponentialRampToValueAtTime(
+          Math.max(MIN_AUDIBLE_GAIN, bundle.waveGain),
+          now + attackSeconds,
+        )
+      }
     }
 
     return {
@@ -619,6 +831,7 @@ export class DroneEngine {
     voice: ToneVoice,
     toneConfig: ToneConfig,
     now: number,
+    updateSeconds: number,
   ): void {
     const frequency = getFrequency(
       toneConfig.noteId,
@@ -628,12 +841,16 @@ export class DroneEngine {
       config.baseOctave,
     )
     const toneGain = Math.max(0.0001, dbToGain(toneConfig.gainDb))
-    voice.outputGain.gain.cancelScheduledValues(now)
-    voice.outputGain.gain.setValueAtTime(voice.outputGain.gain.value, now)
-    voice.outputGain.gain.linearRampToValueAtTime(toneGain, now + PARAM_SMOOTH_SECONDS)
+    if (updateSeconds > PARAM_SMOOTH_SECONDS + 0.01) {
+      scheduleSmoothGainCrossfade(voice.outputGain.gain, toneGain, now, updateSeconds)
+    } else {
+      voice.outputGain.gain.cancelScheduledValues(now)
+      voice.outputGain.gain.setValueAtTime(voice.outputGain.gain.value, now)
+      voice.outputGain.gain.linearRampToValueAtTime(toneGain, now + updateSeconds)
+    }
     voice.panner.pan.cancelScheduledValues(now)
     voice.panner.pan.setValueAtTime(voice.panner.pan.value, now)
-    voice.panner.pan.linearRampToValueAtTime(toneConfig.pan, now + PARAM_SMOOTH_SECONDS)
+    voice.panner.pan.linearRampToValueAtTime(toneConfig.pan, now + updateSeconds)
 
     const entryGlideActive =
       voice.entryGlideEndTime !== null && now < voice.entryGlideEndTime
@@ -642,7 +859,7 @@ export class DroneEngine {
       for (const bundle of voice.oscillators) {
         bundle.oscillator.detune.cancelScheduledValues(now)
         bundle.oscillator.detune.setValueAtTime(bundle.oscillator.detune.value, now)
-        bundle.oscillator.detune.linearRampToValueAtTime(toneConfig.detuneCents, now + PARAM_SMOOTH_SECONDS)
+        bundle.oscillator.detune.linearRampToValueAtTime(toneConfig.detuneCents, now + updateSeconds)
       }
     }
 
@@ -678,17 +895,38 @@ export class DroneEngine {
           bundle.oscillator.frequency.setValueAtTime(bundle.oscillator.frequency.value, now)
           bundle.oscillator.frequency.exponentialRampToValueAtTime(
             Math.max(1, frequency * ratio),
-            now + PARAM_SMOOTH_SECONDS,
+            now + updateSeconds,
           )
         }
-        bundle.gainNode.gain.cancelScheduledValues(now)
-        bundle.gainNode.gain.setValueAtTime(bundle.gainNode.gain.value, now)
-        bundle.gainNode.gain.exponentialRampToValueAtTime(
-          nextWaveGain,
-          now + PARAM_SMOOTH_SECONDS,
-        )
+        if (updateSeconds > PARAM_SMOOTH_SECONDS + 0.01) {
+          scheduleSmoothGainCrossfade(bundle.gainNode.gain, nextWaveGain, now, updateSeconds)
+        } else {
+          bundle.gainNode.gain.cancelScheduledValues(now)
+          bundle.gainNode.gain.setValueAtTime(bundle.gainNode.gain.value, now)
+          bundle.gainNode.gain.exponentialRampToValueAtTime(
+            nextWaveGain,
+            now + updateSeconds,
+          )
+        }
         index += 1
       }
+    }
+  }
+
+  private disposeVoiceNodes(voice: ToneVoice): void {
+    for (const bundle of voice.oscillators) {
+      try {
+        bundle.oscillator.disconnect()
+        bundle.gainNode.disconnect()
+      } catch {
+        // Oscillator may already be stopped/disconnected.
+      }
+    }
+    try {
+      voice.panner.disconnect()
+      voice.outputGain.disconnect()
+    } catch {
+      // Nodes may already be disconnected.
     }
   }
 
@@ -696,20 +934,29 @@ export class DroneEngine {
     if (!this.context) {
       return
     }
-    const now = this.context.currentTime
-    voice.outputGain.gain.cancelScheduledValues(now)
-    voice.outputGain.gain.setValueAtTime(Math.max(voice.outputGain.gain.value, 0.0001), now)
-    voice.outputGain.gain.exponentialRampToValueAtTime(0.0001, now + releaseSeconds)
-    for (const bundle of voice.oscillators) {
-      bundle.gainNode.gain.cancelScheduledValues(now)
-      bundle.gainNode.gain.setValueAtTime(Math.max(bundle.gainNode.gain.value, 0.0001), now)
-      bundle.gainNode.gain.exponentialRampToValueAtTime(0.0001, now + releaseSeconds)
-      bundle.oscillator.stop(now + releaseSeconds + 0.02)
-      bundle.oscillator.disconnect()
-      bundle.gainNode.disconnect()
+    const context = this.context
+    const now = context.currentTime
+    const duration = Math.max(0, releaseSeconds)
+    const stopAt = now + Math.max(duration, 0.01) + 0.03
+
+    if (duration > RELEASE_SECONDS + 0.01) {
+      scheduleSmoothVoiceFadeOut(voice.outputGain.gain, now, duration)
+    } else {
+      voice.outputGain.gain.cancelScheduledValues(now)
+      voice.outputGain.gain.setValueAtTime(Math.max(voice.outputGain.gain.value, 0.0001), now)
+      voice.outputGain.gain.exponentialRampToValueAtTime(0.0001, now + duration)
     }
-    voice.panner.disconnect()
-    voice.outputGain.disconnect()
+
+    for (const bundle of voice.oscillators) {
+      bundle.oscillator.stop(stopAt)
+    }
+
+    window.setTimeout(() => {
+      if (this.context !== context) {
+        return
+      }
+      this.disposeVoiceNodes(voice)
+    }, duration * 1000 + 80)
   }
 }
 

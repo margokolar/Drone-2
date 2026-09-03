@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, Pause } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -21,6 +21,9 @@ type DropdownAlign = 'start' | 'end'
 type PickerItem = {
   id: string
   name: string
+  kind?: 'preset' | 'transport'
+  /** When false, item is skipped in prev/next navigation but still shown in the list. */
+  navigationEnabled?: boolean
 }
 
 type LibraryPickerMenuProps = {
@@ -59,7 +62,9 @@ export function LibraryPickerMenu({
   const [dropdownStyle, setDropdownStyle] = useState<CSSProperties>({})
   const menuRef = useRef<HTMLDivElement | null>(null)
   const dropdownRef = useRef<HTMLDivElement | null>(null)
-  const selectedName = items.find((item) => item.id === selectedId)?.name ?? '—'
+  const selectedItem = items.find((item) => item.id === selectedId)
+  const selectedName = selectedItem?.name ?? '—'
+  const selectedIsTransport = selectedItem?.kind === 'transport'
   const isSelectAppearance = appearance === 'select'
   const listItems = isSelectAppearance ? items : items.filter((item) => item.id !== selectedId)
   const resolvedTriggerClass = clsx(
@@ -197,7 +202,14 @@ export function LibraryPickerMenu({
         aria-expanded={menuOpen}
         aria-label={openAriaLabel}
       >
-        <span className="min-w-0 flex-1 truncate text-left" title={selectedName}>
+        <span
+          className={clsx(
+            'flex min-w-0 flex-1 items-center gap-1.5 truncate text-left',
+            selectedIsTransport && 'text-amber-100',
+          )}
+          title={selectedName}
+        >
+          {selectedIsTransport ? <Pause size={15} className="shrink-0 text-amber-100/90" aria-hidden /> : null}
           {selectedName}
         </span>
         <ChevronDown
@@ -213,16 +225,23 @@ export function LibraryPickerMenu({
         >
           {listItems.map((item) => {
             const isSelected = item.id === selectedId
+            const isTransport = item.kind === 'transport'
+            const isNavigationDisabled = item.navigationEnabled === false
             return (
               <button
                 key={item.id}
                 type="button"
                 className={clsx(
                   resolvedItemClass,
+                  isNavigationDisabled && 'opacity-55',
                   isSelectAppearance
                     ? isSelected
-                      ? 'text-white'
-                      : 'text-white hover:bg-white/10'
+                      ? isTransport
+                        ? 'text-amber-100'
+                        : 'text-white'
+                      : isTransport
+                        ? 'text-amber-100 hover:bg-white/10'
+                        : 'text-white hover:bg-white/10'
                     : inactiveItemClassName,
                 )}
                 onClick={() => {
@@ -236,11 +255,25 @@ export function LibraryPickerMenu({
                   <Check
                     size={20}
                     strokeWidth={2.5}
-                    className={clsx('shrink-0', isSelected ? 'text-white' : 'text-transparent')}
+                    className={clsx(
+                      'shrink-0',
+                      isSelected
+                        ? isTransport
+                          ? 'text-amber-100'
+                          : 'text-white'
+                        : 'text-transparent',
+                    )}
                     aria-hidden={!isSelected}
                   />
                 )}
-                <span className={clsx(isSelectAppearance ? 'shrink-0' : 'min-w-0 flex-1 truncate')}>
+                <span
+                  className={clsx(
+                    'flex min-w-0 items-center gap-1.5',
+                    isSelectAppearance ? 'shrink-0' : 'min-w-0 flex-1 truncate',
+                    isTransport && 'text-amber-100',
+                  )}
+                >
+                  {isTransport ? <Pause size={18} className="shrink-0 text-amber-100/90" aria-hidden /> : null}
                   {item.name}
                 </span>
               </button>

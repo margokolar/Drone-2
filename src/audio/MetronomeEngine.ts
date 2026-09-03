@@ -1,4 +1,5 @@
 import { dbToGain } from './audioMath'
+import { MAX_METRONOME_BPM, MIN_METRONOME_BPM } from '../presets/defaultPresets'
 
 const LOOKAHEAD_MS = 25
 const SCHEDULE_AHEAD_SECONDS = 0.15
@@ -85,7 +86,8 @@ export class MetronomeEngine {
     if (!this.context || !this.config.enabled) {
       return
     }
-    const secondsPerBeat = 60 / Math.max(30, this.config.bpm)
+    const bpm = Math.min(MAX_METRONOME_BPM, Math.max(MIN_METRONOME_BPM, this.config.bpm))
+    const secondsPerBeat = 60 / bpm
     while (this.nextTickAt < this.context.currentTime + SCHEDULE_AHEAD_SECONDS) {
       this.playClickAt(this.nextTickAt)
       this.nextTickAt += secondsPerBeat
@@ -99,12 +101,12 @@ export class MetronomeEngine {
     if (!this.config.muted) {
       const oscillator = this.context.createOscillator()
       const gainNode = this.context.createGain()
-      const clickPitch = 980
+      const clickPitch = 1240
       const attack = 0.001
-      const release = 0.06
-      const peakGain = dbToGain(this.config.volumeDb)
+      const release = 0.05
+      const peakGain = dbToGain(this.config.volumeDb) * 1.35
 
-      oscillator.type = 'triangle'
+      oscillator.type = 'square'
       oscillator.frequency.setValueAtTime(clickPitch, when)
       oscillator.connect(gainNode)
       gainNode.connect(this.context.destination)

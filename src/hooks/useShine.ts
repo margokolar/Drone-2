@@ -11,10 +11,16 @@ export const SHINE_OCTAVE_LABELS = ['0', '1', '2', '3', '4'] as const
 export { DEFAULT_SHINE_OCTAVE_INDEX, DEFAULT_SHINE_VOLUME }
 
 const METER_UPDATE_MS = 40
+/** Shine fade-in is slower than the tone/drone fade-in from the Fade card. */
+const SHINE_FADE_IN_MULTIPLIER = 2
 
 function baseFrequency(noteIndex: number, octaveIndex: number, a4Hz: number): number {
   const midi = 12 * (octaveIndex + 1) + noteIndex
   return a4Hz * 2 ** ((midi - 69) / 12)
+}
+
+function idleDisplayLevels(levels: number[], autos: boolean[]): number[] {
+  return levels.map((level, index) => (autos[index] ? 0 : level))
 }
 
 export type ShineState = {
@@ -48,54 +54,118 @@ export function useShine(
 ): ShineState {
   const shine = useDroneStore((state) => state.shine)
   const setShine = useDroneStore((state) => state.setShine)
+  const activePresetId = useDroneStore((state) => state.activePresetId)
+  const playbackFadeEnabled = useDroneStore((state) => state.playbackFadeEnabled)
+  const playbackFadeInSeconds = useDroneStore((state) => state.playbackFadeInSeconds)
+  const playbackFadeOutSeconds = useDroneStore((state) => state.playbackFadeOutSeconds)
+  const presetCrossfadeSeconds = useDroneStore((state) => state.presetCrossfadeSeconds)
   const { enabled, levels, autos, bumps, volume, octaveIndex } = shine
 
-  const [running, setRunning] = useState(false)
-  const [displayLevels, setDisplayLevels] = useState<number[]>(zeros)
+  const isActive = enabled && playing
+
+  const [displayLevels, setDisplayLevels] = useState<number[]>(() =>
+    idleDisplayLevels(shine.levels, shine.autos),
+  )
 
   const rafRef = useRef<number | null>(null)
   const lastMeterUpdateRef = useRef(0)
+  const previousPresetIdRef = useRef(activePresetId)
+  const previousShineEnabledRef = useRef(enabled)
 
   useEffect(() => {
+    shineEngine.setPlaybackFadeSettings(
+      playbackFadeEnabled ? playbackFadeInSeconds * SHINE_FADE_IN_MULTIPLIER : 0,
+      playbackFadeEnabled ? playbackFadeOutSeconds : 0,
+      playbackFadeEnabled ? presetCrossfadeSeconds : 0,
+    )
+  }, [
+    playbackFadeEnabled,
+    playbackFadeInSeconds,
+    playbackFadeOutSeconds,
+    presetCrossfadeSeconds,
+  ])
+
+  useEffect(() => {
+    if (previousPresetIdRef.current !== activePresetId) {
+      shineEngine.markPresetTransition()
+      previousPresetIdRef.current = activePresetId
+    }
+  }, [activePresetId])
+
+  const applyEngineConfig = useCallback(() => {
     shineEngine.setBaseFrequency(baseFrequency(noteIndex, octaveIndex, a4Hz))
-  }, [noteIndex, octaveIndex, a4Hz])
-
-  useEffect(() => {
     shineEngine.setMasterGainDb(masterGainDb)
-  }, [masterGainDb])
-
-  // Push preset/live config into the engine whenever it changes.
-  useEffect(() => {
     levels.forEach((level, index) => shineEngine.setHarmonicLevel(index, level))
-  }, [levels])
-
-  useEffect(() => {
     autos.forEach((on, index) => shineEngine.setHarmonicAuto(index, on))
-  }, [autos])
-
-  useEffect(() => {
     bumps.forEach((on, index) => shineEngine.setHarmonicBumps(index, on))
-  }, [bumps])
-
-  useEffect(() => {
     shineEngine.setVolume(volume)
-  }, [volume])
+  }, [a4Hz, autos, bumps, levels, masterGainDb, noteIndex, octaveIndex, volume])
 
   useEffect(() => {
-    setDisplayLevels(levels.map((level, index) => (autos[index] ? 0 : level)))
-  }, [levels, autos])
+    if (!isActive) {
+      shineEngine.clearPresetTransition()
+      applyEngineConfig()
+      previousShineEnabledRef.current = enabled
+      shineEngine.stop()
+      return
+    }
+
+    void shineEngine.resume()
+
+    const shineWasEnabled = previousShineEnabledRef.current
+    previousShineEnabledRef.current = enabled
+
+    const isPresetTransition = shineEngine.consumePresetTransition()
+    const shineAppearingOnPreset = isPresetTransition && enabled && !shineWasEnabled
+    const shouldCrossfade =
+      isPresetTransition && shineWasEnabled && enabled && shineEngine.isPlaying()
+
+    if (shouldCrossfade) {
+      shineEngine.crossfadePresetApply(applyEngineConfig)
+    } else if (!shineEngine.isPlaying() || shineAppearingOnPreset) {
+      applyEngineConfig()
+      const fadeInSeconds =
+        shineAppearingOnPreset && playbackFadeEnabled
+          ? Math.max(
+              playbackFadeInSeconds * SHINE_FADE_IN_MULTIPLIER,
+              presetCrossfadeSeconds * SHINE_FADE_IN_MULTIPLIER,
+            )
+          : undefined
+      shineEngine.start({
+        force: shineAppearingOnPreset && shineEngine.isRunning(),
+        fadeInSeconds,
+      })
+    } else {
+      applyEngineConfig()
+    }
+
+    setDisplayLevels(shineEngine.getDisplayLevels())
+  }, [
+    applyEngineConfig,
+    enabled,
+    isActive,
+    playbackFadeEnabled,
+    playbackFadeInSeconds,
+    presetCrossfadeSeconds,
+  ])
 
   useEffect(() => {
-    if (!running) {
+    if (!isActive && !shineEngine.isRunning()) {
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current)
         rafRef.current = null
       }
-      setDisplayLevels(levels.map((level, index) => (autos[index] ? 0 : level)))
+      setDisplayLevels(idleDisplayLevels(levels, autos))
       return
     }
 
+    lastMeterUpdateRef.current = 0
     const tick = () => {
+      if (!isActive && !shineEngine.isRunning()) {
+        rafRef.current = null
+        setDisplayLevels(idleDisplayLevels(levels, autos))
+        return
+      }
       const now = performance.now()
       if (now - lastMeterUpdateRef.current >= METER_UPDATE_MS) {
         lastMeterUpdateRef.current = now
@@ -111,24 +181,13 @@ export function useShine(
         rafRef.current = null
       }
     }
-  }, [running, autos, levels])
+  }, [isActive, levels, autos])
 
   useEffect(() => {
     return () => {
       shineEngine.stop()
     }
   }, [])
-
-  useEffect(() => {
-    if (enabled && playing) {
-      void shineEngine.resume()
-      shineEngine.start()
-      setRunning(true)
-      return
-    }
-    shineEngine.stop()
-    setRunning(false)
-  }, [enabled, playing])
 
   const toggleRunning = useCallback(() => {
     const current = useDroneStore.getState().shine
@@ -222,7 +281,7 @@ export function useShine(
 
   return {
     enabled,
-    running,
+    running: isActive,
     levels,
     autos,
     bumps,

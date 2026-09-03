@@ -16,15 +16,34 @@ import {
   DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS,
   DEFAULT_ENTRY_GLIDE_LOWEST_CENTS,
   DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS,
+  DEFAULT_PLAYBACK_FADE_IN_SECONDS,
+  DEFAULT_PLAYBACK_FADE_OUT_SECONDS,
+  DEFAULT_PRESET_CROSSFADE_SECONDS,
   DEFAULT_PRESETS,
   DEFAULT_TIMBRE_BLEND,
   DEFAULT_TONE_DETUNE_CENTS,
+  DEFAULT_METRONOME_VOLUME_DB,
+  MAX_METRONOME_BPM,
+  MAX_METRONOME_VOLUME_DB,
+  MIN_METRONOME_BPM,
+  MIN_METRONOME_VOLUME_DB,
   MAX_TONE_DETUNE_CENTS,
   MIN_TONE_DETUNE_CENTS,
   SHINE_HARMONIC_COUNT,
   type Preset,
   type ShineConfig,
 } from '../presets/defaultPresets'
+import {
+  buildDefaultPresetNavigation,
+  createTransportMarkerId,
+  getEnabledNavigationEntries,
+  navigationEntryKey,
+  isTransportMarkerKey,
+  normalizePresetNavigation,
+  resolveFirstActiveNavigationTarget,
+  resolvePresetBeforeMarker,
+  type PresetNavigationEntry,
+} from '../presets/presetNavigation'
 
 type SongEntry = {
   id: string
@@ -32,7 +51,9 @@ type SongEntry = {
   /** When false, prev/next song navigation skips this song. Defaults to true. */
   enabled?: boolean
   presets: Preset[]
+  presetNavigation?: PresetNavigationEntry[]
   activePresetId: string
+  activeNavigationKey?: string
 }
 
 type DroneState = {
@@ -40,6 +61,8 @@ type DroneState = {
   songName: string
   songLibrary: SongEntry[]
   activePresetId: string
+  activeNavigationKey: string
+  presetNavigation: PresetNavigationEntry[]
   presets: Preset[]
   tuningSystemId: TuningSystemId
   tonalCenter: TonalCenter
@@ -57,6 +80,10 @@ type DroneState = {
   entryGlideLowestSeconds: number
   entryGlideHighestCents: number
   entryGlideHighestSeconds: number
+  playbackFadeInSeconds: number
+  playbackFadeOutSeconds: number
+  playbackFadeEnabled: boolean
+  presetCrossfadeSeconds: number
   globalOvertoneEditEnabled: boolean
   tones: ToneConfig[]
   partials: PartialConfig[]
@@ -65,6 +92,8 @@ type DroneState = {
   metronomeBpm: number
   metronomeVolumeDb: number
   metronomeMuted: boolean
+  /** When true, drone transport play/pause also starts/stops the click. */
+  metronomeSyncEnabled: boolean
   /** When false, Mic tab and transport mic control are hidden. */
   micFeaturesEnabled: boolean
   controlsLocked: boolean
@@ -89,6 +118,11 @@ type DroneState = {
   setEntryGlideLowestSeconds: (seconds: number) => void
   setEntryGlideHighestCents: (cents: number) => void
   setEntryGlideHighestSeconds: (seconds: number) => void
+  setPlaybackFadeInSeconds: (seconds: number) => void
+  setPlaybackFadeOutSeconds: (seconds: number) => void
+  setPlaybackFadeEnabled: (enabled: boolean) => void
+  togglePlaybackFadeEnabled: () => void
+  setPresetCrossfadeSeconds: (seconds: number) => void
   setGlobalOvertoneEditEnabled: (enabled: boolean) => void
   enableGlobalOvertoneEditFromTone: (noteId: NoteId) => void
   applyPartialsGlobally: (partials: PartialConfig[]) => void
@@ -119,6 +153,8 @@ type DroneState = {
   setMetronomeBpm: (bpm: number) => void
   setMetronomeVolumeDb: (db: number) => void
   setMetronomeMuted: (muted: boolean) => void
+  setMetronomeSyncEnabled: (enabled: boolean) => void
+  toggleMetronomeSyncEnabled: () => void
   setMicFeaturesEnabled: (enabled: boolean) => void
   setControlsLocked: (locked: boolean) => void
   toggleControlsLocked: () => void
@@ -133,6 +169,10 @@ type DroneState = {
   duplicatePreset: (presetId: string) => void
   deletePreset: (presetId: string) => void
   movePreset: (presetId: string, direction: 'up' | 'down') => void
+  insertTransportMarkerAfter: (presetId: string) => void
+  deleteTransportMarker: (markerId: string) => void
+  moveNavigationEntry: (entryKey: string, direction: 'up' | 'down') => void
+  toggleTransportMarkerNavigationEnabled: (markerId: string) => void
   setPresetNavigationEnabled: (presetId: string, enabled: boolean) => void
   togglePresetNavigationEnabled: (presetId: string) => void
   importSong: (songPresets: Preset[], activePresetId?: string, songName?: string) => void
@@ -148,8 +188,6 @@ type DroneState = {
   saveAsNewSong: (songName?: string) => void
   renameSongInLibrary: (songId: string, name: string) => void
   duplicateSongInLibrary: (songId: string) => void
-  selectNextPreset: () => void
-  selectPreviousPreset: () => void
   selectNextSong: () => void
   selectPreviousSong: () => void
 }
@@ -166,10 +204,6 @@ function clamp(value: number, min: number, max: number): number {
 
 function isNavigationEnabled(item: { enabled?: boolean }): boolean {
   return item.enabled !== false
-}
-
-function getEnabledPresets(presets: Preset[]): Preset[] {
-  return presets.filter(isNavigationEnabled)
 }
 
 function getEnabledSongs(songs: SongEntry[]): SongEntry[] {
@@ -253,6 +287,7 @@ function duplicatePresetData(preset: Preset): Preset {
 function applyPresetState(preset: Preset): Pick<
   DroneState,
   | 'activePresetId'
+  | 'activeNavigationKey'
   | 'tuningSystemId'
   | 'tonalCenter'
   | 'baseOctave'
@@ -264,6 +299,7 @@ function applyPresetState(preset: Preset): Pick<
 > {
   return {
     activePresetId: preset.id,
+    activeNavigationKey: preset.id,
     tuningSystemId: preset.tuningSystemId,
     tonalCenter: preset.tonalCenter,
     baseOctave: clamp(preset.baseOctave, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
@@ -302,7 +338,9 @@ function snapshotPresetFromState(
 }
 
 const DEFAULT_PARTIALS = createDefaultPartials()
-const INITIAL_PRESET = duplicatePresetData(DEFAULT_PRESETS[0])
+const INITIAL_PRESETS = DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset))
+const INITIAL_PRESET = INITIAL_PRESETS[0]
+const INITIAL_PRESET_NAVIGATION = buildDefaultPresetNavigation(INITIAL_PRESETS)
 const INITIAL_SONG_ID = 'song-default'
 
 function normalizePartials(partials: PartialConfig[]): PartialConfig[] {
@@ -417,7 +455,10 @@ function migrateTones(
 }
 
 function syncPresetsToCurrentSong(
-  state: Pick<DroneState, 'presets' | 'activePresetId' | 'songName' | 'songLibrary'>,
+  state: Pick<
+    DroneState,
+    'presets' | 'presetNavigation' | 'activePresetId' | 'activeNavigationKey' | 'songName' | 'songLibrary'
+  >,
 ): Pick<DroneState, 'songLibrary'> | Record<string, never> {
   const currentIndex = state.songLibrary.findIndex((entry) => entry.name === state.songName)
   if (currentIndex < 0) {
@@ -427,7 +468,11 @@ function syncPresetsToCurrentSong(
   nextLibrary[currentIndex] = {
     ...nextLibrary[currentIndex],
     presets: state.presets.map((preset) => duplicatePresetData(preset)),
+    presetNavigation: state.presetNavigation.map((entry) =>
+      entry.kind === 'transport' ? { ...entry } : { ...entry },
+    ),
     activePresetId: state.activePresetId,
+    activeNavigationKey: state.activeNavigationKey,
   }
   return { songLibrary: nextLibrary }
 }
@@ -465,12 +510,20 @@ export const useDroneStore = create<DroneState>()(
         {
           id: INITIAL_SONG_ID,
           name: 'My Song',
-          presets: DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset)),
+          presets: INITIAL_PRESETS.map((preset) => duplicatePresetData(preset)),
+          presetNavigation: INITIAL_PRESET_NAVIGATION.map((entry) =>
+            entry.kind === 'transport' ? { ...entry } : { ...entry },
+          ),
           activePresetId: INITIAL_PRESET.id,
+          activeNavigationKey: INITIAL_PRESET.id,
         },
       ],
-      presets: DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset)),
+      presets: INITIAL_PRESETS.map((preset) => duplicatePresetData(preset)),
+      presetNavigation: INITIAL_PRESET_NAVIGATION.map((entry) =>
+        entry.kind === 'transport' ? { ...entry } : { ...entry },
+      ),
       activePresetId: INITIAL_PRESET.id,
+      activeNavigationKey: INITIAL_PRESET.id,
       tuningSystemId: INITIAL_PRESET.tuningSystemId,
       tonalCenter: INITIAL_PRESET.tonalCenter,
       referenceA4Hz: 440,
@@ -483,18 +536,27 @@ export const useDroneStore = create<DroneState>()(
       entryGlideLowestSeconds: DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS,
       entryGlideHighestCents: DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS,
       entryGlideHighestSeconds: DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS,
+      playbackFadeInSeconds: DEFAULT_PLAYBACK_FADE_IN_SECONDS,
+      playbackFadeOutSeconds: DEFAULT_PLAYBACK_FADE_OUT_SECONDS,
+      playbackFadeEnabled: false,
+      presetCrossfadeSeconds: DEFAULT_PRESET_CROSSFADE_SECONDS,
       globalOvertoneEditEnabled: false,
       tones: INITIAL_PRESET.tones.map((tone) => ({ ...tone })),
       partials: normalizePartials(INITIAL_PRESET.partials.map((partial) => ({ ...partial }))),
       shine: normalizeShine(INITIAL_PRESET.shine),
       metronomeEnabled: false,
       metronomeBpm: 72,
-      metronomeVolumeDb: -15,
+      metronomeVolumeDb: DEFAULT_METRONOME_VOLUME_DB,
       metronomeMuted: false,
+      metronomeSyncEnabled: false,
       micFeaturesEnabled: true,
       controlsLocked: false,
       btControlMode: 'pedal',
-      setPlaying: (playing) => set({ playing }),
+      setPlaying: (playing) =>
+        set((state) => ({
+          playing,
+          ...(state.metronomeSyncEnabled ? { metronomeEnabled: playing } : {}),
+        })),
       togglePlaying: () => set((state) => ({ playing: !state.playing })),
       setReferenceA4Hz: (frequency) => set({ referenceA4Hz: clamp(frequency, 400, 480) }),
       nudgeReferenceA4Hz: (delta) =>
@@ -570,6 +632,15 @@ export const useDroneStore = create<DroneState>()(
         set({ entryGlideHighestCents: clamp(Math.round(cents), -50, 50) }),
       setEntryGlideHighestSeconds: (seconds) =>
         set({ entryGlideHighestSeconds: clamp(Math.round(seconds * 10) / 10, 0, 4) }),
+      setPlaybackFadeInSeconds: (seconds) =>
+        set({ playbackFadeInSeconds: clamp(Math.round(seconds * 10) / 10, 0, 2) }),
+      setPlaybackFadeOutSeconds: (seconds) =>
+        set({ playbackFadeOutSeconds: clamp(Math.round(seconds * 10) / 10, 0, 2) }),
+      setPlaybackFadeEnabled: (enabled) => set({ playbackFadeEnabled: enabled }),
+      togglePlaybackFadeEnabled: () =>
+        set((state) => ({ playbackFadeEnabled: !state.playbackFadeEnabled })),
+      setPresetCrossfadeSeconds: (seconds) =>
+        set({ presetCrossfadeSeconds: clamp(Math.round(seconds * 10) / 10, 0, 2) }),
       setGlobalOvertoneEditEnabled: (enabled) => set({ globalOvertoneEditEnabled: enabled }),
       enableGlobalOvertoneEditFromTone: (noteId) =>
         set((state) => {
@@ -894,9 +965,14 @@ export const useDroneStore = create<DroneState>()(
           }),
         })),
       setMetronomeEnabled: (enabled) => set({ metronomeEnabled: enabled }),
-      setMetronomeBpm: (bpm) => set({ metronomeBpm: clamp(bpm, 30, 220) }),
-      setMetronomeVolumeDb: (db) => set({ metronomeVolumeDb: clamp(db, -40, 0) }),
+      setMetronomeBpm: (bpm) =>
+        set({ metronomeBpm: clamp(bpm, MIN_METRONOME_BPM, MAX_METRONOME_BPM) }),
+      setMetronomeVolumeDb: (db) =>
+        set({ metronomeVolumeDb: clamp(db, MIN_METRONOME_VOLUME_DB, MAX_METRONOME_VOLUME_DB) }),
       setMetronomeMuted: (muted) => set({ metronomeMuted: muted }),
+      setMetronomeSyncEnabled: (enabled) => set({ metronomeSyncEnabled: enabled }),
+      toggleMetronomeSyncEnabled: () =>
+        set((state) => ({ metronomeSyncEnabled: !state.metronomeSyncEnabled })),
       setMicFeaturesEnabled: (enabled) => set({ micFeaturesEnabled: enabled }),
       setControlsLocked: (locked) => set({ controlsLocked: locked }),
       toggleControlsLocked: () => set((state) => ({ controlsLocked: !state.controlsLocked })),
@@ -937,9 +1013,21 @@ export const useDroneStore = create<DroneState>()(
             partials: normalizePartials(state.partials.map((partial) => ({ ...partial }))),
             shine: normalizeShine(state.shine),
           }
+          const presetNavigation = [
+            ...state.presetNavigation,
+            { kind: 'preset' as const, presetId: nextPreset.id },
+          ]
           return {
             presets: [...state.presets, nextPreset],
-            activePresetId: nextPreset.id,
+            presetNavigation,
+            ...applyPresetState(nextPreset),
+            ...syncPresetsToCurrentSong({
+              ...state,
+              presets: [...state.presets, nextPreset],
+              presetNavigation,
+              activePresetId: nextPreset.id,
+              activeNavigationKey: nextPreset.id,
+            }),
           }
         }),
       createNewPreset: () =>
@@ -952,7 +1040,21 @@ export const useDroneStore = create<DroneState>()(
           }
           return {
             presets: [...state.presets, nextPreset],
+            presetNavigation: [
+              ...state.presetNavigation,
+              { kind: 'preset', presetId: nextPreset.id },
+            ],
             ...applyPresetState(nextPreset),
+            ...syncPresetsToCurrentSong({
+              ...state,
+              presets: [...state.presets, nextPreset],
+              presetNavigation: [
+                ...state.presetNavigation,
+                { kind: 'preset', presetId: nextPreset.id },
+              ],
+              activePresetId: nextPreset.id,
+              activeNavigationKey: nextPreset.id,
+            }),
           }
         }),
       loadPreset: (presetId) => {
@@ -960,7 +1062,9 @@ export const useDroneStore = create<DroneState>()(
         if (!preset) {
           return
         }
-        set(applyPresetState(preset))
+        set({
+          ...applyPresetState(preset),
+        })
       },
       renamePreset: (presetId, name) =>
         set((state) => {
@@ -983,9 +1087,26 @@ export const useDroneStore = create<DroneState>()(
           const duplicate = duplicatePresetData(source)
           duplicate.id = `preset-${Date.now()}`
           duplicate.name = `${source.name} Copy`
+          const sourceIndex = state.presetNavigation.findIndex(
+            (entry) => entry.kind === 'preset' && entry.presetId === presetId,
+          )
+          const nextNavigation = [...state.presetNavigation]
+          if (sourceIndex >= 0) {
+            nextNavigation.splice(sourceIndex + 1, 0, { kind: 'preset', presetId: duplicate.id })
+          } else {
+            nextNavigation.push({ kind: 'preset', presetId: duplicate.id })
+          }
           return {
             presets: [...state.presets, duplicate],
-            activePresetId: duplicate.id,
+            presetNavigation: nextNavigation,
+            ...applyPresetState(duplicate),
+            ...syncPresetsToCurrentSong({
+              ...state,
+              presets: [...state.presets, duplicate],
+              presetNavigation: nextNavigation,
+              activePresetId: duplicate.id,
+              activeNavigationKey: duplicate.id,
+            }),
           }
         }),
       deletePreset: (presetId) =>
@@ -994,33 +1115,128 @@ export const useDroneStore = create<DroneState>()(
             return state
           }
           const filtered = state.presets.filter((preset) => preset.id !== presetId)
+          const nextNavigation = state.presetNavigation.filter(
+            (entry) => entry.kind === 'transport' || entry.presetId !== presetId,
+          )
           const nextActive = filtered[0]
           const activeStillExists = filtered.some((preset) => preset.id === state.activePresetId)
           if (activeStillExists) {
+            const activeNavigationKey =
+              state.activeNavigationKey === presetId
+                ? state.activePresetId
+                : state.activeNavigationKey
             return {
               presets: filtered,
+              presetNavigation: nextNavigation,
+              activeNavigationKey,
+              ...syncPresetsToCurrentSong({
+                ...state,
+                presets: filtered,
+                presetNavigation: nextNavigation,
+                activeNavigationKey,
+              }),
             }
           }
           return {
             presets: filtered,
+            presetNavigation: nextNavigation,
             ...applyPresetState(nextActive),
+            ...syncPresetsToCurrentSong({
+              ...state,
+              presets: filtered,
+              presetNavigation: nextNavigation,
+              activePresetId: nextActive.id,
+              activeNavigationKey: nextActive.id,
+            }),
           }
         }),
-      movePreset: (presetId, direction) =>
+      movePreset: (presetId, direction) => get().moveNavigationEntry(presetId, direction),
+      insertTransportMarkerAfter: (presetId) =>
         set((state) => {
-          const index = state.presets.findIndex((preset) => preset.id === presetId)
+          const index = state.presetNavigation.findIndex(
+            (entry) => entry.kind === 'preset' && entry.presetId === presetId,
+          )
+          if (index < 0) {
+            return state
+          }
+          const marker = {
+            kind: 'transport' as const,
+            id: createTransportMarkerId(),
+            enabled: true,
+          }
+          const presetNavigation = [...state.presetNavigation]
+          presetNavigation.splice(index + 1, 0, marker)
+          return {
+            presetNavigation,
+            ...syncPresetsToCurrentSong({ ...state, presetNavigation }),
+          }
+        }),
+      deleteTransportMarker: (markerId) =>
+        set((state) => {
+          const presetNavigation = state.presetNavigation.filter(
+            (entry) => !(entry.kind === 'transport' && entry.id === markerId),
+          )
+          if (presetNavigation.length === state.presetNavigation.length) {
+            return state
+          }
+          const activeNavigationKey =
+            state.activeNavigationKey === markerId ? state.activePresetId : state.activeNavigationKey
+          return {
+            presetNavigation,
+            activeNavigationKey,
+            ...syncPresetsToCurrentSong({ ...state, presetNavigation, activeNavigationKey }),
+          }
+        }),
+      moveNavigationEntry: (entryKey, direction) =>
+        set((state) => {
+          const index = state.presetNavigation.findIndex(
+            (entry) => navigationEntryKey(entry) === entryKey,
+          )
           if (index < 0) {
             return state
           }
           const swapIndex = direction === 'up' ? index - 1 : index + 1
-          if (swapIndex < 0 || swapIndex >= state.presets.length) {
+          if (swapIndex < 0 || swapIndex >= state.presetNavigation.length) {
             return state
           }
-          const next = [...state.presets]
-          const current = next[index]
-          next[index] = next[swapIndex]
-          next[swapIndex] = current
-          return { presets: next }
+          const presetNavigation = [...state.presetNavigation]
+          const current = presetNavigation[index]
+          presetNavigation[index] = presetNavigation[swapIndex]
+          presetNavigation[swapIndex] = current
+          return {
+            presetNavigation,
+            ...syncPresetsToCurrentSong({ ...state, presetNavigation }),
+          }
+        }),
+      toggleTransportMarkerNavigationEnabled: (markerId) =>
+        set((state) => {
+          const marker = state.presetNavigation.find(
+            (entry) => entry.kind === 'transport' && entry.id === markerId,
+          )
+          if (!marker || marker.kind !== 'transport') {
+            return state
+          }
+          const nextEnabled = !isNavigationEnabled(marker)
+          if (
+            !nextEnabled &&
+            getEnabledNavigationEntries(state.presetNavigation, state.presets).length <= 1
+          ) {
+            return state
+          }
+          const presetNavigation = state.presetNavigation.map((entry) =>
+            entry.kind === 'transport' && entry.id === markerId
+              ? { ...entry, enabled: nextEnabled }
+              : entry,
+          )
+          const activeNavigationKey =
+            !nextEnabled && state.activeNavigationKey === markerId
+              ? state.activePresetId
+              : state.activeNavigationKey
+          return {
+            presetNavigation,
+            activeNavigationKey,
+            ...syncPresetsToCurrentSong({ ...state, presetNavigation, activeNavigationKey }),
+          }
         }),
       importSong: (songPresets, activePresetId, songName) =>
         set((state) => {
@@ -1053,12 +1269,15 @@ export const useDroneStore = create<DroneState>()(
             id: `song-${Date.now()}`,
             name: resolvedSongName,
             presets: imported.map((preset) => duplicatePresetData(preset)),
+            presetNavigation: buildDefaultPresetNavigation(imported),
             activePresetId: active.id,
+            activeNavigationKey: active.id,
           }
           return {
             songName: resolvedSongName,
             songLibrary: [...state.songLibrary, importedSong],
             presets: imported,
+            presetNavigation: buildDefaultPresetNavigation(imported),
             ...applyPresetState(active),
           }
         }),
@@ -1111,7 +1330,18 @@ export const useDroneStore = create<DroneState>()(
               id: nextSongId,
               name: song.name?.trim() || `Imported Song ${importedSongs.length + 1}`,
               presets: importedPresets.map((preset) => duplicatePresetData(preset)),
+              presetNavigation: normalizePresetNavigation(
+                (song as SongEntry).presetNavigation,
+                importedPresets,
+              ),
               activePresetId: active.id,
+              activeNavigationKey:
+                (song as SongEntry).activeNavigationKey &&
+                normalizePresetNavigation((song as SongEntry).presetNavigation, importedPresets).some(
+                  (entry) => navigationEntryKey(entry) === (song as SongEntry).activeNavigationKey,
+                )
+                  ? (song as SongEntry).activeNavigationKey
+                  : active.id,
             })
           }
 
@@ -1128,6 +1358,7 @@ export const useDroneStore = create<DroneState>()(
             songName: activeSong.name,
             songLibrary: importedSongs,
             presets: copiedPresets,
+            presetNavigation: normalizePresetNavigation(activeSong.presetNavigation, copiedPresets),
             ...applyPresetState(activePreset),
           }
         }),
@@ -1138,12 +1369,32 @@ export const useDroneStore = create<DroneState>()(
             return state
           }
           const copiedPresets = song.presets.map((preset) => duplicatePresetData(preset))
-          const active = copiedPresets.find((preset) => preset.id === song.activePresetId) ?? copiedPresets[0]
+          const presetNavigation = normalizePresetNavigation(song.presetNavigation, copiedPresets)
+          const firstActive = resolveFirstActiveNavigationTarget(presetNavigation, copiedPresets)
+          if (!firstActive) {
+            return state
+          }
+          const landingOnTransport = isTransportMarkerKey(
+            firstActive.navigationKey,
+            presetNavigation,
+          )
+          const presetBeforeMarker = landingOnTransport
+            ? resolvePresetBeforeMarker(
+                presetNavigation,
+                copiedPresets,
+                firstActive.navigationKey,
+              )
+            : null
           return {
             songName: song.name,
             songLibrary: state.songLibrary,
             presets: copiedPresets,
-            ...applyPresetState(active),
+            presetNavigation,
+            ...(presetBeforeMarker
+              ? applyPresetState(presetBeforeMarker)
+              : applyPresetState(firstActive.preset)),
+            activeNavigationKey: firstActive.navigationKey,
+            ...(landingOnTransport && state.playing ? { playing: false } : {}),
           }
         }),
       deleteSongFromLibrary: (songId) =>
@@ -1305,36 +1556,6 @@ export const useDroneStore = create<DroneState>()(
             songLibrary: [...state.songLibrary, newSong],
           }
         }),
-      selectNextPreset: () => {
-        const state = get()
-        const enabledPresets = getEnabledPresets(state.presets)
-        const nextPreset = selectNextInRing(
-          enabledPresets,
-          state.activePresetId,
-          (preset) => preset.id,
-        )
-        if (!nextPreset) {
-          return
-        }
-        set({
-          ...applyPresetState(nextPreset),
-        })
-      },
-      selectPreviousPreset: () => {
-        const state = get()
-        const enabledPresets = getEnabledPresets(state.presets)
-        const previousPreset = selectPreviousInRing(
-          enabledPresets,
-          state.activePresetId,
-          (preset) => preset.id,
-        )
-        if (!previousPreset) {
-          return
-        }
-        set({
-          ...applyPresetState(previousPreset),
-        })
-      },
       selectNextSong: () => {
         const state = get()
         const enabledSongs = getEnabledSongs(state.songLibrary)
@@ -1363,7 +1584,10 @@ export const useDroneStore = create<DroneState>()(
       },
       setPresetNavigationEnabled: (presetId, enabled) =>
         set((state) => {
-          if (!enabled && getEnabledPresets(state.presets).length <= 1) {
+          if (
+            !enabled &&
+            getEnabledNavigationEntries(state.presetNavigation, state.presets).length <= 1
+          ) {
             return state
           }
           return {
@@ -1379,7 +1603,10 @@ export const useDroneStore = create<DroneState>()(
             return state
           }
           const nextEnabled = !isNavigationEnabled(preset)
-          if (!nextEnabled && getEnabledPresets(state.presets).length <= 1) {
+          if (
+            !nextEnabled &&
+            getEnabledNavigationEntries(state.presetNavigation, state.presets).length <= 1
+          ) {
             return state
           }
           return {
@@ -1418,7 +1645,7 @@ export const useDroneStore = create<DroneState>()(
     }),
     {
       name: 'bourdon-store-v1',
-      version: 18,
+      version: 23,
       migrate: (persistedState) => {
         try {
           const typed = persistedState as Partial<DroneState> | undefined
@@ -1445,10 +1672,22 @@ export const useDroneStore = create<DroneState>()(
               ),
             }),
           )
+          const resolvedPresets =
+            migratedPresets.length > 0
+              ? migratedPresets
+              : DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset))
           const resolvedActivePresetId = resolveActivePresetId(
-            migratedPresets.length ? migratedPresets : DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset)),
+            resolvedPresets,
             typed.activePresetId,
           )
+          const presetNavigation = normalizePresetNavigation(typed.presetNavigation, resolvedPresets)
+          const activeNavigationKey =
+            typed.activeNavigationKey &&
+            presetNavigation.some(
+              (entry) => navigationEntryKey(entry) === typed.activeNavigationKey,
+            )
+              ? typed.activeNavigationKey
+              : resolvedActivePresetId
           const migratedTones = migrateTones(
             typed.tones ?? INITIAL_PRESET.tones,
             incomingPartials,
@@ -1456,8 +1695,10 @@ export const useDroneStore = create<DroneState>()(
           )
           return {
             ...typed,
-            presets: migratedPresets,
+            presets: resolvedPresets,
+            presetNavigation,
             activePresetId: resolvedActivePresetId,
+            activeNavigationKey,
             partials: incomingPartials,
             timbreBlend: incomingTimbre,
             tones: migratedTones,
@@ -1465,26 +1706,41 @@ export const useDroneStore = create<DroneState>()(
             baseOctave: clamp(typed.baseOctave ?? 3, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
             songName: typed.songName ?? 'My Song',
             songLibrary:
-              typed.songLibrary?.map((song) =>
-                normalizeSongNavigationEnabled({
+              typed.songLibrary?.map((song) => {
+                const songPresets = (song.presets ?? []).map((preset) => duplicatePresetData(preset))
+                const songPresetNavigation = normalizePresetNavigation(song.presetNavigation, songPresets)
+                return normalizeSongNavigationEnabled({
                   ...song,
                   enabled: song.enabled ?? true,
-                  presets: (song.presets ?? []).map((preset) => duplicatePresetData(preset)),
-                }),
-              ) ?? [
+                  presets: songPresets,
+                  presetNavigation: songPresetNavigation,
+                  activeNavigationKey:
+                    song.activeNavigationKey &&
+                    songPresetNavigation.some(
+                      (entry) => navigationEntryKey(entry) === song.activeNavigationKey,
+                    )
+                      ? song.activeNavigationKey
+                      : song.activePresetId,
+                })
+              }) ?? [
                 {
                   id: INITIAL_SONG_ID,
                   name: typed.songName ?? 'My Song',
-                  presets: migratedPresets.length
-                    ? migratedPresets.map((preset) => duplicatePresetData(preset))
-                    : DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset)),
-                  activePresetId: typed.activePresetId ?? INITIAL_PRESET.id,
+                  presets: resolvedPresets.map((preset) => duplicatePresetData(preset)),
+                  presetNavigation,
+                  activePresetId: resolvedActivePresetId,
+                  activeNavigationKey,
                 },
               ],
             metronomeEnabled: typed.metronomeEnabled ?? false,
-            metronomeBpm: typed.metronomeBpm ?? 72,
-            metronomeVolumeDb: typed.metronomeVolumeDb ?? -15,
+            metronomeBpm: clamp(typed.metronomeBpm ?? 72, MIN_METRONOME_BPM, MAX_METRONOME_BPM),
+            metronomeVolumeDb: clamp(
+              typed.metronomeVolumeDb ?? DEFAULT_METRONOME_VOLUME_DB,
+              MIN_METRONOME_VOLUME_DB,
+              MAX_METRONOME_VOLUME_DB,
+            ),
             metronomeMuted: typed.metronomeMuted ?? false,
+            metronomeSyncEnabled: typed.metronomeSyncEnabled ?? false,
             micFeaturesEnabled: typed.micFeaturesEnabled ?? true,
             harmonicTimbreEnabled: typed.harmonicTimbreEnabled ?? true,
             entryGlideEnabled: typed.entryGlideEnabled ?? true,
@@ -1508,6 +1764,22 @@ export const useDroneStore = create<DroneState>()(
               0,
               4,
             ),
+            playbackFadeInSeconds: clamp(
+              typed.playbackFadeInSeconds ?? DEFAULT_PLAYBACK_FADE_IN_SECONDS,
+              0,
+              2,
+            ),
+            playbackFadeOutSeconds: clamp(
+              typed.playbackFadeOutSeconds ?? DEFAULT_PLAYBACK_FADE_OUT_SECONDS,
+              0,
+              2,
+            ),
+            playbackFadeEnabled: typed.playbackFadeEnabled ?? false,
+            presetCrossfadeSeconds: clamp(
+              typed.presetCrossfadeSeconds ?? DEFAULT_PRESET_CROSSFADE_SECONDS,
+              0,
+              2,
+            ),
             globalOvertoneEditEnabled: typed.globalOvertoneEditEnabled ?? false,
             controlsLocked: typed.controlsLocked ?? false,
             btControlMode: typed.btControlMode === 'speaker' ? 'speaker' : 'pedal',
@@ -1521,6 +1793,8 @@ export const useDroneStore = create<DroneState>()(
         songName: state.songName,
         songLibrary: state.songLibrary,
         activePresetId: state.activePresetId,
+        activeNavigationKey: state.activeNavigationKey,
+        presetNavigation: state.presetNavigation,
         tuningSystemId: state.tuningSystemId,
         tonalCenter: state.tonalCenter,
         referenceA4Hz: state.referenceA4Hz,
@@ -1533,6 +1807,10 @@ export const useDroneStore = create<DroneState>()(
         entryGlideLowestSeconds: state.entryGlideLowestSeconds,
         entryGlideHighestCents: state.entryGlideHighestCents,
         entryGlideHighestSeconds: state.entryGlideHighestSeconds,
+        playbackFadeInSeconds: state.playbackFadeInSeconds,
+        playbackFadeOutSeconds: state.playbackFadeOutSeconds,
+        playbackFadeEnabled: state.playbackFadeEnabled,
+        presetCrossfadeSeconds: state.presetCrossfadeSeconds,
         globalOvertoneEditEnabled: state.globalOvertoneEditEnabled,
         tones: state.tones,
         partials: state.partials,
@@ -1541,6 +1819,7 @@ export const useDroneStore = create<DroneState>()(
         metronomeBpm: state.metronomeBpm,
         metronomeVolumeDb: state.metronomeVolumeDb,
         metronomeMuted: state.metronomeMuted,
+        metronomeSyncEnabled: state.metronomeSyncEnabled,
         micFeaturesEnabled: state.micFeaturesEnabled,
         controlsLocked: state.controlsLocked,
         btControlMode: state.btControlMode,

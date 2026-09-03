@@ -8,6 +8,7 @@
  */
 
 import { dbToGain } from './audioMath'
+import { MIN_AUDIBLE_GAIN, scheduleSmoothFadeIn, scheduleSmoothFadeOut } from './fadeCurves'
 
 export const SHINE_HARMONIC_COUNT = 16
 
@@ -57,7 +58,15 @@ export class ShineEngine {
   private gains: (GainNode | null)[] = []
   private panners: (StereoPannerNode | null)[] = []
   private schedulerTimer: number | null = null
+  private pendingStopTimer: number | null = null
+  private pendingPresetCrossfadeTimer: number | null = null
   private running = false
+  private isAudibleStopping = false
+  private gainFadeInEndTime = 0
+  private pendingPresetTransition = false
+  private playbackFadeInSeconds = 0
+  private playbackFadeOutSeconds = 0
+  private presetCrossfadeSeconds = 0
 
   private baseFrequency = 65.7
   private volume = 0.6
@@ -107,7 +116,114 @@ export class ShineEngine {
   }
 
   isRunning(): boolean {
+    return this.running || this.isAudibleStopping
+  }
+
+  /** True when voices are actively playing, not fading out after stop. */
+  isPlaying(): boolean {
     return this.running
+  }
+
+  private shouldDeferGainUpdates(now: number): boolean {
+    return this.isAudibleStopping || (this.gainFadeInEndTime > 0 && now < this.gainFadeInEndTime)
+  }
+
+  private initialHarmonicGain(index: number): number {
+    if (this.auto[index]) {
+      return AUTO_BASE
+    }
+    return Math.max(MIN_AUDIBLE_GAIN, this.manualLevel[index])
+  }
+
+  setPlaybackFadeSettings(
+    fadeInSeconds: number,
+    fadeOutSeconds: number,
+    presetCrossfadeSeconds = 0,
+  ): void {
+    this.playbackFadeInSeconds = Math.max(0, fadeInSeconds)
+    this.playbackFadeOutSeconds = Math.max(0, fadeOutSeconds)
+    this.presetCrossfadeSeconds = Math.max(0, presetCrossfadeSeconds)
+  }
+
+  markPresetTransition(): void {
+    this.pendingPresetTransition = true
+  }
+
+  clearPresetTransition(): void {
+    this.pendingPresetTransition = false
+  }
+
+  consumePresetTransition(): boolean {
+    if (!this.pendingPresetTransition) {
+      return false
+    }
+    this.pendingPresetTransition = false
+    return true
+  }
+
+  crossfadePresetApply(applyConfig: () => void): void {
+    if (!this.running || !this.context || !this.masterGain) {
+      applyConfig()
+      return
+    }
+    const duration = this.presetCrossfadeSeconds
+    if (duration <= 0) {
+      applyConfig()
+      return
+    }
+    if (this.pendingPresetCrossfadeTimer !== null) {
+      window.clearTimeout(this.pendingPresetCrossfadeTimer)
+      this.pendingPresetCrossfadeTimer = null
+    }
+    const context = this.context
+    const now = context.currentTime
+    this.gainFadeInEndTime = 0
+    scheduleSmoothFadeOut(this.masterGain.gain, now, duration)
+    this.gains.forEach((gainNode) => {
+      if (gainNode) {
+        scheduleSmoothFadeOut(gainNode.gain, now, duration)
+      }
+    })
+    this.pendingPresetCrossfadeTimer = window.setTimeout(() => {
+      this.pendingPresetCrossfadeTimer = null
+      if (!this.context || !this.masterGain) {
+        return
+      }
+      applyConfig()
+      const resumeAt = this.context.currentTime
+      this.masterGain.gain.cancelScheduledValues(resumeAt)
+      this.masterGain.gain.setValueAtTime(MIN_AUDIBLE_GAIN, resumeAt)
+      scheduleSmoothFadeIn(
+        this.masterGain.gain,
+        this.effectiveMasterGain(),
+        resumeAt,
+        duration,
+      )
+      this.gainFadeInEndTime = resumeAt + duration
+      this.gains.forEach((gainNode, index) => {
+        if (!gainNode) {
+          return
+        }
+        const harmonicTarget = this.initialHarmonicGain(index)
+        gainNode.gain.cancelScheduledValues(resumeAt)
+        gainNode.gain.setValueAtTime(MIN_AUDIBLE_GAIN, resumeAt)
+        scheduleSmoothFadeIn(gainNode.gain, harmonicTarget, resumeAt, duration)
+      })
+    }, duration * 1000 + 20)
+  }
+
+  private clearPendingStopTimer(): void {
+    if (this.pendingStopTimer !== null) {
+      window.clearTimeout(this.pendingStopTimer)
+      this.pendingStopTimer = null
+    }
+  }
+
+  private clearPendingPresetCrossfadeTimer(): void {
+    if (this.pendingPresetCrossfadeTimer !== null) {
+      window.clearTimeout(this.pendingPresetCrossfadeTimer)
+      this.pendingPresetCrossfadeTimer = null
+    }
   }
 
   async resume(): Promise<void> {
@@ -117,9 +233,41 @@ export class ShineEngine {
     }
   }
 
-  start(): void {
+  start(options?: { force?: boolean; fadeInSeconds?: number }): void {
+    if (this.running && !options?.force) {
+      return
+    }
+    if (options?.force) {
+      this.clearPendingStopTimer()
+      this.clearPendingPresetCrossfadeTimer()
+      this.isAudibleStopping = false
+      this.running = false
+      this.stopScheduler()
+      if (this.oscillators.length > 0) {
+        this.hardStopVoices()
+      }
+    }
+    const fadeInOverride = options?.fadeInSeconds
+    if (fadeInOverride !== undefined) {
+      const previousFadeIn = this.playbackFadeInSeconds
+      this.playbackFadeInSeconds = fadeInOverride
+      this.startInternal()
+      this.playbackFadeInSeconds = previousFadeIn
+      return
+    }
+    this.startInternal()
+  }
+
+  private startInternal(): void {
+    this.clearPendingStopTimer()
+    this.clearPendingPresetCrossfadeTimer()
+    this.isAudibleStopping = false
+    this.gainFadeInEndTime = 0
     if (this.running) {
       return
+    }
+    if (this.oscillators.length > 0) {
+      this.hardStopVoices()
     }
     const context = this.ensureContext()
     void context.resume().catch(() => {})
@@ -131,6 +279,19 @@ export class ShineEngine {
     )
 
     const now = context.currentTime
+    const fadeInSeconds = this.playbackFadeInSeconds
+    const targetMaster = this.effectiveMasterGain()
+    if (this.masterGain) {
+      this.masterGain.gain.cancelScheduledValues(now)
+      if (fadeInSeconds > 0) {
+        this.masterGain.gain.setValueAtTime(MIN_AUDIBLE_GAIN, now)
+        scheduleSmoothFadeIn(this.masterGain.gain, targetMaster, now, fadeInSeconds)
+        this.gainFadeInEndTime = now + fadeInSeconds
+      } else {
+        this.masterGain.gain.setValueAtTime(targetMaster, now)
+      }
+    }
+
     this.oscillators = []
     this.gains = []
     this.panners = []
@@ -146,7 +307,13 @@ export class ShineEngine {
       oscillator.frequency.setValueAtTime(this.baseFrequency * harmonicNumber, now)
 
       const gainNode = context.createGain()
-      gainNode.gain.setValueAtTime(0.0001, now)
+      const harmonicTarget = this.initialHarmonicGain(index)
+      gainNode.gain.setValueAtTime(MIN_AUDIBLE_GAIN, now)
+      if (fadeInSeconds > 0) {
+        scheduleSmoothFadeIn(gainNode.gain, harmonicTarget, now, fadeInSeconds)
+      } else {
+        gainNode.gain.setValueAtTime(harmonicTarget, now)
+      }
 
       const panner = context.createStereoPanner()
       panner.pan.setValueAtTime(this.basePan[index] * 2 - 1, now)
@@ -173,14 +340,60 @@ export class ShineEngine {
   }
 
   stop(): void {
+    if (!this.running && !this.isAudibleStopping) {
+      return
+    }
+    if (this.isAudibleStopping) {
+      return
+    }
+
+    this.clearPendingPresetCrossfadeTimer()
+    this.gainFadeInEndTime = 0
+
+    const context = this.context
+    if (!context || !this.masterGain) {
+      this.running = false
+      this.stopScheduler()
+      this.hardStopVoices()
+      return
+    }
+
+    const now = context.currentTime
+    const fadeOut = this.playbackFadeOutSeconds
+    if (fadeOut > 0) {
+      this.isAudibleStopping = true
+      scheduleSmoothFadeOut(this.masterGain.gain, now, fadeOut)
+      this.gains.forEach((gainNode) => {
+        if (gainNode) {
+          scheduleSmoothFadeOut(gainNode.gain, now, fadeOut)
+        }
+      })
+      this.clearPendingStopTimer()
+      this.pendingStopTimer = window.setTimeout(() => {
+        this.pendingStopTimer = null
+        this.isAudibleStopping = false
+        this.running = false
+        this.stopScheduler()
+        this.hardStopVoices()
+      }, fadeOut * 1000 + 80)
+      return
+    }
+
+    this.running = false
     this.stopScheduler()
+    this.hardStopVoices()
+  }
+
+  private hardStopVoices(): void {
+    this.isAudibleStopping = false
+    this.gainFadeInEndTime = 0
     const context = this.context
     if (context) {
       const now = context.currentTime
       this.gains.forEach((gainNode) => {
         if (gainNode) {
           gainNode.gain.cancelScheduledValues(now)
-          gainNode.gain.setTargetAtTime(0.0001, now, 0.05)
+          gainNode.gain.setValueAtTime(MIN_AUDIBLE_GAIN, now)
         }
       })
       this.oscillators.forEach((oscillator) => {
@@ -197,10 +410,11 @@ export class ShineEngine {
     this.gains = []
     this.panners = []
     this.displayLevel.fill(0)
-    this.running = false
   }
 
   dispose(): void {
+    this.clearPendingStopTimer()
+    this.clearPendingPresetCrossfadeTimer()
     this.stop()
     if (this.masterGain) {
       this.masterGain.disconnect()
@@ -235,12 +449,19 @@ export class ShineEngine {
 
   /** Shine's own volume (0…1), independent from the global master gain. */
   setVolume(volume: number): void {
-    this.volume = Math.min(1, Math.max(0, volume))
+    const clamped = Math.min(1, Math.max(0, volume))
+    if (Math.abs(clamped - this.volume) < 1e-6) {
+      return
+    }
+    this.volume = clamped
     this.applyMasterGain()
   }
 
   /** Global master gain (dB); Shine obeys it on top of its own volume. */
   setMasterGainDb(db: number): void {
+    if (Math.abs(db - this.masterGainDb) < 1e-6) {
+      return
+    }
     this.masterGainDb = db
     this.applyMasterGain()
   }
@@ -250,13 +471,17 @@ export class ShineEngine {
   }
 
   private applyMasterGain(): void {
-    if (this.masterGain && this.context) {
-      this.masterGain.gain.setTargetAtTime(
-        this.effectiveMasterGain(),
-        this.context.currentTime,
-        0.03,
-      )
+    if (!this.masterGain || !this.context) {
+      return
     }
+    const now = this.context.currentTime
+    if (this.shouldDeferGainUpdates(now)) {
+      return
+    }
+    const target = this.effectiveMasterGain()
+    this.masterGain.gain.cancelScheduledValues(now)
+    this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now)
+    this.masterGain.gain.setTargetAtTime(target, now, GAIN_SMOOTH_SECONDS)
   }
 
   setHarmonicLevel(index: number, level: number): void {
@@ -347,7 +572,9 @@ export class ShineEngine {
       }
 
       this.displayLevel[index] = Math.min(1, level)
-      gainNode.gain.setTargetAtTime(Math.max(0.0001, level), now, GAIN_SMOOTH_SECONDS)
+      if (!this.shouldDeferGainUpdates(now)) {
+        gainNode.gain.setTargetAtTime(Math.max(MIN_AUDIBLE_GAIN, level), now, GAIN_SMOOTH_SECONDS)
+      }
 
       const sweep =
         (Math.sin(2 * Math.PI * (this.moveFrequency[index] * now + this.basePan[index])) + 1) / 2

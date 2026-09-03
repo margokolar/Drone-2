@@ -1,14 +1,21 @@
 import { Pause, Play, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { metronomeEngine } from '../audio/MetronomeEngine'
-import { DEFAULT_METRONOME_BPM, DEFAULT_METRONOME_VOLUME_DB } from '../presets/defaultPresets'
+import {
+  DEFAULT_METRONOME_BPM,
+  DEFAULT_METRONOME_VOLUME_DB,
+  MAX_METRONOME_BPM,
+  MIN_METRONOME_BPM,
+  MAX_METRONOME_VOLUME_DB,
+  MIN_METRONOME_VOLUME_DB,
+} from '../presets/defaultPresets'
 import { NumericValueField } from './NumericValueField'
 import { ResettableRangeInput } from './ResettableRangeInput'
 
 const TEMPO_PRESETS = Array.from({ length: 12 }, (_, index) => 40 + index * 10)
 const TAP_TEMPO_RESET_MS = 2000
-const TAP_TEMPO_MIN_BPM = 30
-const TAP_TEMPO_MAX_BPM = 220
+const TAP_TEMPO_MIN_BPM = MIN_METRONOME_BPM
+const TAP_TEMPO_MAX_BPM = MAX_METRONOME_BPM
 const TAP_TEMPO_HISTORY_LIMIT = 8
 
 type MetronomeControlsProps = {
@@ -129,8 +136,8 @@ export function MetronomeControls({
                 <NumericValueField
                   value={bpm}
                   onCommit={onBpmChange}
-                  min={30}
-                  max={220}
+                  min={MIN_METRONOME_BPM}
+                  max={MAX_METRONOME_BPM}
                   decimals={0}
                   className="box-border flex min-h-11 w-[4.75rem] max-w-full items-center justify-center rounded-md border border-white/15 bg-white/10 px-1 py-1 text-center tabular-nums text-3xl leading-none text-white/90 outline-none transition focus:border-fuchsia-300/60"
                   ariaLabel="Tempo BPM"
@@ -156,8 +163,8 @@ export function MetronomeControls({
             </div>
           </div>
           <ResettableRangeInput
-            min={30}
-            max={220}
+            min={MIN_METRONOME_BPM}
+            max={MAX_METRONOME_BPM}
             step={1}
             value={bpm}
             onChange={(event) => onBpmChange(Number(event.target.value))}
@@ -224,8 +231,8 @@ export function MetronomeControls({
             </p>
           ) : null}
           <ResettableRangeInput
-            min={-40}
-            max={0}
+            min={MIN_METRONOME_VOLUME_DB}
+            max={MAX_METRONOME_VOLUME_DB}
             step={0.1}
             value={volumeDb}
             disabled={muted}

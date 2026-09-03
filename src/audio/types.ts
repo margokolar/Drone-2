@@ -46,4 +46,10 @@ export type DroneRuntimeConfig = {
   highestToneGlideNoteId?: NoteId | null
   lowestToneGlide?: EntryGlideParams | null
   highestToneGlide?: EntryGlideParams | null
+  /** Play fade-in duration in seconds (0 = quick ramp). */
+  playbackFadeInSeconds?: number
+  /** Pause fade-out duration in seconds (0 = instant mute). */
+  playbackFadeOutSeconds?: number
+  /** Crossfade duration when switching presets (0 = quick ramp). */
+  presetCrossfadeSeconds?: number
 }

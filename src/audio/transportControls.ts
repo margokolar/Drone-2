@@ -1,5 +1,8 @@
 import { droneEngine } from './DroneEngine'
+import { metronomeEngine } from './MetronomeEngine'
 import type { DroneRuntimeConfig } from './types'
+import { stepPresetNavigation, playNextPresetFromTransportMarker } from './presetNavigationTransport'
+import { isTransportMarkerKey } from '../presets/presetNavigation'
 import { useDroneStore } from '../store/useDroneStore'
 import { recordBleDebug } from '../utils/bleDebug'
 import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
@@ -22,7 +25,22 @@ export function transportSyncPlaybackState(): void {
   syncMediaSessionPlaybackState(useDroneStore.getState().playing)
 }
 
+function prepareMetronomeForTransportPlay(): void {
+  if (useDroneStore.getState().metronomeSyncEnabled) {
+    metronomeEngine.prepareContext()
+  }
+}
+
+function isOnTransportMarker(): boolean {
+  const state = useDroneStore.getState()
+  return isTransportMarkerKey(state.activeNavigationKey, state.presetNavigation)
+}
+
 export function transportPlay(config: DroneRuntimeConfig): void {
+  if (isOnTransportMarker()) {
+    playNextPresetFromTransportMarker()
+    return
+  }
   droneEngine.setPlaybackIntent(true)
   droneEngine.markGesturePlaybackStarted()
   if (droneEngine.canFastResume()) {
@@ -30,6 +48,7 @@ export function transportPlay(config: DroneRuntimeConfig): void {
   } else {
     droneEngine.ensureRunning(config)
   }
+  prepareMetronomeForTransportPlay()
   useDroneStore.getState().setPlaying(true)
   if (needsIosMediaRemoteIntegration()) {
     syncMediaSessionPlaybackState(true)
@@ -41,6 +60,10 @@ export function transportPlayFromRemote(config: DroneRuntimeConfig): void {
   if (useDroneStore.getState().playing) {
     return
   }
+  if (isOnTransportMarker()) {
+    playNextPresetFromTransportMarker()
+    return
+  }
   droneEngine.setPlaybackIntent(true)
   droneEngine.markGesturePlaybackStarted()
   droneEngine.prepareContextForGesture()
@@ -49,6 +72,7 @@ export function transportPlayFromRemote(config: DroneRuntimeConfig): void {
   } else {
     droneEngine.ensureRunning(config)
   }
+  prepareMetronomeForTransportPlay()
   useDroneStore.getState().setPlaying(true)
   if (needsIosMediaRemoteIntegration()) {
     syncMediaSessionPlaybackState(true)
@@ -97,20 +121,21 @@ export function transportTogglePlay(config: DroneRuntimeConfig): void {
 export function transportResume(config: DroneRuntimeConfig): void {
   droneEngine.setPlaybackIntent(true)
   droneEngine.fastResume(config)
+  prepareMetronomeForTransportPlay()
   useDroneStore.getState().setPlaying(true)
   if (needsIosMediaRemoteIntegration()) {
     syncMediaSessionPlaybackState(true)
   }
 }
 
-export function transportNextPreset(): void {
+export function transportNextPreset(config: DroneRuntimeConfig): void {
   recordBleDebug('note', `nextPreset ctx=${droneEngine.contextDebugLabel()}`)
-  useDroneStore.getState().selectNextPreset()
+  stepPresetNavigation('next', config)
 }
 
-export function transportPreviousPreset(): void {
+export function transportPreviousPreset(config: DroneRuntimeConfig): void {
   recordBleDebug('note', `prevPreset ctx=${droneEngine.contextDebugLabel()}`)
-  useDroneStore.getState().selectPreviousPreset()
+  stepPresetNavigation('previous', config)
 }
 
 export function transportNextSong(): void {
@@ -137,19 +162,19 @@ export function transportVolumeDown(): void {
   recordBleDebug('note', `vol down ${useDroneStore.getState().masterGainDb.toFixed(1)} dB`)
 }
 
-/** Single tap = next preset; double tap within windowMs = previous preset. */
 export function transportPresetPedalPress(
   pendingTimeoutRef: { current: number | null },
+  config: DroneRuntimeConfig,
   windowMs = 300,
 ): void {
   if (pendingTimeoutRef.current !== null) {
     window.clearTimeout(pendingTimeoutRef.current)
     pendingTimeoutRef.current = null
-    transportPreviousPreset()
+    transportPreviousPreset(config)
     return
   }
   pendingTimeoutRef.current = window.setTimeout(() => {
-    transportNextPreset()
+    transportNextPreset(config)
     pendingTimeoutRef.current = null
   }, windowMs)
 }

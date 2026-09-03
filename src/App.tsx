@@ -37,9 +37,13 @@ import {
 import { metronomeEngine } from './audio/MetronomeEngine'
 import { claimMixableAudioSession } from './audio/iosAudioSession'
 import {
+  transportNextPreset,
+  transportPreviousPreset,
   transportPresetPedalPress,
   transportTogglePlay,
 } from './audio/transportControls'
+import { activateTransportMarker } from './audio/presetNavigationTransport'
+import { buildPresetNavigationPickerItems, getEnabledNavigationEntries } from './presets/presetNavigation'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
 import { AddFollowerControls, AddMicToolbarButton } from './components/AddFollowerControls'
@@ -60,6 +64,7 @@ import { ToneMixer, TONE_MIXER_SECTION_ID, toneMixerCardElementId } from './comp
 import { TopControls } from './components/TopControls'
 import { ShineControls } from './components/ShineControls'
 import { EntryGlideControls } from './components/EntryGlideControls'
+import { FadeControls } from './components/FadeControls'
 import { useAddFollower } from './hooks/useAddFollower'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useMetronome } from './hooks/useMetronome'
@@ -423,6 +428,8 @@ function App() {
   const songName = useDroneStore((state) => state.songName)
   const songLibrary = useDroneStore((state) => state.songLibrary)
   const presets = useDroneStore((state) => state.presets)
+  const presetNavigation = useDroneStore((state) => state.presetNavigation)
+  const activeNavigationKey = useDroneStore((state) => state.activeNavigationKey)
   const tones = useDroneStore((state) => state.tones)
   const toneSetNoteIds = useMemo(
     () => new Set<NoteId>([...toneSetLayout.subOctaveIds, ...toneSetLayout.gridIds]),
@@ -444,12 +451,17 @@ function App() {
   const entryGlideLowestSeconds = useDroneStore((state) => state.entryGlideLowestSeconds)
   const entryGlideHighestCents = useDroneStore((state) => state.entryGlideHighestCents)
   const entryGlideHighestSeconds = useDroneStore((state) => state.entryGlideHighestSeconds)
+  const playbackFadeInSeconds = useDroneStore((state) => state.playbackFadeInSeconds)
+  const playbackFadeOutSeconds = useDroneStore((state) => state.playbackFadeOutSeconds)
+  const playbackFadeEnabled = useDroneStore((state) => state.playbackFadeEnabled)
+  const presetCrossfadeSeconds = useDroneStore((state) => state.presetCrossfadeSeconds)
   const globalOvertoneEditEnabled = useDroneStore((state) => state.globalOvertoneEditEnabled)
   const masterGainDb = useDroneStore((state) => state.masterGainDb)
   const metronomeEnabled = useDroneStore((state) => state.metronomeEnabled)
   const metronomeBpm = useDroneStore((state) => state.metronomeBpm)
   const metronomeVolumeDb = useDroneStore((state) => state.metronomeVolumeDb)
   const metronomeMuted = useDroneStore((state) => state.metronomeMuted)
+  const metronomeSyncEnabled = useDroneStore((state) => state.metronomeSyncEnabled)
   const micFeaturesEnabled = useDroneStore((state) => state.micFeaturesEnabled)
   const controlsLocked = useDroneStore((state) => state.controlsLocked)
 
@@ -478,6 +490,10 @@ function App() {
   const setEntryGlideLowestSeconds = useDroneStore((state) => state.setEntryGlideLowestSeconds)
   const setEntryGlideHighestCents = useDroneStore((state) => state.setEntryGlideHighestCents)
   const setEntryGlideHighestSeconds = useDroneStore((state) => state.setEntryGlideHighestSeconds)
+  const setPlaybackFadeInSeconds = useDroneStore((state) => state.setPlaybackFadeInSeconds)
+  const setPlaybackFadeOutSeconds = useDroneStore((state) => state.setPlaybackFadeOutSeconds)
+  const togglePlaybackFadeEnabled = useDroneStore((state) => state.togglePlaybackFadeEnabled)
+  const setPresetCrossfadeSeconds = useDroneStore((state) => state.setPresetCrossfadeSeconds)
   const setGlobalOvertoneEditEnabled = useDroneStore((state) => state.setGlobalOvertoneEditEnabled)
   const enableGlobalOvertoneEditFromTone = useDroneStore((state) => state.enableGlobalOvertoneEditFromTone)
   const applyPartialsGlobally = useDroneStore((state) => state.applyPartialsGlobally)
@@ -490,13 +506,19 @@ function App() {
   const setMetronomeBpm = useDroneStore((state) => state.setMetronomeBpm)
   const setMetronomeVolumeDb = useDroneStore((state) => state.setMetronomeVolumeDb)
   const setMetronomeMuted = useDroneStore((state) => state.setMetronomeMuted)
+  const setMetronomeSyncEnabled = useDroneStore((state) => state.setMetronomeSyncEnabled)
   const saveDroneState = useDroneStore((state) => state.saveDroneState)
   const saveAsPreset = useDroneStore((state) => state.saveAsPreset)
   const loadPreset = useDroneStore((state) => state.loadPreset)
   const renamePreset = useDroneStore((state) => state.renamePreset)
   const duplicatePreset = useDroneStore((state) => state.duplicatePreset)
   const deletePreset = useDroneStore((state) => state.deletePreset)
-  const movePreset = useDroneStore((state) => state.movePreset)
+  const insertTransportMarkerAfter = useDroneStore((state) => state.insertTransportMarkerAfter)
+  const deleteTransportMarker = useDroneStore((state) => state.deleteTransportMarker)
+  const moveNavigationEntry = useDroneStore((state) => state.moveNavigationEntry)
+  const toggleTransportMarkerNavigationEnabled = useDroneStore(
+    (state) => state.toggleTransportMarkerNavigationEnabled,
+  )
   const importSong = useDroneStore((state) => state.importSong)
   const importSongLibrary = useDroneStore((state) => state.importSongLibrary)
   const loadSongFromLibrary = useDroneStore((state) => state.loadSongFromLibrary)
@@ -505,13 +527,16 @@ function App() {
   const saveAsNewSong = useDroneStore((state) => state.saveAsNewSong)
   const renameSongInLibrary = useDroneStore((state) => state.renameSongInLibrary)
   const duplicateSongInLibrary = useDroneStore((state) => state.duplicateSongInLibrary)
-  const selectNextPreset = useDroneStore((state) => state.selectNextPreset)
-  const selectPreviousPreset = useDroneStore((state) => state.selectPreviousPreset)
   const selectNextSong = useDroneStore((state) => state.selectNextSong)
   const selectPreviousSong = useDroneStore((state) => state.selectPreviousSong)
   const togglePresetNavigationEnabled = useDroneStore((state) => state.togglePresetNavigationEnabled)
   const toggleSongNavigationEnabled = useDroneStore((state) => state.toggleSongNavigationEnabled)
-  const canNavigatePresets = presets.filter((preset) => preset.enabled !== false).length > 1
+  const canNavigatePresets =
+    getEnabledNavigationEntries(presetNavigation, presets).length > 1
+  const presetPickerItems = useMemo(
+    () => buildPresetNavigationPickerItems(presetNavigation, presets),
+    [presetNavigation, presets],
+  )
   const canNavigateSongs = songLibrary.filter((song) => song.enabled !== false).length > 1
   const visibleTabs = useMemo(
     () => (micFeaturesEnabled ? TABS : TABS.filter((tab) => tab.id !== 'add')),
@@ -1369,6 +1394,17 @@ function App() {
     [setMetronomeEnabled],
   )
 
+  const handleMetronomeSyncChange = useCallback(
+    (enabled: boolean) => {
+      setMetronomeSyncEnabled(enabled)
+      if (enabled && playing) {
+        metronomeEngine.prepareContext()
+        setMetronomeEnabled(true)
+      }
+    },
+    [playing, setMetronomeEnabled, setMetronomeSyncEnabled],
+  )
+
   const activeTones = useMemo(() => tonesInToneSet.filter((tone) => tone.enabled), [tonesInToneSet])
   const toneMixerTones = useMemo(() => {
     const toneById = new Map(tones.map((tone) => [tone.noteId, tone]))
@@ -1613,6 +1649,9 @@ function App() {
             seconds: entryGlideHighestSeconds,
           }
         : null,
+      playbackFadeInSeconds: playbackFadeEnabled ? playbackFadeInSeconds : 0,
+      playbackFadeOutSeconds: playbackFadeEnabled ? playbackFadeOutSeconds : 0,
+      presetCrossfadeSeconds: playbackFadeEnabled ? presetCrossfadeSeconds : 0,
     }),
     [
       referenceA4Hz,
@@ -1627,6 +1666,10 @@ function App() {
       entryGlideLowestSeconds,
       entryGlideHighestCents,
       entryGlideHighestSeconds,
+      playbackFadeEnabled,
+      playbackFadeInSeconds,
+      playbackFadeOutSeconds,
+      presetCrossfadeSeconds,
       tonesInToneSet,
       partials,
       lowestToneGlideNoteId,
@@ -1639,12 +1682,34 @@ function App() {
     latestRuntimeConfigRef.current = runtimeConfig
   }, [runtimeConfig])
 
+  const handlePresetPickerSelect = useCallback(
+    (id: string) => {
+      const isTransportMarker = presetNavigation.some(
+        (entry) => entry.kind === 'transport' && entry.id === id,
+      )
+      if (isTransportMarker) {
+        activateTransportMarker(id)
+        return
+      }
+      loadPreset(id)
+    },
+    [loadPreset, presetNavigation],
+  )
+
   const handleTogglePlay = useCallback(() => {
     transportTogglePlay(latestRuntimeConfigRef.current)
   }, [])
 
+  const handleNextPreset = useCallback(() => {
+    transportNextPreset(latestRuntimeConfigRef.current)
+  }, [])
+
+  const handlePreviousPreset = useCallback(() => {
+    transportPreviousPreset(latestRuntimeConfigRef.current)
+  }, [])
+
   const handlePresetPedalPress = useCallback(() => {
-    transportPresetPedalPress(upPressTimeoutRef)
+    transportPresetPedalPress(upPressTimeoutRef, latestRuntimeConfigRef.current)
   }, [])
 
   const mediaAnchorRef = useBtControl({
@@ -1693,7 +1758,7 @@ function App() {
     setOvertoneHistoryVersion((value) => value + 1)
   }, [activePresetId])
 
-  useAudioEngine(runtimeConfig, playing)
+  useAudioEngine(runtimeConfig, playing, activePresetId)
 
   const addFollower = useAddFollower()
   useEffect(() => {
@@ -2081,9 +2146,9 @@ function App() {
                   </button>
                 </div>
                 <LibraryPickerMenu
-                  selectedId={activePresetId}
-                  items={presets}
-                  onSelect={loadPreset}
+                  selectedId={activeNavigationKey}
+                  items={presetPickerItems}
+                  onSelect={handlePresetPickerSelect}
                   appearance="select"
                   openAriaLabel="Open preset list"
                   triggerClassName="mt-5"
@@ -2242,6 +2307,16 @@ function App() {
                 }}
               />
             </SectionCard>
+            <FadeControls
+              enabled={playbackFadeEnabled}
+              fadeInSeconds={playbackFadeInSeconds}
+              fadeOutSeconds={playbackFadeOutSeconds}
+              presetCrossfadeSeconds={presetCrossfadeSeconds}
+              onToggleEnabled={togglePlaybackFadeEnabled}
+              onFadeInSecondsChange={setPlaybackFadeInSeconds}
+              onFadeOutSecondsChange={setPlaybackFadeOutSeconds}
+              onPresetCrossfadeSecondsChange={setPresetCrossfadeSeconds}
+            />
             <EntryGlideControls
               enabled={entryGlideEnabled}
               lowestCents={entryGlideLowestCents}
@@ -2453,7 +2528,29 @@ function App() {
             aria-labelledby="tab-metronome"
             hidden={activeTab !== 'metronome'}
           >
-            <SectionCard title="Click" className="[&>header]:mb-0">
+            <SectionCard
+              title="Click"
+              className="[&>header]:mb-0"
+              rightSlot={
+                <button
+                  type="button"
+                  className={`button-safe flex min-h-9 shrink-0 self-center items-center rounded-lg border px-3.5 text-xs font-semibold uppercase tracking-[0.14em] transition ${
+                    metronomeSyncEnabled
+                      ? 'border-fuchsia-300/60 bg-fuchsia-300/20 text-fuchsia-100 hover:bg-fuchsia-300/30'
+                      : 'border-white/15 bg-white/5 text-white/55 hover:bg-white/10'
+                  }`}
+                  onClick={() => handleMetronomeSyncChange(!metronomeSyncEnabled)}
+                  aria-pressed={metronomeSyncEnabled}
+                  aria-label={
+                    metronomeSyncEnabled
+                      ? 'Disable click sync with drone transport play and pause'
+                      : 'Sync click start and stop with drone transport play and pause'
+                  }
+                >
+                  SYNC
+                </button>
+              }
+            >
               <MetronomeControls
                 enabled={metronomeEnabled}
                 bpm={metronomeBpm}
@@ -2505,6 +2602,8 @@ function App() {
                   </h3>
                   <PresetList
                     presets={presets}
+                    presetNavigation={presetNavigation}
+                    activeNavigationKey={activeNavigationKey}
                     activePresetId={activePresetId}
                     onLoadPreset={(presetId) => {
                       loadPreset(presetId)
@@ -2512,8 +2611,12 @@ function App() {
                     onRenamePreset={renamePreset}
                     onDuplicatePreset={duplicatePreset}
                     onDeletePreset={deletePreset}
-                    onMovePreset={movePreset}
+                    onMoveNavigationEntry={moveNavigationEntry}
                     onToggleNavigationEnabled={togglePresetNavigationEnabled}
+                    onInsertTransportAfter={insertTransportMarkerAfter}
+                    onDeleteTransportMarker={deleteTransportMarker}
+                    onToggleTransportNavigationEnabled={toggleTransportMarkerNavigationEnabled}
+                    onActivateTransport={activateTransportMarker}
                   />
                 </section>
                 <section className="min-w-0">
@@ -2706,7 +2809,7 @@ function App() {
                 <button
                   type="button"
                   className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
-                  onClick={selectPreviousPreset}
+                  onClick={handlePreviousPreset}
                   disabled={!canNavigatePresets}
                   aria-label="Previous preset"
                 >
@@ -2724,7 +2827,7 @@ function App() {
                 <button
                   type="button"
                   className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
-                  onClick={selectNextPreset}
+                  onClick={handleNextPreset}
                   disabled={!canNavigatePresets}
                   aria-label="Next preset"
                 >

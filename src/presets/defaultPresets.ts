@@ -5,7 +5,11 @@ import type { TuningSystemId } from '../music/tuning'
 
 export const DEFAULT_MASTER_GAIN_DB = -10
 export const DEFAULT_METRONOME_BPM = 72
-export const DEFAULT_METRONOME_VOLUME_DB = -15
+export const DEFAULT_METRONOME_VOLUME_DB = -6
+export const MIN_METRONOME_BPM = 30
+export const MAX_METRONOME_BPM = 350
+export const MIN_METRONOME_VOLUME_DB = -40
+export const MAX_METRONOME_VOLUME_DB = 6
 export const DEFAULT_TONE_PAN = 0
 export const DEFAULT_TONE_DETUNE_CENTS = 0
 export const MIN_TONE_DETUNE_CENTS = -100
@@ -20,6 +24,11 @@ export const DEFAULT_ENTRY_GLIDE_LOWEST_CENTS = 0
 export const DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS = 2.5
 export const DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS = 0
 export const DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS = 1
+
+export const DEFAULT_PLAYBACK_FADE_IN_SECONDS = 0
+export const DEFAULT_PLAYBACK_FADE_OUT_SECONDS = 0
+export const DEFAULT_PRESET_CROSSFADE_SECONDS = 0
+export const MAX_PLAYBACK_FADE_SECONDS = 2
 
 export function defaultPartialRatio(harmonicIndex: number): number {
   return harmonicIndex
