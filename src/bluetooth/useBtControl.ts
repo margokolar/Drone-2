@@ -28,6 +28,11 @@ import {
   MEDIA_TRACK_PREVIOUS_KEYS,
   PT_PEDAL_NEXT_KEYS,
   PT_PEDAL_PREVIOUS_KEYS,
+  SPEAKER_NEXT_PRESET_KEYS,
+  SPEAKER_NEXT_SONG_KEYS,
+  SPEAKER_PLAY_PAUSE_KEYS,
+  SPEAKER_VOLUME_DOWN_KEYS,
+  SPEAKER_VOLUME_UP_KEYS,
   UNIVERSAL_VOLUME_DOWN_KEYS,
   UNIVERSAL_VOLUME_UP_KEYS,
 } from '../utils/footPedalKeys'
@@ -350,10 +355,10 @@ export function useBtControl({
         })
       })
       setActionHandler('previoustrack', () => {
-        recordBleDebug('mediasession', 'speaker previoustrack')
+        recordBleDebug('mediasession', 'speaker previoustrack → next song')
         runMediaSessionAction(() => {
           void droneEngine.pokeClock()
-          transportPreviousPreset(latestRuntimeConfigRef.current)
+          transportNextSong()
         })
       })
     }
@@ -446,6 +451,94 @@ export function useBtControl({
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
 
+    const handleSpeakerPlayPause = () => {
+      if (useDroneStore.getState().playing) {
+        markSpeakerRemotePause()
+        transportPauseFromRemote()
+        anchor.pause()
+        return
+      }
+      speakerPlayRequestedRef.current = true
+      clipRemoteHoldRef.current = false
+      speakerRemotePauseUntilRef.current = 0
+      transportPlayFromRemote(latestRuntimeConfigRef.current)
+      if (anchor.paused) {
+        void anchor.play().catch(() => {})
+      }
+    }
+
+    let onSpeakerKeyDown: ((event: KeyboardEvent) => void) | null = null
+    if (btControlMode === 'speaker') {
+      onSpeakerKeyDown = (event: KeyboardEvent) => {
+        recordBleDebug(
+          'keydown',
+          `speaker key=${event.key} code=${event.code} hasFocus=${document.hasFocus()}`,
+        )
+        if (isTextEditingTarget(event.target)) {
+          return
+        }
+        if (event.repeat) {
+          return
+        }
+
+        const isSpeakerAction =
+          matchesFootPedalKey(event, SPEAKER_VOLUME_UP_KEYS) ||
+          matchesFootPedalKey(event, SPEAKER_VOLUME_DOWN_KEYS) ||
+          matchesFootPedalKey(event, SPEAKER_NEXT_SONG_KEYS) ||
+          matchesFootPedalKey(event, SPEAKER_PLAY_PAUSE_KEYS) ||
+          matchesFootPedalKey(event, MEDIA_PLAY_KEYS) ||
+          matchesFootPedalKey(event, MEDIA_PAUSE_KEYS) ||
+          matchesFootPedalKey(event, SPEAKER_NEXT_PRESET_KEYS) ||
+          event.code === 'Space' ||
+          event.key === ' '
+
+        if (!isSpeakerAction) {
+          return
+        }
+
+        event.preventDefault()
+        event.stopPropagation()
+        void droneEngine.pokeClock()
+
+        if (matchesFootPedalKey(event, SPEAKER_VOLUME_UP_KEYS)) {
+          transportVolumeUp()
+          return
+        }
+        if (matchesFootPedalKey(event, SPEAKER_VOLUME_DOWN_KEYS)) {
+          transportVolumeDown()
+          return
+        }
+        if (matchesFootPedalKey(event, SPEAKER_NEXT_SONG_KEYS)) {
+          transportNextSong()
+          return
+        }
+        if (
+          matchesFootPedalKey(event, SPEAKER_PLAY_PAUSE_KEYS) ||
+          event.code === 'Space' ||
+          event.key === ' '
+        ) {
+          handleSpeakerPlayPause()
+          return
+        }
+        if (matchesFootPedalKey(event, MEDIA_PLAY_KEYS)) {
+          if (!useDroneStore.getState().playing) {
+            handleSpeakerPlayPause()
+          }
+          return
+        }
+        if (matchesFootPedalKey(event, MEDIA_PAUSE_KEYS)) {
+          if (useDroneStore.getState().playing) {
+            handleSpeakerPlayPause()
+          }
+          return
+        }
+        if (matchesFootPedalKey(event, SPEAKER_NEXT_PRESET_KEYS)) {
+          transportNextPreset(latestRuntimeConfigRef.current)
+        }
+      }
+      window.addEventListener('keydown', onSpeakerKeyDown, true)
+    }
+
     let onPedalKeyDown: ((event: KeyboardEvent) => void) | null = null
     if (btControlMode === 'pedal') {
       onPedalKeyDown = (event: KeyboardEvent) => {
@@ -537,6 +630,9 @@ export function useBtControl({
       anchor.removeEventListener('playing', onAnchorPlaying)
       window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', onVisibilityChange)
+      if (onSpeakerKeyDown) {
+        window.removeEventListener('keydown', onSpeakerKeyDown, true)
+      }
       if (onPedalKeyDown) {
         window.removeEventListener('keydown', onPedalKeyDown, true)
       }
