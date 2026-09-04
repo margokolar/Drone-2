@@ -111,18 +111,20 @@ function maintainSpeakerAnchor(
   const dronePlaying = useDroneStore.getState().playing
   setMediaSessionPlaybackState(dronePlaying)
 
-  const clipHold = clipRemoteHoldRef.current && !dronePlaying
-  if (clipHold) {
+  if (!dronePlaying) {
+    if (!anchor.paused) {
+      anchor.pause()
+    }
     return
   }
 
-  if (dronePlaying) {
-    clipRemoteHoldRef.current = false
-  }
+  clipRemoteHoldRef.current = false
   if (anchor.paused) {
     void anchor.play().catch(() => {})
   }
 }
+
+const SPEAKER_ANCHOR_RESUME_GRACE_MS = 6000
 
 export function useBtControl({
   latestRuntimeConfigRef,
@@ -134,6 +136,8 @@ export function useBtControl({
 }: UseBtControlOptions): RefObject<HTMLAudioElement | null> {
   const mediaAnchorRef = useRef<HTMLAudioElement | null>(null)
   const clipRemoteHoldRef = useRef(false)
+  const speakerPlayRequestedRef = useRef(false)
+  const speakerRemotePauseUntilRef = useRef(0)
   const btControlMode = useDroneStore((state) => state.btControlMode)
   const playing = useDroneStore((state) => state.playing)
 
@@ -148,7 +152,6 @@ export function useBtControl({
     const primeAnchor = () => {
       if (
         useDroneStore.getState().btControlMode === 'speaker' &&
-        clipRemoteHoldRef.current &&
         !useDroneStore.getState().playing
       ) {
         return
@@ -298,6 +301,12 @@ export function useBtControl({
       })
     }
 
+    const markSpeakerRemotePause = () => {
+      clipRemoteHoldRef.current = true
+      speakerPlayRequestedRef.current = false
+      speakerRemotePauseUntilRef.current = Date.now() + SPEAKER_ANCHOR_RESUME_GRACE_MS
+    }
+
     const setupSpeakerMediaSession = () => {
       setActionHandler('play', () => {
         recordBleDebug('mediasession', `speaker play (playing=${useDroneStore.getState().playing})`)
@@ -309,7 +318,9 @@ export function useBtControl({
           if (useDroneStore.getState().playing) {
             return
           }
+          speakerPlayRequestedRef.current = true
           clipRemoteHoldRef.current = false
+          speakerRemotePauseUntilRef.current = 0
           transportPlayFromRemote(latestRuntimeConfigRef.current)
           if (anchor.paused) {
             void anchor.play().catch(() => {})
@@ -326,7 +337,7 @@ export function useBtControl({
           if (!useDroneStore.getState().playing) {
             return
           }
-          clipRemoteHoldRef.current = true
+          markSpeakerRemotePause()
           transportPauseFromRemote()
           anchor.pause()
         })
@@ -358,7 +369,7 @@ export function useBtControl({
     const onSpeakerAnchorPause = () => {
       if (useDroneStore.getState().playing) {
         recordBleDebug('note', 'speaker anchor paused → remote pause')
-        clipRemoteHoldRef.current = true
+        markSpeakerRemotePause()
         transportPauseFromRemote()
         return
       }
@@ -370,14 +381,23 @@ export function useBtControl({
       setMediaSessionPlaybackState(false)
     }
     const onSpeakerAnchorPlaying = () => {
-      const resumeFromClipRemote = clipRemoteHoldRef.current
-      clipRemoteHoldRef.current = false
-      if (resumeFromClipRemote && !useDroneStore.getState().playing) {
+      if (clipRemoteHoldRef.current && !useDroneStore.getState().playing) {
+        const playRequested = speakerPlayRequestedRef.current
+        speakerPlayRequestedRef.current = false
+        const pastGrace = Date.now() >= speakerRemotePauseUntilRef.current
+        if (!playRequested && !pastGrace) {
+          recordBleDebug('note', 'speaker anchor auto-play suppressed after remote pause')
+          void anchor.pause()
+          return
+        }
+        clipRemoteHoldRef.current = false
+        speakerRemotePauseUntilRef.current = 0
         recordBleDebug('note', 'speaker anchor playing → remote play')
         markMediaSessionAction('play')
         transportPlayFromRemote(latestRuntimeConfigRef.current)
         return
       }
+      clipRemoteHoldRef.current = false
       if (useDroneStore.getState().playing) {
         setMediaSessionPlaybackState(true)
       }
@@ -392,6 +412,8 @@ export function useBtControl({
       setupPedalMediaSession()
     } else {
       clipRemoteHoldRef.current = false
+      speakerPlayRequestedRef.current = false
+      speakerRemotePauseUntilRef.current = 0
       setMediaSessionPlaybackState(useDroneStore.getState().playing)
       onAnchorPause = onSpeakerAnchorPause
       onAnchorPlaying = onSpeakerAnchorPlaying
@@ -531,9 +553,17 @@ export function useBtControl({
     }
     setMediaSessionPlaybackState(playing)
     if (!playing) {
+      clipRemoteHoldRef.current = true
+      speakerPlayRequestedRef.current = false
+      speakerRemotePauseUntilRef.current = Date.now() + SPEAKER_ANCHOR_RESUME_GRACE_MS
+      const anchor = mediaAnchorRef.current
+      if (anchor && !anchor.paused) {
+        anchor.pause()
+      }
       return
     }
     clipRemoteHoldRef.current = false
+    speakerRemotePauseUntilRef.current = 0
     const anchor = mediaAnchorRef.current
     if (anchor?.paused) {
       void anchor.play().catch(() => {})
