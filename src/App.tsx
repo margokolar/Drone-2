@@ -86,6 +86,7 @@ import { BLE_KEYBOARD_FOCUS_ROOT_ID } from './utils/restoreBleKeyboardFocus'
 import { BleDebugOverlay } from './components/BleDebugOverlay'
 import { bleDebugEnabled, recordBleDebug } from './utils/bleDebug'
 import {
+  APP_BOTTOM_NAV_SELECTOR,
   PRESETS_SECTION_CARD_ID,
   TONE_STICKY_CHROME_ID,
   scrollToneMixerCardIntoView,
@@ -1939,10 +1940,29 @@ function App() {
       observer.observe(presetsHeader)
     }
 
+    const bottomNav = document.querySelector(APP_BOTTOM_NAV_SELECTOR)
+    if (bottomNav instanceof HTMLElement) {
+      observer.observe(bottomNav)
+    }
+
     window.addEventListener('resize', update)
     return () => {
       observer.disconnect()
       window.removeEventListener('resize', update)
+    }
+  }, [activeTab])
+
+  useEffect(() => {
+    if (activeTab !== 'presets') {
+      return
+    }
+    const previousHtmlOverflow = document.documentElement.style.overflow
+    const previousBodyOverflow = document.body.style.overflow
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow
+      document.body.style.overflow = previousBodyOverflow
     }
   }, [activeTab])
 
@@ -2021,9 +2041,13 @@ function App() {
   )
   const appShell = (
     <div
-      className={`relative ${
-        iphone16ProMaxPreview ? 'min-h-full min-w-0' : 'min-h-screen'
-      } bg-[#111019] text-[#f2f2f7] ${activeTab === 'metronome' ? 'h-screen overflow-hidden' : ''}`}
+      className={`relative bg-[#111019] text-[#f2f2f7] ${
+        activeTab === 'metronome' || activeTab === 'presets'
+          ? 'flex h-[100dvh] flex-col overflow-hidden overscroll-none'
+          : iphone16ProMaxPreview
+            ? 'min-h-full min-w-0'
+            : 'min-h-screen'
+      }`}
     >
       <div
         id={BLE_KEYBOARD_FOCUS_ROOT_ID}
@@ -2061,9 +2085,11 @@ function App() {
         />
       )}
       <div
-        className={`mx-auto w-full max-w-md px-3 pb-5 pt-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
-          activeTab === 'overtones' ? 'landscape:pt-0 max-h-[500px]:pt-0' : ''
-        }`}
+        className={`mx-auto w-full max-w-md px-3 pt-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
+          activeTab === 'presets' || activeTab === 'metronome'
+            ? 'flex min-h-0 flex-1 flex-col pb-0'
+            : 'pb-5'
+        } ${activeTab === 'overtones' ? 'landscape:pt-0 max-h-[500px]:pt-0' : ''}`}
       >
         <div
           id={TONE_STICKY_CHROME_ID}
@@ -2206,7 +2232,11 @@ function App() {
 
         <main
           className={`landscape:pb-2 max-h-[500px]:pb-2 ${
-            activeTab === 'metronome' ? 'pb-32' : 'pb-44'
+            activeTab === 'metronome'
+              ? 'pb-32'
+              : activeTab === 'presets'
+                ? 'flex min-h-0 flex-1 flex-col pb-0'
+                : 'pb-44'
           }`}
           onTouchStart={handleSwipeTouchStart}
           onTouchEnd={handleSwipeTouchEnd}
@@ -2581,7 +2611,7 @@ function App() {
             <AddFollowerControls {...addFollower} />
           </div>
           <div
-            className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
+            className="flex h-[calc(100dvh-var(--sticky-chrome-bottom,calc(env(safe-area-inset-top,0px)+4.75rem))-var(--bottom-chrome-height,5.5rem))] min-h-0 flex-col landscape:h-[calc(100dvh-var(--bottom-chrome-height,4.5rem)-env(safe-area-inset-top,0px))] max-h-[500px]:h-[calc(100dvh-var(--bottom-chrome-height,4.5rem)-env(safe-area-inset-top,0px))]"
             role="tabpanel"
             id="panel-presets"
             aria-labelledby="tab-presets"
@@ -2603,7 +2633,7 @@ function App() {
                   <Save size={15} />
                 </button>
               }
-              className="flex max-h-[calc(100dvh-13rem)] flex-col overflow-hidden [&>header]:mb-3 [&>header]:shrink-0 landscape:max-h-[calc(100dvh-9rem)] max-h-[500px]:max-h-[calc(100dvh-9rem)]"
+              className="flex min-h-0 flex-1 flex-col overflow-hidden [&>header]:mb-3 [&>header]:shrink-0"
             >
               <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
                 <section className="flex min-h-0 min-w-0 flex-col">
@@ -2688,7 +2718,7 @@ function App() {
           </div>
         </main>
       </div>
-      <div className="fixed bottom-0 left-0 right-0 z-30 px-3 pb-2">
+      <div className="fixed bottom-0 left-0 right-0 z-30 px-3 pb-2" data-app-bottom-nav>
         <div className="mx-auto w-full max-w-[26.5rem] space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-[62.5rem]">
           <nav
             className="overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm"

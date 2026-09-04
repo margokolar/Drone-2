@@ -1,7 +1,9 @@
 import type { NoteId } from '../music/notes'
 
 export const TONE_STICKY_CHROME_ID = 'tone-sticky-chrome'
+export const APP_BOTTOM_NAV_SELECTOR = '[data-app-bottom-nav]'
 export const STICKY_CHROME_BOTTOM_VAR = '--sticky-chrome-bottom'
+export const BOTTOM_CHROME_HEIGHT_VAR = '--bottom-chrome-height'
 export const PRESETS_SECTION_HEADER_HEIGHT_VAR = '--presets-section-header-height'
 export const PRESETS_SECTION_CARD_ID = 'presets-section-card'
 
@@ -9,10 +11,12 @@ export const PRESETS_SECTION_CARD_ID = 'presets-section-card'
 export function syncStickyChromeLayoutOffsets(options?: {
   stickyChromeId?: string
   presetsSectionCardId?: string
+  bottomNavSelector?: string
 }): void {
   const {
     stickyChromeId = TONE_STICKY_CHROME_ID,
     presetsSectionCardId = PRESETS_SECTION_CARD_ID,
+    bottomNavSelector = APP_BOTTOM_NAV_SELECTOR,
   } = options ?? {}
 
   const root = document.documentElement
@@ -23,6 +27,17 @@ export function syncStickyChromeLayoutOffsets(options?: {
     root.style.setProperty(STICKY_CHROME_BOTTOM_VAR, `${chromeRect.bottom}px`)
   } else {
     root.style.removeProperty(STICKY_CHROME_BOTTOM_VAR)
+  }
+
+  const bottomNav = document.querySelector(bottomNavSelector)
+  if (bottomNav instanceof HTMLElement) {
+    const bottomNavRect = bottomNav.getBoundingClientRect()
+    root.style.setProperty(
+      BOTTOM_CHROME_HEIGHT_VAR,
+      `${Math.max(0, window.innerHeight - bottomNavRect.top)}px`,
+    )
+  } else {
+    root.style.removeProperty(BOTTOM_CHROME_HEIGHT_VAR)
   }
 
   const presetsHeader = document.querySelector(`#${presetsSectionCardId} > header`)
