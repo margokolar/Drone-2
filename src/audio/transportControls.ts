@@ -120,12 +120,41 @@ export function transportResume(config: DroneRuntimeConfig): void {
   }
 }
 
+const PRESET_STEP_DEDUPE_MS = 400
+
+let lastNextPresetStepAt = 0
+let lastPrevPresetStepAt = 0
+
+function shouldSkipPresetStep(direction: 'next' | 'previous'): boolean {
+  const now = Date.now()
+  if (direction === 'next') {
+    if (now - lastNextPresetStepAt < PRESET_STEP_DEDUPE_MS) {
+      recordBleDebug('note', 'nextPreset deduped')
+      return true
+    }
+    lastNextPresetStepAt = now
+    return false
+  }
+  if (now - lastPrevPresetStepAt < PRESET_STEP_DEDUPE_MS) {
+    recordBleDebug('note', 'prevPreset deduped')
+    return true
+  }
+  lastPrevPresetStepAt = now
+  return false
+}
+
 export function transportNextPreset(config: DroneRuntimeConfig): void {
+  if (shouldSkipPresetStep('next')) {
+    return
+  }
   recordBleDebug('note', `nextPreset ctx=${droneEngine.contextDebugLabel()}`)
   stepPresetNavigation('next', config)
 }
 
 export function transportPreviousPreset(config: DroneRuntimeConfig): void {
+  if (shouldSkipPresetStep('previous')) {
+    return
+  }
   recordBleDebug('note', `prevPreset ctx=${droneEngine.contextDebugLabel()}`)
   stepPresetNavigation('previous', config)
 }

@@ -4,6 +4,7 @@ import {
   navigationEntryKey,
   selectNextInRing,
   selectPreviousInRing,
+  type PresetNavigationEntry,
 } from '../presets/presetNavigation'
 import { useDroneStore } from '../store/useDroneStore'
 import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
@@ -96,6 +97,43 @@ export function playNextPresetFromTransportMarker(): void {
   advancePastTransportMarker('next', activeKey, enabledEntries)
 }
 
+function resolveNavigationActiveKey(
+  navigation: PresetNavigationEntry[],
+  enabledEntries: PresetNavigationEntry[],
+  activeNavigationKey: string,
+  activePresetId: string,
+): string {
+  if (enabledEntries.some((entry) => navigationEntryKey(entry) === activeNavigationKey)) {
+    return activeNavigationKey
+  }
+
+  const activePresetEntry = enabledEntries.find(
+    (entry) => entry.kind === 'preset' && entry.presetId === activePresetId,
+  )
+  if (activePresetEntry) {
+    return navigationEntryKey(activePresetEntry)
+  }
+
+  const fullKeys = navigation.map(navigationEntryKey)
+  let startIndex = fullKeys.indexOf(activeNavigationKey)
+  if (startIndex < 0) {
+    startIndex = navigation.findIndex(
+      (entry) => entry.kind === 'preset' && entry.presetId === activePresetId,
+    )
+  }
+  if (startIndex >= 0) {
+    for (let offset = 0; offset < navigation.length; offset += 1) {
+      const entry = navigation[(startIndex - offset + navigation.length) % navigation.length]
+      const key = navigationEntryKey(entry)
+      if (enabledEntries.some((enabled) => navigationEntryKey(enabled) === key)) {
+        return key
+      }
+    }
+  }
+
+  return enabledEntries.length > 0 ? navigationEntryKey(enabledEntries[0]) : activeNavigationKey
+}
+
 export function stepPresetNavigation(
   direction: 'next' | 'previous',
   _config: DroneRuntimeConfig,
@@ -106,7 +144,12 @@ export function stepPresetNavigation(
     return
   }
 
-  const activeKey = state.activeNavigationKey || state.activePresetId
+  const activeKey = resolveNavigationActiveKey(
+    state.presetNavigation,
+    enabledEntries,
+    state.activeNavigationKey || state.activePresetId,
+    state.activePresetId,
+  )
   const nextEntry =
     direction === 'next'
       ? selectNextInRing(enabledEntries, activeKey, navigationEntryKey)

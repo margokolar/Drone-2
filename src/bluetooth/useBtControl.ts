@@ -289,6 +289,10 @@ export function useBtControl({
       })
       setActionHandler('nexttrack', () => {
         recordBleDebug('mediasession', 'pedal nexttrack')
+        if (wasMediaSessionHandledRecently('next')) {
+          return
+        }
+        markMediaSessionAction('next')
         runMediaSessionAction(() => {
           void droneEngine.pokeClock()
           transportNextPreset(latestRuntimeConfigRef.current)
@@ -483,6 +487,7 @@ export function useBtControl({
         }
 
         if (isKeyboardNextPreset) {
+          markMediaSessionAction('next')
           transportNextPreset(latestRuntimeConfigRef.current)
           return
         }
@@ -514,9 +519,15 @@ export function useBtControl({
             event.preventDefault()
             return
           }
+          if (wasMediaSessionHandledRecently('next')) {
+            event.preventDefault()
+            event.stopPropagation()
+            return
+          }
           event.preventDefault()
           event.stopPropagation()
           void droneEngine.pokeClock()
+          markMediaSessionAction('next')
           transportNextPreset(latestRuntimeConfigRef.current)
           return
         }
