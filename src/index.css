@@ -183,3 +183,8 @@ select {
     text-indent: 0.04rem;
   }
 }
+
+.presets-column-scroll {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
