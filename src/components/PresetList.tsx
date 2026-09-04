@@ -1,9 +1,10 @@
 import clsx from 'clsx'
-import { ArrowDown, ArrowUp, Check, Copy, Pause, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Copy, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { Preset } from '../presets/defaultPresets'
 import { resolveActivePresetHighlightKey, type PresetNavigationEntry } from '../presets/presetNavigation'
+import { PlayPauseIcon } from './PlayPauseIcon'
 
 type PresetListProps = {
   presets: Preset[]
@@ -128,18 +129,14 @@ export function PresetList({
                   'cursor-pointer',
                 )}
                 onClick={() => onActivateTransport(entry.id)}
+                aria-label="Play / Pause marker"
               >
-                <div className="mb-1.5 flex min-h-8 items-center gap-2">
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <Pause size={15} className="shrink-0 text-amber-100/90" aria-hidden />
-                    <div className="text-safe min-w-0 truncate text-sm font-semibold text-white">
-                      Play / Pause
-                    </div>
-                  </div>
+                <div className="mb-1.5 flex min-h-10 items-center gap-2">
+                  <PlayPauseIcon size={28} className="shrink-0 text-amber-100/90" />
                   <button
                     type="button"
                     className={clsx(
-                      'shrink-0 rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition',
+                      'ml-auto shrink-0 rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition',
                       isNavigationEnabled
                         ? 'border-amber-300/50 bg-amber-300/15 text-amber-100 hover:bg-amber-300/25'
                         : 'border-white/15 bg-white/5 text-white/55 hover:bg-white/10',

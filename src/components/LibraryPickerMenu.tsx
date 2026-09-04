@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Check, ChevronDown, Pause } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -8,6 +8,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react'
+import { PlayPauseIcon } from './PlayPauseIcon'
 
 const VIEWPORT_GUTTER_PX = 12
 const COMPACT_DROPDOWN_PANEL_CLASS =
@@ -207,10 +208,13 @@ export function LibraryPickerMenu({
             'flex min-w-0 flex-1 items-center gap-1.5 truncate text-left',
             selectedIsTransport && 'text-amber-100',
           )}
-          title={selectedName}
+          title={selectedIsTransport ? 'Play / Pause' : selectedName}
         >
-          {selectedIsTransport ? <Pause size={15} className="shrink-0 text-amber-100/90" aria-hidden /> : null}
-          {selectedName}
+          {selectedIsTransport ? (
+            <PlayPauseIcon size={22} className="shrink-0 text-amber-100/90" />
+          ) : (
+            selectedName
+          )}
         </span>
         <ChevronDown
           size={chevronSize}
@@ -272,9 +276,13 @@ export function LibraryPickerMenu({
                     isSelectAppearance ? 'shrink-0' : 'min-w-0 flex-1 truncate',
                     isTransport && 'text-amber-100',
                   )}
+                  title={isTransport ? 'Play / Pause' : item.name}
                 >
-                  {isTransport ? <Pause size={18} className="shrink-0 text-amber-100/90" aria-hidden /> : null}
-                  {item.name}
+                  {isTransport ? (
+                    <PlayPauseIcon size={28} className="shrink-0 text-amber-100/90" />
+                  ) : (
+                    item.name
+                  )}
                 </span>
               </button>
             )
