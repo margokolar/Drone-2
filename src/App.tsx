@@ -2566,45 +2566,50 @@ function App() {
                   <Save size={15} />
                 </button>
               }
+              className="flex max-h-[calc(100dvh-13rem)] flex-col overflow-hidden [&>header]:mb-3 [&>header]:shrink-0 landscape:max-h-[calc(100dvh-9rem)] max-h-[500px]:max-h-[calc(100dvh-9rem)]"
             >
-              <div className="grid min-w-0 grid-cols-2 gap-3">
-                <section className="min-w-0">
-                  <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
+              <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
+                <section className="flex min-h-0 min-w-0 flex-col">
+                  <h3 className="mb-2 shrink-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
                     Presets
                   </h3>
-                  <PresetList
-                    presets={presets}
-                    presetNavigation={presetNavigation}
-                    activeNavigationKey={activeNavigationKey}
-                    activePresetId={activePresetId}
-                    onLoadPreset={(presetId) => {
-                      loadPreset(presetId)
-                    }}
-                    onRenamePreset={renamePreset}
-                    onDuplicatePreset={duplicatePreset}
-                    onDeletePreset={deletePreset}
-                    onMoveNavigationEntry={moveNavigationEntry}
-                    onToggleNavigationEnabled={togglePresetNavigationEnabled}
-                    onInsertTransportAfter={insertTransportMarkerAfter}
-                    onDeleteTransportMarker={deleteTransportMarker}
-                    onToggleTransportNavigationEnabled={toggleTransportMarkerNavigationEnabled}
-                    onActivateTransport={activateTransportMarker}
-                  />
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                    <PresetList
+                      presets={presets}
+                      presetNavigation={presetNavigation}
+                      activeNavigationKey={activeNavigationKey}
+                      activePresetId={activePresetId}
+                      onLoadPreset={(presetId) => {
+                        loadPreset(presetId)
+                      }}
+                      onRenamePreset={renamePreset}
+                      onDuplicatePreset={duplicatePreset}
+                      onDeletePreset={deletePreset}
+                      onMoveNavigationEntry={moveNavigationEntry}
+                      onToggleNavigationEnabled={togglePresetNavigationEnabled}
+                      onInsertTransportAfter={insertTransportMarkerAfter}
+                      onDeleteTransportMarker={deleteTransportMarker}
+                      onToggleTransportNavigationEnabled={toggleTransportMarkerNavigationEnabled}
+                      onActivateTransport={activateTransportMarker}
+                    />
+                  </div>
                 </section>
-                <section className="min-w-0">
-                  <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
+                <section className="flex min-h-0 min-w-0 flex-col">
+                  <h3 className="mb-2 shrink-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
                     Songs
                   </h3>
-                  <SongList
-                    songName={songName}
-                    songLibrary={songLibrary}
-                    onLoadSong={loadSongFromLibrary}
-                    onRenameSong={renameSongInLibrary}
-                    onDuplicateSong={duplicateSongInLibrary}
-                    onDeleteSong={deleteSongFromLibrary}
-                    onMoveSong={moveSongInLibrary}
-                    onToggleNavigationEnabled={toggleSongNavigationEnabled}
-                  />
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                    <SongList
+                      songName={songName}
+                      songLibrary={songLibrary}
+                      onLoadSong={loadSongFromLibrary}
+                      onRenameSong={renameSongInLibrary}
+                      onDuplicateSong={duplicateSongInLibrary}
+                      onDeleteSong={deleteSongFromLibrary}
+                      onMoveSong={moveSongInLibrary}
+                      onToggleNavigationEnabled={toggleSongNavigationEnabled}
+                    />
+                  </div>
                 </section>
               </div>
             </SectionCard>

@@ -477,6 +477,34 @@ function syncPresetsToCurrentSong(
   return { songLibrary: nextLibrary }
 }
 
+function cloneNavigationForSongCopy(
+  navigation: PresetNavigationEntry[] | undefined,
+  presets: Preset[],
+  activeNavigationKey: string | undefined,
+  activePresetId: string,
+): Pick<SongEntry, 'presetNavigation' | 'activeNavigationKey'> {
+  const markerIdRemap = new Map<string, string>()
+  const clonedNavigation =
+    navigation?.map((entry) => {
+      if (entry.kind === 'transport') {
+        const nextId = createTransportMarkerId()
+        markerIdRemap.set(entry.id, nextId)
+        return { ...entry, id: nextId }
+      }
+      return { ...entry }
+    }) ?? undefined
+  const presetNavigation = normalizePresetNavigation(clonedNavigation, presets)
+  let resolvedActiveKey = activeNavigationKey ?? activePresetId
+  if (markerIdRemap.has(resolvedActiveKey)) {
+    resolvedActiveKey = markerIdRemap.get(resolvedActiveKey)!
+  }
+  if (!presetNavigation.some((entry) => navigationEntryKey(entry) === resolvedActiveKey)) {
+    resolvedActiveKey =
+      presetNavigation.find((entry) => entry.kind === 'preset')?.presetId ?? activePresetId
+  }
+  return { presetNavigation, activeNavigationKey: resolvedActiveKey }
+}
+
 function applyDroneStateSave(
   state: DroneState,
 ): Pick<DroneState, 'presets'> & Partial<Pick<DroneState, 'songLibrary'>> | null {
@@ -1551,11 +1579,21 @@ export const useDroneStore = create<DroneState>()(
             resolvedName = `${baseName} ${collisionIndex}`
             collisionIndex += 1
           }
+          const isActiveSong = source.name === state.songName
+          const duplicatedPresets = source.presets.map((preset) => duplicatePresetData(preset))
+          const { presetNavigation, activeNavigationKey } = cloneNavigationForSongCopy(
+            isActiveSong ? state.presetNavigation : source.presetNavigation,
+            duplicatedPresets,
+            isActiveSong ? state.activeNavigationKey : source.activeNavigationKey,
+            isActiveSong ? state.activePresetId : source.activePresetId,
+          )
           const newSong: SongEntry = {
             id: `song-${Date.now()}`,
             name: resolvedName,
-            presets: source.presets.map((preset) => duplicatePresetData(preset)),
-            activePresetId: source.activePresetId,
+            presets: duplicatedPresets,
+            presetNavigation,
+            activePresetId: isActiveSong ? state.activePresetId : source.activePresetId,
+            activeNavigationKey,
           }
           return {
             songLibrary: [...state.songLibrary, newSong],
