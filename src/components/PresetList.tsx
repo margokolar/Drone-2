@@ -135,53 +135,49 @@ export function PresetList({
               >
                 <div className="mb-1.5 flex min-h-10 items-center gap-2">
                   <PlayPauseIcon size={28} className="shrink-0 text-amber-100/90" />
+                  <NavigationCheckbox
+                    checked={isNavigationEnabled}
+                    onToggle={() => onToggleTransportNavigationEnabled(entry.id)}
+                    buttonClassName={navigationToggleButtonClass}
+                    accentColor="amber"
+                    ariaLabelWhenChecked="Disable play/pause marker in prev/next navigation"
+                    ariaLabelWhenUnchecked="Enable play/pause marker in prev/next navigation"
+                  />
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex w-full flex-nowrap items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onMoveNavigationEntry(entry.id, 'up')
-                      }}
-                      className={clsx(toolButtonClass, 'shrink-0')}
-                      aria-label="Move play/pause marker up"
-                    >
-                      <ArrowUp size={16} />
-                    </button>
-                    <NavigationCheckbox
-                      checked={isNavigationEnabled}
-                      onToggle={() => onToggleTransportNavigationEnabled(entry.id)}
-                      buttonClassName={navigationToggleButtonClass}
-                      accentColor="amber"
-                      ariaLabelWhenChecked="Disable play/pause marker in prev/next navigation"
-                      ariaLabelWhenUnchecked="Enable play/pause marker in prev/next navigation"
-                    />
-                  </div>
-                  <div className="flex w-full flex-nowrap items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onMoveNavigationEntry(entry.id, 'down')
-                      }}
-                      className={clsx(toolButtonClass, 'shrink-0')}
-                      aria-label="Move play/pause marker down"
-                    >
-                      <ArrowDown size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onDeleteTransportMarker(entry.id)
-                      }}
-                      className={clsx(deleteButtonClass, 'ml-auto shrink-0')}
-                      aria-label="Delete play/pause marker"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+                <div className="flex w-full flex-nowrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onMoveNavigationEntry(entry.id, 'up')
+                    }}
+                    className={clsx(toolButtonClass, 'shrink-0')}
+                    aria-label="Move play/pause marker up"
+                  >
+                    <ArrowUp size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onMoveNavigationEntry(entry.id, 'down')
+                    }}
+                    className={clsx(toolButtonClass, 'shrink-0')}
+                    aria-label="Move play/pause marker down"
+                  >
+                    <ArrowDown size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onDeleteTransportMarker(entry.id)
+                    }}
+                    className={clsx(deleteButtonClass, 'ml-auto shrink-0')}
+                    aria-label="Delete play/pause marker"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </article>
             )
@@ -285,6 +281,16 @@ export function PresetList({
                     <div className="text-safe min-w-0 truncate text-sm font-semibold text-white">{preset.name}</div>
                   )}
                 </div>
+                {!isEditing && (
+                  <NavigationCheckbox
+                    checked={isNavigationEnabled}
+                    onToggle={() => onToggleNavigationEnabled(preset.id)}
+                    buttonClassName={navigationToggleButtonClass}
+                    accentColor="fuchsia"
+                    ariaLabelWhenChecked="Disable preset in prev/next navigation"
+                    ariaLabelWhenUnchecked="Enable preset in prev/next navigation"
+                  />
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 {isEditing ? (
@@ -340,16 +346,6 @@ export function PresetList({
                       >
                         <Plus size={16} />
                       </button>
-                      {!isEditing && (
-                        <NavigationCheckbox
-                          checked={isNavigationEnabled}
-                          onToggle={() => onToggleNavigationEnabled(preset.id)}
-                          buttonClassName={navigationToggleButtonClass}
-                          accentColor="fuchsia"
-                          ariaLabelWhenChecked="Disable preset in prev/next navigation"
-                          ariaLabelWhenUnchecked="Enable preset in prev/next navigation"
-                        />
-                      )}
                     </div>
                     <div className="flex w-full flex-nowrap items-center gap-1.5">
                       <button
