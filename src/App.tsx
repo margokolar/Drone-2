@@ -2662,9 +2662,17 @@ function App() {
                   </div>
                 </section>
                 <section className="flex min-h-0 min-w-0 flex-col">
-                  <h3 className="mb-2 shrink-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
-                    Songs
-                  </h3>
+                  <div className="mb-2 shrink-0 space-y-0.5">
+                    <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
+                      Songs
+                    </h3>
+                    <p
+                      className="truncate text-xs font-medium text-cyan-200"
+                      title={songName}
+                    >
+                      {songName.trim() || 'Untitled'}
+                    </p>
+                  </div>
                   <div className="presets-column-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
                     <SongList
                       songName={songName}
