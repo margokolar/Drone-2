@@ -7,11 +7,17 @@ export const FOOT_PEDAL_PLAY_KEYS = new Set([
 ])
 
 export const FOOT_PEDAL_PRESET_KEYS = new Set([
-  'ArrowUp',
   'ArrowLeft',
   'NumpadAdd',
   'Equal',
 ])
+
+/**
+ * AirTurn DIGIT — keyboard mode (Control → Keyboard):
+ * 1 media vol+, 2 PageUp next song, 3 Space play/pause, 4 ArrowUp next preset, 5 media vol−.
+ */
+export const KEYBOARD_NEXT_PRESET_KEYS = new Set(['ArrowUp'])
+export const KEYBOARD_PLAY_PAUSE_KEYS = new Set([' ', 'Space'])
 
 /** PT pedal — PageUp next song; PageDown previous preset. */
 export const PT_PEDAL_NEXT_KEYS = new Set(['PageUp'])
@@ -26,25 +32,6 @@ export const MEDIA_PLAY_KEYS = new Set(['MediaPlay'])
 export const MEDIA_PAUSE_KEYS = new Set(['MediaPause'])
 export const MEDIA_TRACK_NEXT_KEYS = new Set(['MediaTrackNext'])
 export const MEDIA_TRACK_PREVIOUS_KEYS = new Set(['MediaTrackPrevious'])
-
-/**
- * Speaker mode — AirTurn DIGIT (media + digit modes) and JBL Clip 5:
- * 1 vol up, 2 next song, 3 play/pause, 4 next preset, 5 vol down.
- */
-export const SPEAKER_VOLUME_UP_KEYS = new Set(['1', 'Digit1'])
-export const SPEAKER_NEXT_SONG_KEYS = new Set([
-  'PageUp',
-  'MediaTrackPrevious',
-  '2',
-  'Digit2',
-])
-export const SPEAKER_PLAY_PAUSE_KEYS = new Set([
-  'MediaPlayPause',
-  '3',
-  'Digit3',
-])
-export const SPEAKER_NEXT_PRESET_KEYS = new Set(['MediaTrackNext', '4', 'Digit4'])
-export const SPEAKER_VOLUME_DOWN_KEYS = new Set(['5', 'Digit5'])
 
 const FOOT_PEDAL_KEY_CODES: Record<string, number> = {
   ArrowUp: 38,

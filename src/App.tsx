@@ -2836,7 +2836,7 @@ function App() {
           />
           <aside
             ref={sideMenuRef}
-            className="fixed left-0 top-0 z-50 h-full w-[280px] border-r border-white/10 bg-[#1a1825] p-4 shadow-2xl"
+            className="fixed left-0 top-0 z-50 flex h-full w-[280px] flex-col border-r border-white/10 bg-[#1a1825] p-4 shadow-2xl"
             onClick={(event) => {
               const target = event.target as HTMLElement | null
               const interactiveAncestor = target?.closest(
@@ -2858,7 +2858,10 @@ function App() {
                 <X size={20} />
               </button>
             </div>
-            <div className="space-y-2">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain">
+              <div data-keep-menu-open>
+                <BtControlMenuSection />
+              </div>
               <button
                 type="button"
                 className="button-safe flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
@@ -2970,9 +2973,6 @@ function App() {
                   </button>
                 </div>
               ) : null}
-              <div data-keep-menu-open>
-                <BtControlMenuSection />
-              </div>
               <button
                 type="button"
                 className="button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"

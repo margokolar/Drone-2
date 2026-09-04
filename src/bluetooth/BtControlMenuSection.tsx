@@ -2,16 +2,11 @@ import { useState } from 'react'
 import { Bluetooth, ChevronDown } from 'lucide-react'
 import { BT_CONTROL_MODES } from './types'
 import { useDroneStore } from '../store/useDroneStore'
-import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
 
 export function BtControlMenuSection() {
   const [menuOpen, setMenuOpen] = useState(false)
   const btControlMode = useDroneStore((state) => state.btControlMode)
   const setBtControlMode = useDroneStore((state) => state.setBtControlMode)
-
-  if (!needsIosMediaRemoteIntegration()) {
-    return null
-  }
 
   return (
     <div className="space-y-2">
