@@ -119,21 +119,23 @@ export function PresetList({
                 : 'border-red-300/40 bg-red-300/10 text-red-100 hover:bg-red-300/20',
             )
             const navigationToggleButtonClass = clsx(toolButtonClass, 'ml-auto shrink-0')
+            const isCollapsed = !isNavigationEnabled
             return (
               <article
                 key={entry.id}
                 className={clsx(
-                  'rounded-xl border px-3 py-2 transition',
+                  'rounded-xl border px-3 transition',
+                  isCollapsed ? 'py-1.5' : 'py-2',
                   isActive
                     ? 'border-amber-300/70 bg-amber-300/15 shadow-[0_0_18px_rgba(251,191,36,0.12)]'
                     : 'border-white/10 bg-white/5 hover:bg-white/10',
                   !isNavigationEnabled && 'opacity-55',
-                  'cursor-pointer',
+                  isNavigationEnabled && 'cursor-pointer',
                 )}
-                onClick={() => onActivateTransport(entry.id)}
+                onClick={isNavigationEnabled ? () => onActivateTransport(entry.id) : undefined}
                 aria-label="Play / Pause marker"
               >
-                <div className="mb-1.5 flex min-h-10 items-center gap-2">
+                <div className={clsx('flex min-h-10 items-center gap-2', !isCollapsed && 'mb-1.5')}>
                   <PlayPauseIcon size={28} className="shrink-0 text-amber-100/90" />
                   <NavigationCheckbox
                     checked={isNavigationEnabled}
@@ -144,7 +146,8 @@ export function PresetList({
                     ariaLabelWhenUnchecked="Enable play/pause marker in prev/next navigation"
                   />
                 </div>
-                <div className="flex w-full flex-nowrap items-center gap-1.5">
+                {!isCollapsed ? (
+                  <div className="flex w-full flex-nowrap items-center gap-1.5">
                   <button
                     type="button"
                     onClick={(event) => {
@@ -179,6 +182,7 @@ export function PresetList({
                     <Trash2 size={16} />
                   </button>
                 </div>
+                ) : null}
               </article>
             )
           }
@@ -191,6 +195,7 @@ export function PresetList({
           const isActive = activePresetHighlightKey === preset.id
           const isNavigationEnabled = preset.enabled !== false
           const isEditing = editingPresetId === preset.id
+          const isCollapsed = !isNavigationEnabled && !isEditing
           const toolButtonClass = clsx(
             'flex min-h-9 min-w-9 items-center justify-center rounded-lg border p-1.5 transition',
             isActive
@@ -208,7 +213,8 @@ export function PresetList({
             <article
               key={preset.id}
               className={clsx(
-                'rounded-xl border px-3 py-2 transition',
+                'rounded-xl border px-3 transition',
+                isCollapsed ? 'py-1.5' : 'py-2',
                 isActive
                   ? 'border-fuchsia-300/70 bg-fuchsia-300/20 shadow-[0_0_18px_rgba(240,171,252,0.16)]'
                   : 'border-white/10 bg-white/5 hover:bg-white/10',
@@ -217,7 +223,7 @@ export function PresetList({
               )}
               onClick={!isEditing ? () => onLoadPreset(preset.id) : undefined}
             >
-              <div className="mb-1.5 flex min-h-8 items-center gap-2">
+              <div className={clsx('flex min-h-8 items-center gap-2', !isCollapsed && 'mb-1.5')}>
                 <div className="flex min-w-0 flex-1 items-center">
                   {isEditing ? (
                     <form
@@ -292,6 +298,7 @@ export function PresetList({
                   />
                 )}
               </div>
+              {!isCollapsed ? (
               <div className="flex flex-col gap-1.5">
                 {isEditing ? (
                   <button
@@ -385,6 +392,7 @@ export function PresetList({
                   </>
                 )}
               </div>
+              ) : null}
             </article>
           )
         })}
