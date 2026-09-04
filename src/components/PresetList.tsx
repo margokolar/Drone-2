@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { ArrowDown, ArrowUp, Check, Copy, Pencil, Plus, Trash2 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import { flushSync } from 'react-dom'
 import type { Preset } from '../presets/defaultPresets'
 import { resolveActivePresetHighlightKey, type PresetNavigationEntry } from '../presets/presetNavigation'
@@ -99,10 +99,27 @@ export function PresetList({
     presetNavigation,
   )
 
+  const displayedNavigation = useMemo(() => {
+    const enabledEntries: PresetNavigationEntry[] = []
+    const disabledEntries: PresetNavigationEntry[] = []
+    for (const entry of presetNavigation) {
+      const isNavigationEnabled =
+        entry.kind === 'transport'
+          ? entry.enabled !== false
+          : presets.find((preset) => preset.id === entry.presetId)?.enabled !== false
+      if (isNavigationEnabled) {
+        enabledEntries.push(entry)
+      } else {
+        disabledEntries.push(entry)
+      }
+    }
+    return [...enabledEntries, ...disabledEntries]
+  }, [presetNavigation, presets])
+
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        {presetNavigation.map((entry) => {
+        {displayedNavigation.map((entry) => {
           if (entry.kind === 'transport') {
             const isNavigationEnabled = entry.enabled !== false
             const isActive = isNavigationEnabled && activeNavigationKey === entry.id

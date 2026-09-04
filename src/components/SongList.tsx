@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { ArrowDown, ArrowUp, Check, Copy, Pencil, Trash2 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import { flushSync } from 'react-dom'
 import { NavigationCheckbox } from './NavigationCheckbox'
 
@@ -84,12 +84,26 @@ export function SongList({
     }, 400)
   }
 
+  const displayedSongs = useMemo(() => {
+    const enabledSongs: SongEntry[] = []
+    const disabledSongs: SongEntry[] = []
+    for (const song of songLibrary) {
+      if (song.enabled !== false) {
+        enabledSongs.push(song)
+      } else {
+        disabledSongs.push(song)
+      }
+    }
+    return [...enabledSongs, ...disabledSongs]
+  }, [songLibrary])
+
   return (
     <div className="space-y-1.5">
-      {songLibrary.map((song) => {
+      {displayedSongs.map((song) => {
         const isActive = song.name === songName
         const isNavigationEnabled = song.enabled !== false
         const isEditing = editingSongId === song.id
+        const isCollapsed = !isNavigationEnabled && !isEditing
         const toolButtonClass = clsx(
           'flex min-h-9 min-w-9 items-center justify-center rounded-lg border p-1.5 transition',
           isActive
@@ -108,7 +122,8 @@ export function SongList({
           <article
             key={song.id}
             className={clsx(
-              'rounded-xl border px-3 py-2 transition',
+              'rounded-xl border px-3 transition',
+              isCollapsed ? 'py-1.5' : 'py-2',
               isActive
                 ? 'border-cyan-300/70 bg-cyan-300/20 shadow-[0_0_18px_rgba(103,232,249,0.14)]'
                 : 'border-white/10 bg-white/5 hover:bg-white/10',
@@ -117,7 +132,7 @@ export function SongList({
             )}
             onClick={!isEditing ? () => onLoadSong(song.id) : undefined}
           >
-            <div className="mb-1.5 flex min-h-8 items-center gap-2">
+            <div className={clsx('flex min-h-8 items-center gap-2', !isCollapsed && 'mb-1.5')}>
               <div className="flex min-w-0 flex-1 items-center">
                 {isEditing ? (
                   <form
@@ -181,7 +196,18 @@ export function SongList({
                   <div className="text-safe min-w-0 truncate text-sm font-semibold text-white">{song.name}</div>
                 )}
               </div>
+              {!isEditing && (
+                <NavigationCheckbox
+                  checked={isNavigationEnabled}
+                  onToggle={() => onToggleNavigationEnabled(song.id)}
+                  buttonClassName={navigationToggleButtonClass}
+                  accentColor="cyan"
+                  ariaLabelWhenChecked="Disable song in prev/next navigation"
+                  ariaLabelWhenUnchecked="Enable song in prev/next navigation"
+                />
+              )}
             </div>
+            {!isCollapsed ? (
             <div className="flex flex-col gap-1.5">
               {isEditing ? (
                 <button
@@ -224,14 +250,6 @@ export function SongList({
                     >
                       <ArrowUp size={16} />
                     </button>
-                    <NavigationCheckbox
-                      checked={isNavigationEnabled}
-                      onToggle={() => onToggleNavigationEnabled(song.id)}
-                      buttonClassName={navigationToggleButtonClass}
-                      accentColor="cyan"
-                      ariaLabelWhenChecked="Disable song in prev/next navigation"
-                      ariaLabelWhenUnchecked="Enable song in prev/next navigation"
-                    />
                   </div>
                   <div className="flex w-full flex-nowrap items-center gap-1.5">
                     <button
@@ -272,6 +290,7 @@ export function SongList({
                 </>
               )}
             </div>
+            ) : null}
           </article>
         )
       })}
