@@ -1394,7 +1394,12 @@ export const useDroneStore = create<DroneState>()(
               ? applyPresetState(presetBeforeMarker)
               : applyPresetState(firstActive.preset)),
             activeNavigationKey: firstActive.navigationKey,
-            ...(landingOnTransport && state.playing ? { playing: false } : {}),
+            ...(landingOnTransport
+              ? {
+                  playing: false,
+                  ...(state.metronomeSyncEnabled ? { metronomeEnabled: false } : {}),
+                }
+              : {}),
           }
         }),
       deleteSongFromLibrary: (songId) =>

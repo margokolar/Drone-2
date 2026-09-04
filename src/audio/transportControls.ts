@@ -1,7 +1,7 @@
 import { droneEngine } from './DroneEngine'
 import { metronomeEngine } from './MetronomeEngine'
 import type { DroneRuntimeConfig } from './types'
-import { stepPresetNavigation, playNextPresetFromTransportMarker } from './presetNavigationTransport'
+import { stepPresetNavigation, playNextPresetFromTransportMarker, syncTransportPaused } from './presetNavigationTransport'
 import { isTransportMarkerKey } from '../presets/presetNavigation'
 import { useDroneStore } from '../store/useDroneStore'
 import { recordBleDebug } from '../utils/bleDebug'
@@ -81,11 +81,7 @@ export function transportPlayFromRemote(config: DroneRuntimeConfig): void {
 }
 
 export function transportPause(): void {
-  droneEngine.pause()
-  useDroneStore.getState().setPlaying(false)
-  if (needsIosMediaRemoteIntegration()) {
-    syncMediaSessionPlaybackState(false)
-  }
+  syncTransportPaused()
   recordBleDebug('note', `paused ctx=${droneEngine.contextDebugLabel()}`)
   window.setTimeout(() => {
     recordBleDebug(
@@ -100,11 +96,7 @@ export function transportPauseFromRemote(): void {
   if (!useDroneStore.getState().playing) {
     return
   }
-  droneEngine.pause()
-  useDroneStore.getState().setPlaying(false)
-  if (needsIosMediaRemoteIntegration()) {
-    syncMediaSessionPlaybackState(false)
-  }
+  syncTransportPaused()
   recordBleDebug('note', `remote pause ctx=${droneEngine.contextDebugLabel()}`)
 }
 

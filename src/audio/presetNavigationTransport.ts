@@ -6,11 +6,27 @@ import {
   selectPreviousInRing,
 } from '../presets/presetNavigation'
 import { useDroneStore } from '../store/useDroneStore'
+import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
 import { droneEngine } from './DroneEngine'
 import { metronomeEngine } from './MetronomeEngine'
 import { shineEngine } from './ShineEngine'
 import { buildRuntimeConfigFromStore } from './runtimeConfigFromStore'
 import type { DroneRuntimeConfig } from './types'
+
+/** Pause audio and sync store + iOS media session (same as transport pause button). */
+export function syncTransportPaused(): void {
+  droneEngine.setPlaybackIntent(false)
+  droneEngine.pause()
+  useDroneStore.getState().setPlaying(false)
+  if (!needsIosMediaRemoteIntegration() || !('mediaSession' in navigator)) {
+    return
+  }
+  try {
+    navigator.mediaSession.playbackState = 'paused'
+  } catch {
+    // Ignore browsers that reject the write.
+  }
+}
 
 function startPresetPlayback(config: DroneRuntimeConfig): void {
   droneEngine.setPlaybackIntent(true)
@@ -65,10 +81,7 @@ export function activateTransportMarker(markerId: string): void {
   if (!isTransportMarkerKey(markerId, state.presetNavigation)) {
     return
   }
-  if (state.playing) {
-    droneEngine.pause()
-    useDroneStore.getState().setPlaying(false)
-  }
+  syncTransportPaused()
   useDroneStore.setState({ activeNavigationKey: markerId })
 }
 
@@ -108,10 +121,7 @@ export function stepPresetNavigation(
       advancePastTransportMarker(direction, activeKey, enabledEntries)
       return
     }
-    if (state.playing) {
-      droneEngine.pause()
-      useDroneStore.getState().setPlaying(false)
-    }
+    syncTransportPaused()
     useDroneStore.setState({ activeNavigationKey: nextEntry.id })
     return
   }
