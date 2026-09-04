@@ -2114,21 +2114,10 @@ function App() {
               }`}
             >
               <article className="relative min-w-0 overflow-hidden rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
-                <h2 className="mb-2 pr-[4.25rem] text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
-                  Preset
-                </h2>
-                <div className="absolute right-2 top-2 z-10 flex gap-1">
-                  <button
-                    type="button"
-                    className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] text-white/80 transition hover:bg-[#352a48]"
-                    onClick={(event) => {
-                      triggerSaveFlash(event.currentTarget)
-                      saveDroneState()
-                    }}
-                    aria-label="Save drone state"
-                  >
-                    <Save size={15} />
-                  </button>
+                <div className="mb-2 flex min-h-8 items-center gap-2">
+                  <h2 className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
+                    Preset
+                  </h2>
                   <button
                     type="button"
                     className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] text-white/80 transition hover:bg-[#352a48]"
@@ -2147,14 +2136,13 @@ function App() {
                   onSelect={handlePresetPickerSelect}
                   appearance="select"
                   openAriaLabel="Open preset list"
-                  triggerClassName="mt-5"
                 />
               </article>
               <article className="relative min-w-0 overflow-hidden rounded-xl border border-white/10 bg-[#1a1825] p-3">
-                <h2 className="mb-2 pr-[2.5rem] text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
-                  Song
-                </h2>
-                <div className="absolute right-2 top-2 z-10 flex gap-1">
+                <div className="mb-2 flex min-h-8 items-center gap-2">
+                  <h2 className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
+                    Song
+                  </h2>
                   <button
                     type="button"
                     className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] text-white/80 transition hover:bg-[#352a48]"
@@ -2174,7 +2162,6 @@ function App() {
                   appearance="select"
                   dropdownAlign="end"
                   openAriaLabel="Open song list"
-                  triggerClassName="mt-5"
                 />
               </article>
             </div>
