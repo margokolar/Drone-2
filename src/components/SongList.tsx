@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { ArrowDown, ArrowUp, Check, Copy, Pencil, Trash2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
+import { NavigationCheckbox } from './NavigationCheckbox'
 
 type SongEntry = {
   id: string
@@ -101,6 +102,7 @@ export function SongList({
             ? 'border-red-300/55 bg-[#2a2238] text-red-200 hover:bg-red-300/20'
             : 'border-red-300/40 bg-red-300/10 text-red-100 hover:bg-red-300/20',
         )
+        const navigationToggleButtonClass = clsx(toolButtonClass, 'ml-auto shrink-0')
 
         return (
           <article
@@ -179,29 +181,6 @@ export function SongList({
                   <div className="text-safe min-w-0 truncate text-sm font-semibold text-white">{song.name}</div>
                 )}
               </div>
-              {!isEditing && (
-                <button
-                  type="button"
-                  className={clsx(
-                    'shrink-0 rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition',
-                    isNavigationEnabled
-                      ? 'border-cyan-300/50 bg-cyan-300/15 text-cyan-100 hover:bg-cyan-300/25'
-                      : 'border-white/15 bg-white/5 text-white/55 hover:bg-white/10',
-                  )}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onToggleNavigationEnabled(song.id)
-                  }}
-                  aria-pressed={isNavigationEnabled}
-                  aria-label={
-                    isNavigationEnabled
-                      ? 'Disable song in prev/next navigation'
-                      : 'Enable song in prev/next navigation'
-                  }
-                >
-                  {isNavigationEnabled ? 'On' : 'Off'}
-                </button>
-              )}
             </div>
             <div className="flex flex-col gap-1.5">
               {isEditing ? (
@@ -222,14 +201,14 @@ export function SongList({
                 </button>
               ) : (
                 <>
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex w-full flex-nowrap items-center gap-1.5">
                     <button
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation()
                         startEditing(song)
                       }}
-                      className={toolButtonClass}
+                      className={clsx(toolButtonClass, 'shrink-0')}
                       aria-label="Edit song title"
                     >
                       <Pencil size={16} />
@@ -240,11 +219,19 @@ export function SongList({
                         event.stopPropagation()
                         onMoveSong(song.id, 'up')
                       }}
-                      className={toolButtonClass}
+                      className={clsx(toolButtonClass, 'shrink-0')}
                       aria-label="Move song up"
                     >
                       <ArrowUp size={16} />
                     </button>
+                    <NavigationCheckbox
+                      checked={isNavigationEnabled}
+                      onToggle={() => onToggleNavigationEnabled(song.id)}
+                      buttonClassName={navigationToggleButtonClass}
+                      accentColor="cyan"
+                      ariaLabelWhenChecked="Disable song in prev/next navigation"
+                      ariaLabelWhenUnchecked="Enable song in prev/next navigation"
+                    />
                   </div>
                   <div className="flex w-full flex-nowrap items-center gap-1.5">
                     <button
@@ -275,7 +262,7 @@ export function SongList({
                         event.stopPropagation()
                         onDeleteSong(song.id)
                       }}
-                      className={clsx(deleteButtonClass, 'ml-auto')}
+                      className={clsx(deleteButtonClass, 'ml-auto shrink-0')}
                       aria-label="Delete song"
                       disabled={songLibrary.length <= 1}
                     >

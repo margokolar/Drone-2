@@ -5,6 +5,7 @@ import { flushSync } from 'react-dom'
 import type { Preset } from '../presets/defaultPresets'
 import { resolveActivePresetHighlightKey, type PresetNavigationEntry } from '../presets/presetNavigation'
 import { PlayPauseIcon } from './PlayPauseIcon'
+import { NavigationCheckbox } from './NavigationCheckbox'
 
 type PresetListProps = {
   presets: Preset[]
@@ -117,6 +118,7 @@ export function PresetList({
                 ? 'border-red-300/55 bg-[#2a2238] text-red-200 hover:bg-red-300/20'
                 : 'border-red-300/40 bg-red-300/10 text-red-100 hover:bg-red-300/20',
             )
+            const navigationToggleButtonClass = clsx(toolButtonClass, 'ml-auto shrink-0')
             return (
               <article
                 key={entry.id}
@@ -133,62 +135,53 @@ export function PresetList({
               >
                 <div className="mb-1.5 flex min-h-10 items-center gap-2">
                   <PlayPauseIcon size={28} className="shrink-0 text-amber-100/90" />
-                  <button
-                    type="button"
-                    className={clsx(
-                      'ml-auto shrink-0 rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition',
-                      isNavigationEnabled
-                        ? 'border-amber-300/50 bg-amber-300/15 text-amber-100 hover:bg-amber-300/25'
-                        : 'border-white/15 bg-white/5 text-white/55 hover:bg-white/10',
-                    )}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onToggleTransportNavigationEnabled(entry.id)
-                    }}
-                    aria-pressed={isNavigationEnabled}
-                    aria-label={
-                      isNavigationEnabled
-                        ? 'Disable play/pause marker in prev/next navigation'
-                        : 'Enable play/pause marker in prev/next navigation'
-                    }
-                  >
-                    {isNavigationEnabled ? 'On' : 'Off'}
-                  </button>
                 </div>
-                <div className="flex w-full flex-nowrap items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onMoveNavigationEntry(entry.id, 'up')
-                    }}
-                    className={toolButtonClass}
-                    aria-label="Move play/pause marker up"
-                  >
-                    <ArrowUp size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onMoveNavigationEntry(entry.id, 'down')
-                    }}
-                    className={toolButtonClass}
-                    aria-label="Move play/pause marker down"
-                  >
-                    <ArrowDown size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onDeleteTransportMarker(entry.id)
-                    }}
-                    className={clsx(deleteButtonClass, 'ml-auto')}
-                    aria-label="Delete play/pause marker"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex w-full flex-nowrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onMoveNavigationEntry(entry.id, 'up')
+                      }}
+                      className={clsx(toolButtonClass, 'shrink-0')}
+                      aria-label="Move play/pause marker up"
+                    >
+                      <ArrowUp size={16} />
+                    </button>
+                    <NavigationCheckbox
+                      checked={isNavigationEnabled}
+                      onToggle={() => onToggleTransportNavigationEnabled(entry.id)}
+                      buttonClassName={navigationToggleButtonClass}
+                      accentColor="amber"
+                      ariaLabelWhenChecked="Disable play/pause marker in prev/next navigation"
+                      ariaLabelWhenUnchecked="Enable play/pause marker in prev/next navigation"
+                    />
+                  </div>
+                  <div className="flex w-full flex-nowrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onMoveNavigationEntry(entry.id, 'down')
+                      }}
+                      className={clsx(toolButtonClass, 'shrink-0')}
+                      aria-label="Move play/pause marker down"
+                    >
+                      <ArrowDown size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onDeleteTransportMarker(entry.id)
+                      }}
+                      className={clsx(deleteButtonClass, 'ml-auto shrink-0')}
+                      aria-label="Delete play/pause marker"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
               </article>
             )
@@ -214,6 +207,7 @@ export function PresetList({
               ? 'border-red-300/55 bg-[#2a2238] text-red-200 hover:bg-red-300/20'
               : 'border-red-300/40 bg-red-300/10 text-red-100 hover:bg-red-300/20',
           )
+          const navigationToggleButtonClass = clsx(toolButtonClass, 'ml-auto shrink-0')
           return (
             <article
               key={preset.id}
@@ -291,29 +285,6 @@ export function PresetList({
                     <div className="text-safe min-w-0 truncate text-sm font-semibold text-white">{preset.name}</div>
                   )}
                 </div>
-                {!isEditing && (
-                  <button
-                    type="button"
-                    className={clsx(
-                      'shrink-0 rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition',
-                      isNavigationEnabled
-                        ? 'border-fuchsia-300/50 bg-fuchsia-300/15 text-fuchsia-100 hover:bg-fuchsia-300/25'
-                        : 'border-white/15 bg-white/5 text-white/55 hover:bg-white/10',
-                    )}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onToggleNavigationEnabled(preset.id)
-                    }}
-                    aria-pressed={isNavigationEnabled}
-                    aria-label={
-                      isNavigationEnabled
-                        ? 'Disable preset in prev/next navigation'
-                        : 'Enable preset in prev/next navigation'
-                    }
-                  >
-                    {isNavigationEnabled ? 'On' : 'Off'}
-                  </button>
-                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 {isEditing ? (
@@ -369,6 +340,16 @@ export function PresetList({
                       >
                         <Plus size={16} />
                       </button>
+                      {!isEditing && (
+                        <NavigationCheckbox
+                          checked={isNavigationEnabled}
+                          onToggle={() => onToggleNavigationEnabled(preset.id)}
+                          buttonClassName={navigationToggleButtonClass}
+                          accentColor="fuchsia"
+                          ariaLabelWhenChecked="Disable preset in prev/next navigation"
+                          ariaLabelWhenUnchecked="Enable preset in prev/next navigation"
+                        />
+                      )}
                     </div>
                     <div className="flex w-full flex-nowrap items-center gap-1.5">
                       <button
