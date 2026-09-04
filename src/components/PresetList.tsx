@@ -337,14 +337,14 @@ export function PresetList({
                   </button>
                 ) : (
                   <>
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex w-full flex-nowrap items-center gap-1.5">
                       <button
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation()
                           startEditing(preset)
                         }}
-                        className={toolButtonClass}
+                        className={clsx(toolButtonClass, 'shrink-0')}
                         aria-label="Edit preset title"
                       >
                         <Pencil size={16} />
@@ -355,7 +355,7 @@ export function PresetList({
                           event.stopPropagation()
                           onMoveNavigationEntry(preset.id, 'up')
                         }}
-                        className={toolButtonClass}
+                        className={clsx(toolButtonClass, 'shrink-0')}
                         aria-label="Move preset up"
                       >
                         <ArrowUp size={16} />
@@ -366,7 +366,7 @@ export function PresetList({
                           event.stopPropagation()
                           onInsertTransportAfter(preset.id)
                         }}
-                        className={toolButtonClass}
+                        className={clsx(toolButtonClass, 'shrink-0')}
                         aria-label="Insert play/pause marker after this preset"
                         title="Insert play/pause after"
                       >
@@ -380,7 +380,7 @@ export function PresetList({
                           event.stopPropagation()
                           onDuplicatePreset(preset.id)
                         }}
-                        className={toolButtonClass}
+                        className={clsx(toolButtonClass, 'shrink-0')}
                         aria-label="Duplicate preset"
                       >
                         <Copy size={16} />
@@ -391,7 +391,7 @@ export function PresetList({
                           event.stopPropagation()
                           onMoveNavigationEntry(preset.id, 'down')
                         }}
-                        className={toolButtonClass}
+                        className={clsx(toolButtonClass, 'shrink-0')}
                         aria-label="Move preset down"
                       >
                         <ArrowDown size={16} />
@@ -402,7 +402,7 @@ export function PresetList({
                           event.stopPropagation()
                           onDeletePreset(preset.id)
                         }}
-                        className={clsx(deleteButtonClass, 'ml-auto')}
+                        className={clsx(deleteButtonClass, 'ml-auto shrink-0')}
                         aria-label="Delete preset"
                       >
                         <Trash2 size={16} />
