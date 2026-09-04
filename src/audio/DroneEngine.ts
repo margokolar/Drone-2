@@ -36,6 +36,10 @@ const DEFAULT_ENTRY_GLIDE: EntryGlideParams = {
 const MIN_AUDIBLE_GAIN = 0.0001
 const FADE_CURVE_STEPS = 64
 
+function usesSmoothCrossfade(duration: number): boolean {
+  return duration > PARAM_SMOOTH_SECONDS + 0.01
+}
+
 function buildFadeInCurve(targetGain: number): Float32Array {
   const curve = new Float32Array(FADE_CURVE_STEPS)
   const target = Math.max(MIN_AUDIBLE_GAIN, targetGain)
@@ -601,6 +605,7 @@ export class DroneEngine {
       this.forceMute(now)
       return
     }
+    const voiceTransition = this.resolveVoiceTransitionTiming()
     const masterTarget = dbToGain(config.masterGainDb)
     const isAudiblyMuted = this.masterGain.gain.value < 0.002
     if (isAudiblyMuted && this.playbackFadeInSeconds > 0) {
@@ -610,6 +615,13 @@ export class DroneEngine {
         now,
         this.playbackFadeInSeconds,
       )
+    } else if (usesSmoothCrossfade(voiceTransition.updateSeconds)) {
+      scheduleSmoothGainCrossfade(
+        this.masterGain.gain,
+        masterTarget,
+        now,
+        voiceTransition.updateSeconds,
+      )
     } else {
       this.masterGain.gain.cancelScheduledValues(now)
       this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now)
@@ -618,8 +630,6 @@ export class DroneEngine {
         now + PARAM_SMOOTH_SECONDS,
       )
     }
-
-    const voiceTransition = this.resolveVoiceTransitionTiming()
 
     const targetNotes = new Set<string>()
     for (const toneConfig of config.tones) {
@@ -789,7 +799,7 @@ export class DroneEngine {
     }
 
     outputGain.gain.cancelScheduledValues(now)
-    if (attackSeconds > ATTACK_SECONDS + 0.01) {
+    if (usesSmoothCrossfade(attackSeconds)) {
       scheduleSmoothVoiceFadeIn(outputGain.gain, toneGain, now, attackSeconds)
     } else if (this.playbackFadeInSeconds > 0) {
       outputGain.gain.setValueAtTime(Math.max(MIN_AUDIBLE_GAIN, toneGain), now)
@@ -803,7 +813,7 @@ export class DroneEngine {
 
     for (const bundle of oscillators) {
       bundle.gainNode.gain.cancelScheduledValues(now)
-      if (attackSeconds > ATTACK_SECONDS + 0.01) {
+      if (usesSmoothCrossfade(attackSeconds)) {
         scheduleSmoothVoiceFadeIn(bundle.gainNode.gain, bundle.waveGain, now, attackSeconds)
       } else if (this.playbackFadeInSeconds > 0) {
         bundle.gainNode.gain.setValueAtTime(Math.max(MIN_AUDIBLE_GAIN, bundle.waveGain), now)
@@ -841,7 +851,7 @@ export class DroneEngine {
       config.baseOctave,
     )
     const toneGain = Math.max(0.0001, dbToGain(toneConfig.gainDb))
-    if (updateSeconds > PARAM_SMOOTH_SECONDS + 0.01) {
+    if (usesSmoothCrossfade(updateSeconds)) {
       scheduleSmoothGainCrossfade(voice.outputGain.gain, toneGain, now, updateSeconds)
     } else {
       voice.outputGain.gain.cancelScheduledValues(now)
@@ -898,7 +908,7 @@ export class DroneEngine {
             now + updateSeconds,
           )
         }
-        if (updateSeconds > PARAM_SMOOTH_SECONDS + 0.01) {
+        if (usesSmoothCrossfade(updateSeconds)) {
           scheduleSmoothGainCrossfade(bundle.gainNode.gain, nextWaveGain, now, updateSeconds)
         } else {
           bundle.gainNode.gain.cancelScheduledValues(now)
@@ -939,7 +949,7 @@ export class DroneEngine {
     const duration = Math.max(0, releaseSeconds)
     const stopAt = now + Math.max(duration, 0.01) + 0.03
 
-    if (duration > RELEASE_SECONDS + 0.01) {
+    if (usesSmoothCrossfade(duration)) {
       scheduleSmoothVoiceFadeOut(voice.outputGain.gain, now, duration)
     } else {
       voice.outputGain.gain.cancelScheduledValues(now)
