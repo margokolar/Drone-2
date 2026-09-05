@@ -1,0 +1,32 @@
+---
+description: Scope visual/UI changes to the Capacitor iOS app without changing PWA/browser
+alwaysApply: true
+---
+
+# iOS-only visuals (PWA unchanged)
+
+When the user asks for iOS app look/layout changes, **do not change the PWA or desktop browser** unless they explicitly ask for both.
+
+## Detection
+
+- Startup adds classes on `<html>` and `<body>` via `applyPlatformBodyClasses()` in `src/main.tsx`.
+- **`ios-app`** — Capacitor on iPhone/iPad (`Capacitor.getPlatform() === 'ios'`).
+- **`capacitor-native`** — any Capacitor native shell (includes iOS).
+
+Helpers: `src/utils/platform.ts` — `isIosApp()`, `isCapacitorNative()`.
+
+## How to implement iOS-only UI
+
+1. **Tailwind (preferred):** prefix utilities with `ios-app:` (e.g. `ios-app:pb-[env(safe-area-inset-bottom)]`). Requires ancestor `.ios-app` on body — already set at startup.
+2. **CSS:** scope under `.ios-app` in `index.css` (e.g. `.ios-app .bottom-nav { … }`).
+3. **React:** branch with `isIosApp()` from `src/utils/platform.ts` for different markup — keep the default branch identical to current PWA behavior.
+
+## Do not
+
+- Change global layout/styles without an `ios-app` / `isIosApp()` guard.
+- Edit PWA manifest, service worker, or Vercel-only assets for iOS-only polish.
+- Use `Capacitor.isNativePlatform()` alone when the change is iOS-specific (Android would get it too).
+
+## Prompting
+
+User may say "ainult iOS-äpis" / "PWA-d ära muuda" — treat that as mandatory for the whole task.

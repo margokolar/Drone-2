@@ -4,7 +4,10 @@ import { Capacitor } from '@capacitor/core'
 import '@fontsource/noto-music/music-400.css'
 import './index.css'
 import App from './App.tsx'
+import { applyPlatformBodyClasses } from './utils/platform'
 import { registerSW } from 'virtual:pwa-register'
+
+applyPlatformBodyClasses()
 
 async function setupServiceWorker() {
   // Native Capacitor builds ship a fresh web bundle on each deploy. A PWA

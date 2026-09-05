@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tailwind: ios-app:… utilities apply only inside the Capacitor iOS shell. */
+@custom-variant ios-app (&:where(.ios-app *));
+
 :root {
   font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   line-height: 1.35;

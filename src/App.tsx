@@ -2736,12 +2736,12 @@ function App() {
       >
         <div className="mx-auto w-full max-w-[26.5rem] space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-[62.5rem]">
           <nav
-            className={`overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm ${
+            className={`overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm ios-app:overflow-x-hidden ${
               activeTab !== 'overtones' ? 'landscape:hidden max-h-[500px]:hidden' : ''
             }`}
             aria-label="App sections"
           >
-            <div className="flex w-max min-w-full items-center justify-center gap-1 landscape:w-full max-h-[500px]:w-full">
+            <div className="flex w-max min-w-full items-center justify-center gap-1 ios-app:w-full ios-app:max-w-full ios-app:gap-0.5 ios-app:justify-stretch landscape:w-full max-h-[500px]:w-full">
               {visibleTabs.map(({ id, label }) => (
                 <button
                   key={id}
@@ -2750,7 +2750,7 @@ function App() {
                   aria-selected={activeTab === id}
                   aria-controls={`panel-${id}`}
                   id={`tab-${id}`}
-                  className={`button-safe shrink-0 rounded-lg border px-3 py-2 text-center text-sm font-medium transition landscape:hidden max-h-[500px]:hidden ${activeTab === id ? 'border-white/25 bg-white/15 text-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'}`}
+                  className={`button-safe shrink-0 rounded-lg border px-3 py-2 text-center text-sm font-medium transition ios-app:min-w-0 ios-app:flex-1 ios-app:px-1.5 ios-app:py-2.5 ios-app:text-[0.8125rem] ios-app:leading-tight landscape:hidden max-h-[500px]:hidden ${activeTab === id ? 'border-white/25 bg-white/15 text-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'}`}
                   onClick={() => handleTabChange(id)}
                 >
                   {label}
