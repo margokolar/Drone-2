@@ -46,10 +46,10 @@ function HarmonicBar({
   const displayLevel = Math.min(1, Math.max(0, level))
 
   return (
-    <div className="flex min-w-0 flex-1 basis-0 flex-col items-center gap-1 landscape:h-auto landscape:flex-none landscape:justify-end max-h-[500px]:h-auto max-h-[500px]:flex-none max-h-[500px]:justify-end">
+    <div className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col items-center gap-1 landscape:h-full max-h-[500px]:h-full">
       <div
         ref={trackRef}
-        className={`relative w-full min-h-0 flex-1 overflow-hidden rounded-md border landscape:h-[6.75rem] landscape:max-h-[6.75rem] landscape:flex-none max-h-[500px]:h-[6.75rem] max-h-[500px]:max-h-[6.75rem] max-h-[500px]:flex-none ${
+        className={`relative min-h-0 w-full flex-1 overflow-hidden rounded-md border ${
           auto ? 'border-fuchsia-500/40' : 'border-rose-900/60'
         } bg-black`}
         style={{ touchAction: 'none' }}
@@ -219,16 +219,16 @@ export function ShineControls({
           {allControlsRow}
         </div>
       }
-      className="landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:overflow-hidden landscape:pb-0 landscape:[&>header]:mb-2 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:overflow-hidden max-h-[500px]:pb-0 max-h-[500px]:[&>header]:mb-2"
+      className="landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:overflow-hidden landscape:[&>header]:mb-2 landscape:[&>header]:shrink-0 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:overflow-hidden max-h-[500px]:[&>header]:mb-2 max-h-[500px]:[&>header]:shrink-0"
     >
       <div className="space-y-4 landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:space-y-0 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:space-y-0">
         <div className="flex flex-wrap items-center gap-2 landscape:hidden max-h-[500px]:hidden">
           {allControlsRow}
         </div>
 
-        <div className="landscape:mt-auto landscape:flex-none max-h-[500px]:mt-auto max-h-[500px]:flex-none">
+        <div className="min-h-0 landscape:flex landscape:flex-1 landscape:flex-col max-h-[500px]:flex max-h-[500px]:flex-1 max-h-[500px]:flex-col">
           <div
-            className="flex h-52 items-stretch gap-0.5 landscape:h-auto landscape:items-end max-h-[500px]:h-auto max-h-[500px]:items-end"
+            className="flex h-52 min-h-0 items-stretch gap-0.5 landscape:h-full landscape:min-h-0 landscape:flex-1 max-h-[500px]:h-full max-h-[500px]:min-h-0 max-h-[500px]:flex-1"
             data-swipe-ignore
           >
             {levels.map((level, index) => (

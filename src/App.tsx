@@ -2241,7 +2241,7 @@ function App() {
               : activeTab === 'presets'
                 ? 'flex min-h-0 flex-1 flex-col pb-0'
                 : activeTab === 'shine'
-                  ? 'landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:pb-0 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:pb-0'
+                  ? 'landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:pb-[var(--bottom-chrome-height,4.5rem)] max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:pb-[var(--bottom-chrome-height,4.5rem)]'
                   : 'pb-44'
           }`}
           onTouchStart={handleSwipeTouchStart}
