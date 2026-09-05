@@ -3,6 +3,12 @@ import type { DroneRuntimeConfig, EntryGlideParams, PartialConfig, ToneConfig } 
 import { getFrequency } from '../music/tuning'
 import { recordBleDebug } from '../utils/bleDebug'
 import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
+import {
+  MIN_AUDIBLE_GAIN,
+  scheduleSmoothFadeIn,
+  scheduleSmoothFadeOut,
+  scheduleSmoothGainCrossfade,
+} from './fadeCurves'
 
 type OscBundle = {
   oscillator: OscillatorNode
@@ -33,33 +39,8 @@ const DEFAULT_ENTRY_GLIDE: EntryGlideParams = {
   seconds: 2,
 }
 
-const MIN_AUDIBLE_GAIN = 0.0001
-const FADE_CURVE_STEPS = 64
-
 function usesSmoothCrossfade(duration: number): boolean {
   return duration > PARAM_SMOOTH_SECONDS + 0.01
-}
-
-function buildFadeInCurve(targetGain: number): Float32Array {
-  const curve = new Float32Array(FADE_CURVE_STEPS)
-  const target = Math.max(MIN_AUDIBLE_GAIN, targetGain)
-  for (let index = 0; index < FADE_CURVE_STEPS; index += 1) {
-    const progress = index / (FADE_CURVE_STEPS - 1)
-    const shaped = Math.sin((progress * Math.PI) / 2)
-    curve[index] = Math.max(MIN_AUDIBLE_GAIN, target * shaped)
-  }
-  return curve
-}
-
-function buildFadeOutCurve(startGain: number): Float32Array {
-  const curve = new Float32Array(FADE_CURVE_STEPS)
-  const start = Math.max(MIN_AUDIBLE_GAIN, startGain)
-  for (let index = 0; index < FADE_CURVE_STEPS; index += 1) {
-    const progress = index / (FADE_CURVE_STEPS - 1)
-    const shaped = Math.cos((progress * Math.PI) / 2)
-    curve[index] = Math.max(MIN_AUDIBLE_GAIN, start * shaped)
-  }
-  return curve
 }
 
 function scheduleSmoothMasterFadeIn(
@@ -68,9 +49,7 @@ function scheduleSmoothMasterFadeIn(
   now: number,
   duration: number,
 ): void {
-  param.cancelScheduledValues(now)
-  param.setValueAtTime(MIN_AUDIBLE_GAIN, now)
-  param.setValueCurveAtTime(buildFadeInCurve(targetGain), now, duration)
+  scheduleSmoothFadeIn(param, targetGain, now, duration)
 }
 
 function scheduleSmoothMasterFadeOut(
@@ -79,10 +58,7 @@ function scheduleSmoothMasterFadeOut(
   now: number,
   duration: number,
 ): void {
-  const start = Math.max(MIN_AUDIBLE_GAIN, startGain)
-  param.cancelScheduledValues(now)
-  param.setValueAtTime(start, now)
-  param.setValueCurveAtTime(buildFadeOutCurve(start), now, duration)
+  scheduleSmoothFadeOut(param, now, duration, startGain)
 }
 
 function scheduleSmoothVoiceFadeIn(
@@ -91,14 +67,7 @@ function scheduleSmoothVoiceFadeIn(
   now: number,
   duration: number,
 ): void {
-  const target = Math.max(MIN_AUDIBLE_GAIN, targetGain)
-  param.cancelScheduledValues(now)
-  if (duration <= 0) {
-    param.setValueAtTime(target, now)
-    return
-  }
-  param.setValueAtTime(MIN_AUDIBLE_GAIN, now)
-  param.setValueCurveAtTime(buildFadeInCurve(target), now, duration)
+  scheduleSmoothFadeIn(param, targetGain, now, duration)
 }
 
 function scheduleSmoothVoiceFadeOut(
@@ -106,42 +75,7 @@ function scheduleSmoothVoiceFadeOut(
   now: number,
   duration: number,
 ): void {
-  param.cancelScheduledValues(now)
-  const start = Math.max(MIN_AUDIBLE_GAIN, param.value)
-  if (duration <= 0) {
-    param.setValueAtTime(MIN_AUDIBLE_GAIN, now)
-    return
-  }
-  param.setValueAtTime(start, now)
-  param.setValueCurveAtTime(buildFadeOutCurve(start), now, duration)
-}
-
-function scheduleSmoothGainCrossfade(
-  param: AudioParam,
-  targetGain: number,
-  now: number,
-  duration: number,
-): void {
-  param.cancelScheduledValues(now)
-  const start = Math.max(MIN_AUDIBLE_GAIN, param.value)
-  const target = Math.max(MIN_AUDIBLE_GAIN, targetGain)
-  if (duration <= 0 || Math.abs(Math.log(start / target)) < 0.001) {
-    param.setValueAtTime(target, now)
-    return
-  }
-  if (duration <= PARAM_SMOOTH_SECONDS + 0.01) {
-    param.setValueAtTime(start, now)
-    param.exponentialRampToValueAtTime(target, now + duration)
-    return
-  }
-  const curve = new Float32Array(FADE_CURVE_STEPS)
-  for (let index = 0; index < FADE_CURVE_STEPS; index += 1) {
-    const progress = index / (FADE_CURVE_STEPS - 1)
-    const shaped = (1 - Math.cos((progress * Math.PI) / 2)) / 2
-    curve[index] = Math.max(MIN_AUDIBLE_GAIN, start * (1 - shaped) + target * shaped)
-  }
-  param.setValueAtTime(start, now)
-  param.setValueCurveAtTime(curve, now, duration)
+  scheduleSmoothFadeOut(param, now, duration)
 }
 
 type VoiceTransitionTiming = {
@@ -163,6 +97,10 @@ export class DroneEngine {
   private playbackFadeInSeconds = 0
   private playbackFadeOutSeconds = 0
   private presetCrossfadeSeconds = 0
+  /** True after pause/mute until the next audible sync restores levels. */
+  private resumeFromSilence = true
+  /** Last intended master gain; WKWebView AudioParam.value is unreliable mid-curve. */
+  private lastMasterTarget = MIN_AUDIBLE_GAIN
 
   setPlaybackIntent(shouldPlay: boolean): void {
     this.shouldPlay = shouldPlay
@@ -314,6 +252,8 @@ export class DroneEngine {
     } else {
       this.masterGain.gain.setValueAtTime(masterTarget, now)
     }
+    this.lastMasterTarget = masterTarget
+    this.resumeFromSilence = false
 
     for (const [noteId, voice] of this.voiceMap.entries()) {
       const toneConfig = config.tones.find((tone) => tone.noteId === noteId && tone.enabled)
@@ -521,6 +461,7 @@ export class DroneEngine {
     if (!this.masterGain) {
       return
     }
+    this.resumeFromSilence = true
     this.masterGain.gain.cancelScheduledValues(now)
     this.masterGain.gain.setValueAtTime(0.0001, now)
     this.muteVoicesAt(now, 0.0001)
@@ -541,7 +482,8 @@ export class DroneEngine {
     if (!this.masterGain) {
       return
     }
-    const startGain = this.masterGain.gain.value
+    this.resumeFromSilence = true
+    const startGain = Math.max(this.lastMasterTarget, this.masterGain.gain.value, MIN_AUDIBLE_GAIN)
     scheduleSmoothMasterFadeOut(this.masterGain.gain, startGain, now, fadeOutSeconds)
     this.muteVoicesAt(now + fadeOutSeconds, MIN_AUDIBLE_GAIN)
   }
@@ -607,29 +549,37 @@ export class DroneEngine {
     }
     const voiceTransition = this.resolveVoiceTransitionTiming()
     const masterTarget = dbToGain(config.masterGainDb)
-    const isAudiblyMuted = this.masterGain.gain.value < 0.002
-    if (isAudiblyMuted && this.playbackFadeInSeconds > 0) {
+    // Do not trust AudioParam.value < threshold on iOS — mid-curve reads often
+    // return ~0 and would restart a silence fade-in, killing the crossfade.
+    if (this.resumeFromSilence && this.playbackFadeInSeconds > 0) {
       scheduleSmoothMasterFadeIn(
         this.masterGain.gain,
         masterTarget,
         now,
         this.playbackFadeInSeconds,
       )
+    } else if (this.resumeFromSilence) {
+      this.masterGain.gain.cancelScheduledValues(now)
+      this.masterGain.gain.setValueAtTime(masterTarget, now)
     } else if (usesSmoothCrossfade(voiceTransition.updateSeconds)) {
       scheduleSmoothGainCrossfade(
         this.masterGain.gain,
         masterTarget,
         now,
         voiceTransition.updateSeconds,
+        this.lastMasterTarget,
       )
     } else {
       this.masterGain.gain.cancelScheduledValues(now)
-      this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now)
+      const start = Math.max(MIN_AUDIBLE_GAIN, this.lastMasterTarget, this.masterGain.gain.value)
+      this.masterGain.gain.setValueAtTime(start, now)
       this.masterGain.gain.linearRampToValueAtTime(
         this.started ? masterTarget : MIN_AUDIBLE_GAIN,
         now + PARAM_SMOOTH_SECONDS,
       )
     }
+    this.lastMasterTarget = masterTarget
+    this.resumeFromSilence = false
 
     const targetNotes = new Set<string>()
     for (const toneConfig of config.tones) {
@@ -851,8 +801,18 @@ export class DroneEngine {
       config.baseOctave,
     )
     const toneGain = Math.max(0.0001, dbToGain(toneConfig.gainDb))
+    const outputStart =
+      voice.outputGain.gain.value > 0.002
+        ? voice.outputGain.gain.value
+        : Math.max(MIN_AUDIBLE_GAIN, toneGain)
     if (usesSmoothCrossfade(updateSeconds)) {
-      scheduleSmoothGainCrossfade(voice.outputGain.gain, toneGain, now, updateSeconds)
+      scheduleSmoothGainCrossfade(
+        voice.outputGain.gain,
+        toneGain,
+        now,
+        updateSeconds,
+        outputStart,
+      )
     } else {
       voice.outputGain.gain.cancelScheduledValues(now)
       voice.outputGain.gain.setValueAtTime(voice.outputGain.gain.value, now)
@@ -909,7 +869,17 @@ export class DroneEngine {
           )
         }
         if (usesSmoothCrossfade(updateSeconds)) {
-          scheduleSmoothGainCrossfade(bundle.gainNode.gain, nextWaveGain, now, updateSeconds)
+          const waveStart =
+            bundle.gainNode.gain.value > 0.002
+              ? bundle.gainNode.gain.value
+              : Math.max(MIN_AUDIBLE_GAIN, bundle.waveGain, nextWaveGain)
+          scheduleSmoothGainCrossfade(
+            bundle.gainNode.gain,
+            nextWaveGain,
+            now,
+            updateSeconds,
+            waveStart,
+          )
         } else {
           bundle.gainNode.gain.cancelScheduledValues(now)
           bundle.gainNode.gain.setValueAtTime(bundle.gainNode.gain.value, now)
