@@ -14,12 +14,13 @@ export const FOOT_PEDAL_PRESET_KEYS = new Set([
 
 /**
  * AirTurn DIGIT — keyboard mode (Control → Keyboard):
- * 1 media vol+, 2 PageUp next song, 3 Space play/pause, 4 ArrowUp next preset, 5 media vol−.
+ * 1 media vol+, 2 PageUp next song (double → previous song), 3 Space play/pause,
+ * 4 ArrowUp next preset (double → previous preset), 5 media vol−.
  */
 export const KEYBOARD_NEXT_PRESET_KEYS = new Set(['ArrowUp'])
 export const KEYBOARD_PLAY_PAUSE_KEYS = new Set([' ', 'Space'])
 
-/** PT pedal — PageUp next song; PageDown previous preset. */
+/** PT / AirTurn — PageUp next song (double → previous song); PageDown previous preset. */
 export const PT_PEDAL_NEXT_KEYS = new Set(['PageUp'])
 export const PT_PEDAL_PREVIOUS_KEYS = new Set(['PageDown'])
 

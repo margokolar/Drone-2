@@ -199,3 +199,20 @@ export function transportPresetPedalPress(
     pendingTimeoutRef.current = null
   }, windowMs)
 }
+
+/** Single press → next song; second press within windowMs → previous song. */
+export function transportSongPedalPress(
+  pendingTimeoutRef: { current: number | null },
+  windowMs = 300,
+): void {
+  if (pendingTimeoutRef.current !== null) {
+    window.clearTimeout(pendingTimeoutRef.current)
+    pendingTimeoutRef.current = null
+    transportPreviousSong()
+    return
+  }
+  pendingTimeoutRef.current = window.setTimeout(() => {
+    transportNextSong()
+    pendingTimeoutRef.current = null
+  }, windowMs)
+}

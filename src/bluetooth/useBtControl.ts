@@ -2,13 +2,14 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { droneEngine } from '../audio/DroneEngine'
 import {
   transportNextPreset,
-  transportNextSong,
   transportPause,
   transportPauseFromRemote,
   transportPlay,
   transportPlayFromRemote,
+  transportPresetPedalPress,
   transportPreviousPreset,
   transportResume,
+  transportSongPedalPress,
   transportVolumeDown,
   transportVolumeUp,
 } from '../audio/transportControls'
@@ -140,6 +141,8 @@ export function useBtControl({
   const clipRemoteHoldRef = useRef(false)
   const speakerPlayRequestedRef = useRef(false)
   const speakerRemotePauseUntilRef = useRef(0)
+  const arrowUpTimeoutRef = useRef<number | null>(null)
+  const pageUpTimeoutRef = useRef<number | null>(null)
   const btControlMode = useDroneStore((state) => state.btControlMode)
   const playing = useDroneStore((state) => state.playing)
 
@@ -214,7 +217,8 @@ export function useBtControl({
         event.preventDefault()
         event.stopPropagation()
         void droneEngine.pokeClock()
-        transportNextSong()
+        // Single PageUp → next song; double within 300ms → previous song.
+        transportSongPedalPress(pageUpTimeoutRef)
         return
       }
 
@@ -243,8 +247,14 @@ export function useBtControl({
     }
 
     window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [])
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true)
+      if (pageUpTimeoutRef.current !== null) {
+        window.clearTimeout(pageUpTimeoutRef.current)
+        pageUpTimeoutRef.current = null
+      }
+    }
+  }, [latestRuntimeConfigRef])
 
   useEffect(() => {
     if (!needsIosMediaRemoteIntegration()) {
@@ -487,8 +497,8 @@ export function useBtControl({
         }
 
         if (isKeyboardNextPreset) {
-          markMediaSessionAction('next')
-          transportNextPreset(latestRuntimeConfigRef.current)
+          // Single ArrowUp → next preset; double within 300ms → previous preset.
+          transportPresetPedalPress(arrowUpTimeoutRef, latestRuntimeConfigRef.current)
           return
         }
 
@@ -562,6 +572,10 @@ export function useBtControl({
       document.removeEventListener('visibilitychange', onVisibilityChange)
       if (onPedalKeyDown) {
         window.removeEventListener('keydown', onPedalKeyDown, true)
+      }
+      if (arrowUpTimeoutRef.current !== null) {
+        window.clearTimeout(arrowUpTimeoutRef.current)
+        arrowUpTimeoutRef.current = null
       }
       setActionHandler('play', null)
       setActionHandler('pause', null)
