@@ -2750,7 +2750,7 @@ function App() {
                   aria-selected={activeTab === id}
                   aria-controls={`panel-${id}`}
                   id={`tab-${id}`}
-                  className={`button-safe shrink-0 rounded-lg border px-3 py-2 text-center text-sm font-medium transition ios-app:flex ios-app:h-11 ios-app:min-w-0 ios-app:flex-1 ios-app:items-center ios-app:justify-center ios-app:rounded-xl ios-app:px-2 ios-app:py-0 ios-app:text-base ios-app:leading-snug ios-app:font-semibold landscape:hidden max-h-[500px]:hidden ${
+                  className={`button-safe shrink-0 rounded-lg border px-3 py-2 text-center text-sm font-medium transition ios-app:flex ios-app:h-11 ios-app:min-w-0 ios-app:flex-1 ios-app:items-center ios-app:justify-center ios-app:rounded-xl ios-app:px-1 ios-app:py-0 ios-app:text-sm ios-app:leading-none ios-app:tracking-tight ios-app:font-semibold landscape:hidden max-h-[500px]:hidden ${
                     activeTab === id
                       ? 'border-white/25 bg-white/15 text-white ios-app:border-fuchsia-300/60 ios-app:bg-fuchsia-400/15 ios-app:text-white'
                       : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 ios-app:border-white/15 ios-app:bg-white/5 ios-app:text-white ios-app:hover:bg-white/10'
