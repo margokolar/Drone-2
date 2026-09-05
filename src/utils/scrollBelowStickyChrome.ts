@@ -29,13 +29,24 @@ export function syncStickyChromeLayoutOffsets(options?: {
     root.style.removeProperty(STICKY_CHROME_BOTTOM_VAR)
   }
 
+  // Prefer the visual/layout viewport so Capacitor iOS matches CSS 100dvh
+  // better than window.innerHeight (which can disagree after rotation).
+  const viewportHeight =
+    window.visualViewport?.height ?? document.documentElement.clientHeight ?? window.innerHeight
+  const viewportOffsetTop = window.visualViewport?.offsetTop ?? 0
+  const viewportBottom = viewportOffsetTop + viewportHeight
+
   const bottomNav = document.querySelector(bottomNavSelector)
   if (bottomNav instanceof HTMLElement) {
     const bottomNavRect = bottomNav.getBoundingClientRect()
-    root.style.setProperty(
-      BOTTOM_CHROME_HEIGHT_VAR,
-      `${Math.max(0, window.innerHeight - bottomNavRect.top)}px`,
-    )
+    if (bottomNavRect.height > 1) {
+      root.style.setProperty(
+        BOTTOM_CHROME_HEIGHT_VAR,
+        `${Math.max(0, viewportBottom - bottomNavRect.top)}px`,
+      )
+    } else {
+      root.style.removeProperty(BOTTOM_CHROME_HEIGHT_VAR)
+    }
   } else {
     root.style.removeProperty(BOTTOM_CHROME_HEIGHT_VAR)
   }

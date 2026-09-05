@@ -1946,9 +1946,15 @@ function App() {
     }
 
     window.addEventListener('resize', update)
+    window.addEventListener('orientationchange', update)
+    window.visualViewport?.addEventListener('resize', update)
+    window.visualViewport?.addEventListener('scroll', update)
     return () => {
       observer.disconnect()
       window.removeEventListener('resize', update)
+      window.removeEventListener('orientationchange', update)
+      window.visualViewport?.removeEventListener('resize', update)
+      window.visualViewport?.removeEventListener('scroll', update)
     }
   }, [activeTab])
 
@@ -2087,18 +2093,18 @@ function App() {
         />
       )}
       <div
-        className={`mx-auto w-full max-w-md px-3 pt-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
+        className={`mx-auto w-full max-w-md pt-0 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
           activeTab === 'presets' || activeTab === 'metronome'
             ? 'flex min-h-0 flex-1 flex-col pb-0'
             : activeTab === 'shine'
-              ? 'landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:pb-0 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:pb-0'
+              ? 'landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:pb-0 landscape:pt-[env(safe-area-inset-top,0px)] max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:pb-0 max-h-[500px]:pt-[env(safe-area-inset-top,0px)]'
               : 'pb-5'
         } ${activeTab === 'overtones' ? 'landscape:pt-0 max-h-[500px]:pt-0' : ''}`}
       >
         <div
           id={TONE_STICKY_CHROME_ID}
           ref={stickyChromeRef}
-          className={`sticky top-0 z-50 -mx-3 bg-[#111019] px-3 pb-2 pt-[env(safe-area-inset-top,0px)] ${
+          className={`sticky top-0 z-50 -ml-[max(0.75rem,env(safe-area-inset-left,0px))] -mr-[max(0.75rem,env(safe-area-inset-right,0px))] bg-[#111019] pb-2 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] pt-[env(safe-area-inset-top,0px)] ${
             activeTab === 'tone' ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}
         >
@@ -2724,7 +2730,10 @@ function App() {
           </div>
         </main>
       </div>
-      <div className="fixed bottom-0 left-0 right-0 z-30 px-3 pb-2" data-app-bottom-nav>
+      <div
+        className="fixed bottom-0 left-0 right-0 z-30 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]"
+        data-app-bottom-nav
+      >
         <div className="mx-auto w-full max-w-[26.5rem] space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-[62.5rem]">
           <nav
             className={`overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm ${
