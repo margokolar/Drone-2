@@ -184,16 +184,6 @@ select {
   }
 }
 
-.shine-harmonic-scroll {
-  scrollbar-gutter: stable;
-}
-
-@media (orientation: landscape), (max-height: 500px) {
-  .shine-harmonic-scroll {
-    scrollbar-width: thin;
-  }
-}
-
 .presets-column-scroll {
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
