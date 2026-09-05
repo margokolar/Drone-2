@@ -1852,6 +1852,32 @@ function App() {
     [activeTab, scrollToPageTop],
   )
 
+  const shineLandscapeTabBar = useMemo(
+    () => (
+      <div className="hidden min-w-0 flex-1 items-center justify-end gap-1 overflow-x-auto landscape:flex max-h-[500px]:flex">
+        {visibleTabs.map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === id}
+            aria-controls={`panel-${id}`}
+            id={`tab-${id}-shine-landscape`}
+            className={`button-safe shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+              activeTab === id
+                ? 'border-white/25 bg-white/15 text-white'
+                : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
+            }`}
+            onClick={() => handleTabChange(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    ),
+    [activeTab, handleTabChange, visibleTabs],
+  )
+
   const swipeStartRef = useRef<{ x: number; y: number; ignore: boolean } | null>(null)
 
   const handleSwipeTouchStart = useCallback(
@@ -2714,6 +2740,7 @@ function App() {
               tonalCenter={tonalCenter}
               onTonalCenterChange={setTonalCenter}
               onSaveDroneState={saveDroneState}
+              headerRightSlot={shineLandscapeTabBar}
             />
           </div>
         </main>

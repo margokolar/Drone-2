@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { Play, Save, Square } from 'lucide-react'
 import { SectionCard } from './SectionCard'
 import { ResettableRangeInput } from './ResettableRangeInput'
@@ -10,6 +10,7 @@ type ShineControlsProps = ShineState & {
   tonalCenter: TonalCenter
   onTonalCenterChange: (value: TonalCenter) => void
   onSaveDroneState: () => void
+  headerRightSlot?: ReactNode
 }
 
 type HarmonicBarProps = {
@@ -46,7 +47,7 @@ function HarmonicBar({
   const displayLevel = Math.min(1, Math.max(0, level))
 
   return (
-    <div className="flex min-w-0 flex-1 basis-0 flex-col items-center gap-1">
+    <div className="flex min-w-0 flex-1 basis-0 flex-col items-center gap-1 landscape:min-w-[1.875rem] landscape:flex-none landscape:gap-0.5 max-h-[500px]:min-w-[1.875rem] max-h-[500px]:flex-none">
       <div
         ref={trackRef}
         className={`relative w-full flex-1 overflow-hidden rounded-md border ${
@@ -129,6 +130,7 @@ export function ShineControls({
   tonalCenter,
   onTonalCenterChange,
   onSaveDroneState,
+  headerRightSlot,
 }: ShineControlsProps) {
   const allAuto = autos.every(Boolean)
   const allBumps = autos.some(Boolean) && autos.every((autoOn, index) => (autoOn ? bumps[index] : true))
@@ -140,7 +142,7 @@ export function ShineControls({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className={`button-safe flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.12em] transition ${
+            className={`button-safe flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.12em] transition landscape:min-h-10 landscape:px-4 landscape:py-2 landscape:text-xs max-h-[500px]:min-h-10 max-h-[500px]:px-4 max-h-[500px]:py-2 max-h-[500px]:text-xs ${
               enabled
                 ? 'border-amber-300/80 bg-amber-300/25 text-amber-50 shadow-[0_0_18px_rgba(251,191,36,0.28)] hover:bg-amber-300/35'
                 : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
@@ -153,9 +155,11 @@ export function ShineControls({
           </button>
         </div>
       }
+      rightSlot={headerRightSlot}
+      className="landscape:[&>header]:mb-2 max-h-[500px]:[&>header]:mb-2"
     >
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2">
+        <div className="flex flex-wrap items-center gap-2 landscape:hidden max-h-[500px]:hidden">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs uppercase tracking-[0.14em] text-white/50">All</span>
             <button
@@ -211,8 +215,12 @@ export function ShineControls({
           </div>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-[#292a36] p-2">
-          <div className="flex h-52 items-stretch gap-0.5" data-swipe-ignore>
+        <div className="landscape:mx-auto landscape:w-[calc(100%-0.25rem)] landscape:max-w-[34rem] max-h-[500px]:mx-auto max-h-[500px]:w-[calc(100%-0.25rem)] max-h-[500px]:max-w-[34rem]">
+          <div className="rounded-xl border border-white/10 bg-[#292a36] p-2 landscape:p-1.5 max-h-[500px]:p-1.5">
+            <div
+              className="shine-harmonic-scroll flex h-52 items-stretch gap-0.5 landscape:h-[8.25rem] landscape:max-h-[8.25rem] landscape:overflow-x-auto landscape:overscroll-x-contain max-h-[500px]:h-[8.25rem] max-h-[500px]:max-h-[8.25rem] max-h-[500px]:overflow-x-auto max-h-[500px]:overscroll-x-contain"
+              data-swipe-ignore
+            >
             {levels.map((level, index) => (
               <HarmonicBar
                 key={index}
@@ -225,10 +233,11 @@ export function ShineControls({
                 onToggleBumps={() => setBumps(index, !bumps[index])}
               />
             ))}
+            </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+        <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 landscape:hidden max-h-[500px]:hidden">
           <div className="mb-1 flex items-center justify-between">
             <span className="text-xs uppercase tracking-[0.16em] text-white/60">Volume</span>
             <span className="text-xs tabular-nums text-white/70">{Math.round(volume * 100)}%</span>
@@ -245,7 +254,7 @@ export function ShineControls({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 landscape:hidden max-h-[500px]:hidden">
           <label className="flex flex-col gap-1 text-xs uppercase tracking-[0.16em] text-white/60">
             Tonal center
             <select
@@ -266,7 +275,7 @@ export function ShineControls({
             <select
               value={octaveIndex}
               onChange={(event) => setOctaveIndex(Number(event.target.value))}
-              className="rounded-lg border border-white/15 bg-[#252332] px-2 py-2 text-sm text-white/90"
+              className="shine-octave-select rounded-lg border border-white/15 bg-[#252332] px-2 py-2 text-sm text-white/90"
             >
               {SHINE_OCTAVE_LABELS.map((label, index) => (
                 <option key={label} value={index}>
