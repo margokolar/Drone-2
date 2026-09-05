@@ -46,10 +46,10 @@ function HarmonicBar({
   const displayLevel = Math.min(1, Math.max(0, level))
 
   return (
-    <div className="flex min-w-0 flex-1 basis-0 flex-col items-center gap-1 landscape:h-full landscape:min-h-0 max-h-[500px]:h-full max-h-[500px]:min-h-0">
+    <div className="flex min-w-0 flex-1 basis-0 flex-col items-center gap-1 landscape:h-auto landscape:flex-none landscape:justify-end max-h-[500px]:h-auto max-h-[500px]:flex-none max-h-[500px]:justify-end">
       <div
         ref={trackRef}
-        className={`relative w-full min-h-0 flex-1 overflow-hidden rounded-md border ${
+        className={`relative w-full min-h-0 flex-1 overflow-hidden rounded-md border landscape:h-[6.75rem] landscape:max-h-[6.75rem] landscape:flex-none max-h-[500px]:h-[6.75rem] max-h-[500px]:max-h-[6.75rem] max-h-[500px]:flex-none ${
           auto ? 'border-fuchsia-500/40' : 'border-rose-900/60'
         } bg-black`}
         style={{ touchAction: 'none' }}
@@ -76,10 +76,10 @@ function HarmonicBar({
           style={{ height: `${displayLevel * 100}%` }}
         />
       </div>
-      <span className="text-[10px] tabular-nums text-white/60">{harmonicNumber}</span>
+      <span className="shrink-0 text-[10px] tabular-nums text-white/60">{harmonicNumber}</span>
       <button
         type="button"
-        className={`text-[11px] font-bold leading-none transition ${
+        className={`shrink-0 text-[11px] font-bold leading-none transition ${
           auto ? 'text-cyan-300' : 'text-white/50 hover:text-white/80'
         }`}
         onClick={onToggleAuto}
@@ -91,7 +91,7 @@ function HarmonicBar({
       <button
         type="button"
         disabled={!auto}
-        className={`text-[11px] font-bold leading-none transition ${
+        className={`shrink-0 text-[11px] font-bold leading-none transition ${
           !auto
             ? 'text-white/20'
             : bumps
@@ -219,19 +219,18 @@ export function ShineControls({
           {allControlsRow}
         </div>
       }
-      className="landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:overflow-hidden landscape:[&>header]:mb-2 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:overflow-hidden max-h-[500px]:[&>header]:mb-2"
+      className="landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:overflow-hidden landscape:pb-0 landscape:[&>header]:mb-2 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:overflow-hidden max-h-[500px]:pb-0 max-h-[500px]:[&>header]:mb-2"
     >
       <div className="space-y-4 landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:space-y-0 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:space-y-0">
         <div className="flex flex-wrap items-center gap-2 landscape:hidden max-h-[500px]:hidden">
           {allControlsRow}
         </div>
 
-        <div className="landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col">
-          <div className="rounded-xl border border-white/10 bg-[#292a36] p-2 landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:p-1.5 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:p-1.5">
-            <div
-              className="flex h-52 items-stretch gap-0.5 landscape:h-auto landscape:min-h-0 landscape:flex-1 max-h-[500px]:h-auto max-h-[500px]:min-h-0 max-h-[500px]:flex-1"
-              data-swipe-ignore
-            >
+        <div className="landscape:mt-auto landscape:flex-none max-h-[500px]:mt-auto max-h-[500px]:flex-none">
+          <div
+            className="flex h-52 items-stretch gap-0.5 landscape:h-auto landscape:items-end max-h-[500px]:h-auto max-h-[500px]:items-end"
+            data-swipe-ignore
+          >
             {levels.map((level, index) => (
               <HarmonicBar
                 key={index}
@@ -244,7 +243,6 @@ export function ShineControls({
                 onToggleBumps={() => setBumps(index, !bumps[index])}
               />
             ))}
-            </div>
           </div>
         </div>
 

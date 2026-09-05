@@ -2727,7 +2727,9 @@ function App() {
       <div className="fixed bottom-0 left-0 right-0 z-30 px-3 pb-2" data-app-bottom-nav>
         <div className="mx-auto w-full max-w-[26.5rem] space-y-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-[62.5rem]">
           <nav
-            className="overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm"
+            className={`overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm ${
+              activeTab !== 'overtones' ? 'landscape:hidden max-h-[500px]:hidden' : ''
+            }`}
             aria-label="App sections"
           >
             <div className="flex w-max min-w-full items-center justify-center gap-1 landscape:w-full max-h-[500px]:w-full">
