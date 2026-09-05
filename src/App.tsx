@@ -2044,9 +2044,11 @@ function App() {
       className={`relative bg-[#111019] text-[#f2f2f7] ${
         activeTab === 'metronome' || activeTab === 'presets'
           ? 'flex h-[100dvh] flex-col overflow-hidden overscroll-none'
-          : iphone16ProMaxPreview
-            ? 'min-h-full min-w-0'
-            : 'min-h-screen'
+          : activeTab === 'shine'
+            ? 'landscape:flex landscape:h-[100dvh] landscape:flex-col landscape:overflow-hidden landscape:overscroll-none max-h-[500px]:flex max-h-[500px]:h-[100dvh] max-h-[500px]:flex-col max-h-[500px]:overflow-hidden max-h-[500px]:overscroll-none'
+            : iphone16ProMaxPreview
+              ? 'min-h-full min-w-0'
+              : 'min-h-screen'
       }`}
     >
       <div
@@ -2088,7 +2090,9 @@ function App() {
         className={`mx-auto w-full max-w-md px-3 pt-0 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
           activeTab === 'presets' || activeTab === 'metronome'
             ? 'flex min-h-0 flex-1 flex-col pb-0'
-            : 'pb-5'
+            : activeTab === 'shine'
+              ? 'landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:pb-0 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:pb-0'
+              : 'pb-5'
         } ${activeTab === 'overtones' ? 'landscape:pt-0 max-h-[500px]:pt-0' : ''}`}
       >
         <div
@@ -2236,7 +2240,9 @@ function App() {
               ? 'pb-32'
               : activeTab === 'presets'
                 ? 'flex min-h-0 flex-1 flex-col pb-0'
-                : 'pb-44'
+                : activeTab === 'shine'
+                  ? 'landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:pb-0 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:pb-0'
+                  : 'pb-44'
           }`}
           onTouchStart={handleSwipeTouchStart}
           onTouchEnd={handleSwipeTouchEnd}
@@ -2703,7 +2709,7 @@ function App() {
             />
           </div>
           <div
-            className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
+            className="space-y-4 landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:space-y-0 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:space-y-0"
             role="tabpanel"
             id="panel-shine"
             aria-labelledby="tab-shine"

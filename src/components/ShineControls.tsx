@@ -46,10 +46,10 @@ function HarmonicBar({
   const displayLevel = Math.min(1, Math.max(0, level))
 
   return (
-    <div className="flex min-w-0 flex-1 basis-0 flex-col items-center gap-1 landscape:min-w-[1.875rem] landscape:flex-none landscape:gap-0.5 max-h-[500px]:min-w-[1.875rem] max-h-[500px]:flex-none">
+    <div className="flex min-w-0 flex-1 basis-0 flex-col items-center gap-1 landscape:h-full landscape:min-h-0 max-h-[500px]:h-full max-h-[500px]:min-h-0">
       <div
         ref={trackRef}
-        className={`relative w-full flex-1 overflow-hidden rounded-md border ${
+        className={`relative w-full min-h-0 flex-1 overflow-hidden rounded-md border ${
           auto ? 'border-fuchsia-500/40' : 'border-rose-900/60'
         } bg-black`}
         style={{ touchAction: 'none' }}
@@ -219,17 +219,17 @@ export function ShineControls({
           {allControlsRow}
         </div>
       }
-      className="landscape:[&>header]:mb-2 max-h-[500px]:[&>header]:mb-2"
+      className="landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:overflow-hidden landscape:[&>header]:mb-2 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:overflow-hidden max-h-[500px]:[&>header]:mb-2"
     >
-      <div className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2">
+      <div className="space-y-4 landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:space-y-0 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:space-y-0">
         <div className="flex flex-wrap items-center gap-2 landscape:hidden max-h-[500px]:hidden">
           {allControlsRow}
         </div>
 
-        <div className="landscape:mx-auto landscape:w-[calc(100%-0.25rem)] landscape:max-w-[34rem] max-h-[500px]:mx-auto max-h-[500px]:w-[calc(100%-0.25rem)] max-h-[500px]:max-w-[34rem]">
-          <div className="rounded-xl border border-white/10 bg-[#292a36] p-2 landscape:p-1.5 max-h-[500px]:p-1.5">
+        <div className="landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col">
+          <div className="rounded-xl border border-white/10 bg-[#292a36] p-2 landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:p-1.5 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:p-1.5">
             <div
-              className="shine-harmonic-scroll flex h-52 items-stretch gap-0.5 landscape:h-40 landscape:max-h-40 landscape:overflow-x-auto landscape:overscroll-x-contain max-h-[500px]:h-40 max-h-[500px]:max-h-40 max-h-[500px]:overflow-x-auto max-h-[500px]:overscroll-x-contain"
+              className="flex h-52 items-stretch gap-0.5 landscape:h-auto landscape:min-h-0 landscape:flex-1 max-h-[500px]:h-auto max-h-[500px]:min-h-0 max-h-[500px]:flex-1"
               data-swipe-ignore
             >
             {levels.map((level, index) => (
