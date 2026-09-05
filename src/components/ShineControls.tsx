@@ -133,28 +133,31 @@ export function ShineControls({
   const allAuto = autos.every(Boolean)
   const allBumps = autos.some(Boolean) && autos.every((autoOn, index) => (autoOn ? bumps[index] : true))
 
+  const shineActionButtonClass =
+    'button-safe flex min-h-[44px] shrink-0 items-center justify-center rounded-xl border px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.12em] transition landscape:min-h-10 landscape:px-4 landscape:py-2 landscape:text-xs max-h-[500px]:min-h-10 max-h-[500px]:px-4 max-h-[500px]:py-2 max-h-[500px]:text-xs'
+
   const allControlsRow = (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs uppercase tracking-[0.14em] text-white/50 landscape:hidden max-h-[500px]:hidden">
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.14em] text-white/50 landscape:tracking-[0.12em] max-h-[500px]:tracking-[0.12em]">
         All
       </span>
       <button
         type="button"
-        className="button-safe min-w-[3.5rem] rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-center text-xs font-medium text-white/80 transition hover:bg-white/10 landscape:min-w-[2.75rem] landscape:px-2 landscape:py-1 landscape:text-[10px] max-h-[500px]:min-w-[2.75rem] max-h-[500px]:px-2 max-h-[500px]:py-1 max-h-[500px]:text-[10px]"
+        className={`${shineActionButtonClass} border-white/15 bg-white/5 text-white/80 hover:bg-white/10`}
         onClick={allOn}
       >
         On
       </button>
       <button
         type="button"
-        className="button-safe min-w-[3.5rem] rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-center text-xs font-medium text-white/80 transition hover:bg-white/10 landscape:min-w-[2.75rem] landscape:px-2 landscape:py-1 landscape:text-[10px] max-h-[500px]:min-w-[2.75rem] max-h-[500px]:px-2 max-h-[500px]:py-1 max-h-[500px]:text-[10px]"
+        className={`${shineActionButtonClass} border-white/15 bg-white/5 text-white/80 hover:bg-white/10`}
         onClick={allOff}
       >
         Off
       </button>
       <button
         type="button"
-        className={`button-safe min-w-[3.5rem] rounded-lg border px-2.5 py-1.5 text-center text-xs font-medium transition landscape:min-w-[2.75rem] landscape:px-2 landscape:py-1 landscape:text-[10px] max-h-[500px]:min-w-[2.75rem] max-h-[500px]:px-2 max-h-[500px]:py-1 max-h-[500px]:text-[10px] ${
+        className={`${shineActionButtonClass} ${
           allAuto
             ? 'border-cyan-300/60 bg-cyan-300/20 text-cyan-50'
             : 'border-white/15 bg-white/5 text-white/80 hover:bg-white/10'
@@ -166,7 +169,7 @@ export function ShineControls({
       </button>
       <button
         type="button"
-        className={`button-safe min-w-[3.5rem] rounded-lg border px-2.5 py-1.5 text-center text-xs font-medium transition landscape:min-w-[2.75rem] landscape:px-2 landscape:py-1 landscape:text-[10px] max-h-[500px]:min-w-[2.75rem] max-h-[500px]:px-2 max-h-[500px]:py-1 max-h-[500px]:text-[10px] ${
+        className={`${shineActionButtonClass} ${
           allBumps
             ? 'border-cyan-300/60 bg-cyan-300/20 text-cyan-50'
             : 'border-white/15 bg-white/5 text-white/80 hover:bg-white/10'
@@ -178,7 +181,7 @@ export function ShineControls({
       </button>
       <button
         type="button"
-        className="button-safe flex min-w-[3.5rem] items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] px-2.5 py-1.5 text-xs text-white/80 transition hover:bg-[#352a48] landscape:min-w-[2.75rem] landscape:px-2 landscape:py-1 max-h-[500px]:min-w-[2.75rem] max-h-[500px]:px-2 max-h-[500px]:py-1"
+        className={`${shineActionButtonClass} border-white/15 bg-[#2a2238] px-4 text-white/80 hover:bg-[#352a48] landscape:px-3 max-h-[500px]:px-3`}
         onClick={(event) => {
           triggerSaveFlash(event.currentTarget)
           onSaveDroneState()
@@ -186,7 +189,7 @@ export function ShineControls({
         aria-label="Save drone state"
         title="Save drone state"
       >
-        <Save size={16} />
+        <Save size={18} />
       </button>
     </div>
   )
@@ -198,7 +201,7 @@ export function ShineControls({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className={`button-safe flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.12em] transition landscape:min-h-10 landscape:px-4 landscape:py-2 landscape:text-xs max-h-[500px]:min-h-10 max-h-[500px]:px-4 max-h-[500px]:py-2 max-h-[500px]:text-xs ${
+            className={`${shineActionButtonClass} gap-2 ${
               enabled
                 ? 'border-amber-300/80 bg-amber-300/25 text-amber-50 shadow-[0_0_18px_rgba(251,191,36,0.28)] hover:bg-amber-300/35'
                 : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
@@ -226,7 +229,7 @@ export function ShineControls({
         <div className="landscape:mx-auto landscape:w-[calc(100%-0.25rem)] landscape:max-w-[34rem] max-h-[500px]:mx-auto max-h-[500px]:w-[calc(100%-0.25rem)] max-h-[500px]:max-w-[34rem]">
           <div className="rounded-xl border border-white/10 bg-[#292a36] p-2 landscape:p-1.5 max-h-[500px]:p-1.5">
             <div
-              className="shine-harmonic-scroll flex h-52 items-stretch gap-0.5 landscape:h-[8.25rem] landscape:max-h-[8.25rem] landscape:overflow-x-auto landscape:overscroll-x-contain max-h-[500px]:h-[8.25rem] max-h-[500px]:max-h-[8.25rem] max-h-[500px]:overflow-x-auto max-h-[500px]:overscroll-x-contain"
+              className="shine-harmonic-scroll flex h-52 items-stretch gap-0.5 landscape:h-40 landscape:max-h-40 landscape:overflow-x-auto landscape:overscroll-x-contain max-h-[500px]:h-40 max-h-[500px]:max-h-40 max-h-[500px]:overflow-x-auto max-h-[500px]:overscroll-x-contain"
               data-swipe-ignore
             >
             {levels.map((level, index) => (
