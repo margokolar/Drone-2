@@ -1,3 +1,6 @@
+import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
+
 type ConfirmDialogProps = {
   open: boolean
   title: string
@@ -15,18 +18,38 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+    const previousHtmlOverflow = document.documentElement.style.overflow
+    const previousBodyOverflow = document.body.style.overflow
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow
+      document.body.style.overflow = previousBodyOverflow
+    }
+  }, [open])
+
   if (!open) {
     return null
   }
 
-  return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black p-4">
+      <button
+        type="button"
+        className="absolute inset-0"
+        aria-label="Cancel"
+        onClick={onCancel}
+      />
       <div
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-message"
-        className="w-full max-w-sm rounded-xl border border-white/15 bg-[#1b1827] p-4 shadow-2xl"
+        className="relative z-[201] w-full max-w-sm rounded-xl border border-white/15 bg-[#1b1827] p-4 shadow-2xl"
       >
         <h2 id="confirm-dialog-title" className="text-sm font-semibold text-white">
           {title}
@@ -51,6 +74,7 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
