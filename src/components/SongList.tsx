@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { ArrowDown, ArrowUp, Check, Copy, Pencil, Trash2 } from 'lucide-react'
 import { useRef, useState, useMemo } from 'react'
 import { flushSync } from 'react-dom'
+import { ConfirmDialog } from './ConfirmDialog'
 import { NavigationCheckbox } from './NavigationCheckbox'
 
 type SongEntry = {
@@ -33,6 +34,7 @@ export function SongList({
 }: SongListProps) {
   const [editingSongId, setEditingSongId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
+  const [pendingDeleteSongId, setPendingDeleteSongId] = useState<string | null>(null)
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const renameBlurTimeoutRef = useRef<number | null>(null)
   const renameIgnoreBlurRef = useRef(false)
@@ -97,8 +99,28 @@ export function SongList({
     return [...enabledSongs, ...disabledSongs]
   }, [songLibrary])
 
+  const pendingDeleteSong = pendingDeleteSongId
+    ? songLibrary.find((song) => song.id === pendingDeleteSongId)
+    : null
+
   return (
     <div className="space-y-1.5">
+      <ConfirmDialog
+        open={pendingDeleteSong !== null}
+        title="Delete song?"
+        message={
+          pendingDeleteSong
+            ? `Delete “${pendingDeleteSong.name}” and all its presets? This cannot be undone.`
+            : ''
+        }
+        onConfirm={() => {
+          if (pendingDeleteSongId) {
+            onDeleteSong(pendingDeleteSongId)
+          }
+          setPendingDeleteSongId(null)
+        }}
+        onCancel={() => setPendingDeleteSongId(null)}
+      />
       {displayedSongs.map((song) => {
         const isActive = song.name === songName
         const isNavigationEnabled = song.enabled !== false
@@ -278,7 +300,7 @@ export function SongList({
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation()
-                        onDeleteSong(song.id)
+                        setPendingDeleteSongId(song.id)
                       }}
                       className={clsx(deleteButtonClass, 'ml-auto shrink-0')}
                       aria-label="Delete song"

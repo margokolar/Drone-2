@@ -4,8 +4,13 @@ import { useRef, useState, useMemo } from 'react'
 import { flushSync } from 'react-dom'
 import type { Preset } from '../presets/defaultPresets'
 import { resolveActivePresetHighlightKey, type PresetNavigationEntry } from '../presets/presetNavigation'
+import { ConfirmDialog } from './ConfirmDialog'
 import { PlayPauseIcon } from './PlayPauseIcon'
 import { NavigationCheckbox } from './NavigationCheckbox'
+
+type PendingDelete =
+  | { kind: 'preset'; id: string; name: string }
+  | { kind: 'transport'; id: string }
 
 type PresetListProps = {
   presets: Preset[]
@@ -42,6 +47,7 @@ export function PresetList({
 }: PresetListProps) {
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const renameBlurTimeoutRef = useRef<number | null>(null)
   const renameIgnoreBlurRef = useRef(false)
@@ -116,8 +122,33 @@ export function PresetList({
     return [...enabledEntries, ...disabledEntries]
   }, [presetNavigation, presets])
 
+  const confirmDelete = () => {
+    if (!pendingDelete) {
+      return
+    }
+    if (pendingDelete.kind === 'preset') {
+      onDeletePreset(pendingDelete.id)
+    } else {
+      onDeleteTransportMarker(pendingDelete.id)
+    }
+    setPendingDelete(null)
+  }
+
   return (
     <div className="space-y-3">
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={
+          pendingDelete?.kind === 'transport' ? 'Delete play/pause marker?' : 'Delete preset?'
+        }
+        message={
+          pendingDelete?.kind === 'preset'
+            ? `Delete “${pendingDelete.name}”? This cannot be undone.`
+            : 'Remove this play/pause marker from the preset list?'
+        }
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
       <div className="space-y-1.5">
         {displayedNavigation.map((entry) => {
           if (entry.kind === 'transport') {
@@ -191,7 +222,7 @@ export function PresetList({
                     type="button"
                     onClick={(event) => {
                       event.stopPropagation()
-                      onDeleteTransportMarker(entry.id)
+                      setPendingDelete({ kind: 'transport', id: entry.id })
                     }}
                     className={clsx(deleteButtonClass, 'ml-auto shrink-0')}
                     aria-label="Delete play/pause marker"
@@ -398,7 +429,7 @@ export function PresetList({
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation()
-                          onDeletePreset(preset.id)
+                          setPendingDelete({ kind: 'preset', id: preset.id, name: preset.name })
                         }}
                         className={clsx(deleteButtonClass, 'ml-auto shrink-0')}
                         aria-label="Delete preset"
