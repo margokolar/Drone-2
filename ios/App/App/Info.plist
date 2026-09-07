@@ -49,6 +49,8 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Drone uses the microphone so ADD can follow your pitch and tune the drone.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Drone connects to Bluetooth MIDI devices such as the Scribble display.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

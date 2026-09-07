@@ -188,6 +188,7 @@ type DroneState = {
   saveAsNewSong: (songName?: string) => void
   renameSongInLibrary: (songId: string, name: string) => void
   duplicateSongInLibrary: (songId: string) => void
+  importPresetsFromSong: (sourceSongId: string, sourcePresetIds: string[]) => void
   selectNextSong: () => void
   selectPreviousSong: () => void
 }
@@ -1597,6 +1598,58 @@ export const useDroneStore = create<DroneState>()(
           }
           return {
             songLibrary: [...state.songLibrary, newSong],
+          }
+        }),
+      importPresetsFromSong: (sourceSongId, sourcePresetIds) =>
+        set((state) => {
+          if (sourcePresetIds.length === 0) {
+            return state
+          }
+          const sourceSong = state.songLibrary.find((entry) => entry.id === sourceSongId)
+          if (!sourceSong) {
+            return state
+          }
+          const currentSong = state.songLibrary.find((entry) => entry.name === state.songName)
+          const sourcePresets =
+            currentSong?.id === sourceSongId
+              ? state.presets
+              : sourceSong.presets
+          const existingNames = new Set(state.presets.map((preset) => preset.name))
+          const importedPresets: Preset[] = []
+          const navigationAdds: PresetNavigationEntry[] = []
+          for (const sourcePresetId of sourcePresetIds) {
+            const sourcePreset = sourcePresets.find((preset) => preset.id === sourcePresetId)
+            if (!sourcePreset) {
+              continue
+            }
+            const duplicate = duplicatePresetData(sourcePreset)
+            duplicate.id = `preset-${Date.now()}-${importedPresets.length}`
+            let resolvedName = sourcePreset.name.trim() || 'Preset'
+            if (existingNames.has(resolvedName)) {
+              let suffix = 2
+              while (existingNames.has(`${sourcePreset.name} ${suffix}`)) {
+                suffix += 1
+              }
+              resolvedName = `${sourcePreset.name} ${suffix}`
+            }
+            duplicate.name = resolvedName
+            existingNames.add(resolvedName)
+            importedPresets.push(duplicate)
+            navigationAdds.push({ kind: 'preset', presetId: duplicate.id })
+          }
+          if (importedPresets.length === 0) {
+            return state
+          }
+          const presets = [...state.presets, ...importedPresets]
+          const presetNavigation = [...state.presetNavigation, ...navigationAdds]
+          return {
+            presets,
+            presetNavigation,
+            ...syncPresetsToCurrentSong({
+              ...state,
+              presets,
+              presetNavigation,
+            }),
           }
         }),
       selectNextSong: () => {

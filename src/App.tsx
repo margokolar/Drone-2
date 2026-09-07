@@ -55,6 +55,7 @@ import { OvertoneAllSoloButton, OvertoneToneNavControls, HarmonicTimbreToggleBut
 import { OvertoneMidiPanel } from './components/OvertoneMidiPanel'
 import { PartialEditor } from './components/PartialEditor'
 import { TimbreMorphSlider } from './components/TimbreMorphSlider'
+import { ImportPresetsFromSong } from './components/ImportPresetsFromSong'
 import { PresetList } from './components/PresetList'
 import { SongList } from './components/SongList'
 import { ResettableRangeInput } from './components/ResettableRangeInput'
@@ -82,6 +83,8 @@ import { useDroneStore } from './store/useDroneStore'
 import { startNativeAudioSessionGuard } from './native/startNativeAudioSessionGuard'
 import { BtControlMenuSection } from './bluetooth/BtControlMenuSection'
 import { useBtControl } from './bluetooth/useBtControl'
+import { useScribbleDisplay } from './hooks/useScribbleDisplay'
+import { ScribbleMenuSection } from './scribble/ScribbleMenuSection'
 import { BLE_KEYBOARD_FOCUS_ROOT_ID } from './utils/restoreBleKeyboardFocus'
 import { BleDebugOverlay } from './components/BleDebugOverlay'
 import { bleDebugEnabled, recordBleDebug } from './utils/bleDebug'
@@ -519,6 +522,7 @@ function App() {
   const loadPreset = useDroneStore((state) => state.loadPreset)
   const renamePreset = useDroneStore((state) => state.renamePreset)
   const duplicatePreset = useDroneStore((state) => state.duplicatePreset)
+  const importPresetsFromSong = useDroneStore((state) => state.importPresetsFromSong)
   const deletePreset = useDroneStore((state) => state.deletePreset)
   const insertTransportMarkerAfter = useDroneStore((state) => state.insertTransportMarkerAfter)
   const deleteTransportMarker = useDroneStore((state) => state.deleteTransportMarker)
@@ -1724,6 +1728,14 @@ function App() {
     songName,
   })
 
+  const scribble = useScribbleDisplay({
+    songName,
+    activePresetId,
+    presets,
+    presetNavigation,
+    songLibrary,
+  })
+
   useEffect(() => {
     useDroneStore.setState((state) => ({
       tones: state.tones.map((tone) => (toneSetNoteIds.has(tone.noteId) ? tone : { ...tone, enabled: false })),
@@ -2653,6 +2665,11 @@ function App() {
                     Presets
                   </h3>
                   <div className="presets-column-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                    <ImportPresetsFromSong
+                      songName={songName}
+                      songLibrary={songLibrary}
+                      onImport={importPresetsFromSong}
+                    />
                     <PresetList
                       presets={presets}
                       presetNavigation={presetNavigation}
@@ -2954,6 +2971,9 @@ function App() {
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain">
               <div data-keep-menu-open>
                 <BtControlMenuSection />
+              </div>
+              <div data-keep-menu-open>
+                <ScribbleMenuSection scribble={scribble} />
               </div>
               <button
                 type="button"
