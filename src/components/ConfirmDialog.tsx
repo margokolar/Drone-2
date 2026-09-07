@@ -20,13 +20,13 @@ export function ConfirmDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/65 p-4">
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black p-4">
       <div
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-message"
-        className="w-full max-w-sm rounded-xl border border-white/15 bg-[#252332] p-4 shadow-2xl"
+        className="w-full max-w-sm rounded-xl border border-white/15 bg-[#1b1827] p-4 shadow-2xl"
       >
         <h2 id="confirm-dialog-title" className="text-sm font-semibold text-white">
           {title}
