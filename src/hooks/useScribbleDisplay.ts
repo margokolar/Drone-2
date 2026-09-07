@@ -61,6 +61,7 @@ type SongLibraryEntry = {
 type UseScribbleDisplayArgs = {
   songName: string
   activePresetId: string
+  activeNavigationKey: string
   presets: Preset[]
   presetNavigation: PresetNavigationEntry[]
   songLibrary: SongLibraryEntry[]
@@ -74,6 +75,7 @@ function pickScribbleEndpoint(endpoints: MidiEndpoint[]): MidiEndpoint | null {
 export function useScribbleDisplay({
   songName,
   activePresetId,
+  activeNavigationKey,
   presets,
   presetNavigation,
   songLibrary,
@@ -109,8 +111,15 @@ export function useScribbleDisplay({
   slotMapRef.current = slotMap
 
   const currentSlot = useMemo(
-    () => resolveScribbleSlot(slotMap, songName, activePresetId, activePresetName),
-    [activePresetId, activePresetName, slotMap, songName],
+    () =>
+      resolveScribbleSlot(
+        slotMap,
+        songName,
+        activePresetId,
+        activePresetName,
+        activeNavigationKey,
+      ),
+    [activeNavigationKey, activePresetId, activePresetName, slotMap, songName],
   )
 
   const setSettings = useCallback((patch: Partial<ScribbleSettings>) => {
@@ -293,7 +302,7 @@ export function useScribbleDisplay({
           suppressIncomingRef.current = false
         }, 150)
       })
-  }, [activePresetId, currentSlot, settings.channel, settings.destinationId, settings.enabled, setSettings])
+  }, [activeNavigationKey, activePresetId, currentSlot, settings.channel, settings.destinationId, settings.enabled, setSettings])
 
   return {
     supported: isIosApp(),

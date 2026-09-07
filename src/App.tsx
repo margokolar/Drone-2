@@ -1731,6 +1731,7 @@ function App() {
   const scribble = useScribbleDisplay({
     songName,
     activePresetId,
+    activeNavigationKey,
     presets,
     presetNavigation,
     songLibrary,

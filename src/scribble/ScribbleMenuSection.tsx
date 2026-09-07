@@ -132,7 +132,7 @@ export function ScribbleMenuSection({ scribble }: ScribbleMenuSectionProps) {
                 {scribble.lastSentSlot === scribble.currentSlot ? ' (sent)' : ''}
               </p>
             ) : (
-              <p className="mt-1">Current preset is not in the slot map.</p>
+              <p className="mt-1">Current selection is not in the slot map.</p>
             )}
           </div>
 

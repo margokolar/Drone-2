@@ -6,13 +6,23 @@ import {
   type PresetNavigationEntry,
 } from '../presets/presetNavigation'
 
-export type ScribbleSlotEntry = {
+export type ScribblePresetSlotEntry = {
+  kind: 'preset'
   /** 0–127 (Scribble preset 1–128) */
   slot: number
   songName: string
   presetName: string
   presetId: string
 }
+
+export type ScribbleTransportSlotEntry = {
+  kind: 'transport'
+  slot: number
+  songName: string
+  markerId: string
+}
+
+export type ScribbleSlotEntry = ScribblePresetSlotEntry | ScribbleTransportSlotEntry
 
 export type ScribbleSongSource = {
   name: string
@@ -22,6 +32,7 @@ export type ScribbleSongSource = {
 }
 
 const SCRIBBLE_MAX_SLOTS = 128
+const SCRIBBLE_TRANSPORT_LABEL = 'Play/Pause'
 
 function truncateForScribble(text: string, max: number): string {
   const trimmed = text.trim()
@@ -43,17 +54,24 @@ export function buildScribbleSlotMap(songs: ScribbleSongSource[]): ScribbleSlotE
     )
     const enabled = getEnabledNavigationEntries(navigation, song.presets)
     for (const entry of enabled) {
-      if (entry.kind !== 'preset') {
-        continue
-      }
       if (entries.length >= SCRIBBLE_MAX_SLOTS) {
         return entries
+      }
+      if (entry.kind === 'transport') {
+        entries.push({
+          kind: 'transport',
+          slot: entries.length,
+          songName: song.name,
+          markerId: entry.id,
+        })
+        continue
       }
       const preset = song.presets.find((item) => item.id === entry.presetId)
       if (!preset) {
         continue
       }
       entries.push({
+        kind: 'preset',
         slot: entries.length,
         songName: song.name,
         presetName: preset.name,
@@ -69,16 +87,35 @@ export function resolveScribbleSlot(
   songName: string,
   activePresetId: string,
   activePresetName?: string,
+  activeNavigationKey?: string,
 ): number | null {
+  if (activeNavigationKey) {
+    const transportSlot = map.find(
+      (entry) =>
+        entry.kind === 'transport' &&
+        entry.songName === songName &&
+        entry.markerId === activeNavigationKey,
+    )
+    if (transportSlot) {
+      return transportSlot.slot
+    }
+  }
+
   const byId = map.find(
-    (entry) => entry.songName === songName && entry.presetId === activePresetId,
+    (entry) =>
+      entry.kind === 'preset' &&
+      entry.songName === songName &&
+      entry.presetId === activePresetId,
   )
   if (byId) {
     return byId.slot
   }
   if (activePresetName) {
     const byName = map.find(
-      (entry) => entry.songName === songName && entry.presetName === activePresetName,
+      (entry) =>
+        entry.kind === 'preset' &&
+        entry.songName === songName &&
+        entry.presetName === activePresetName,
     )
     return byName?.slot ?? null
   }
@@ -97,19 +134,26 @@ export function formatScribbleSetupGuide(map: ScribbleSlotEntry[]): string {
   const lines = [
     'Drone → Scribble slot map',
     'Configure each Scribble preset in edit.piratemidi.com:',
-    '  Primary line (12 chars) = preset name',
+    '  Primary line (12 chars) = preset name or "Play/Pause"',
     '  Secondary line (16 chars) = song name',
     '',
   ]
   for (const entry of map) {
-    const presetLine = truncateForScribble(entry.presetName, 12)
     const songLine = truncateForScribble(entry.songName, 16)
+    if (entry.kind === 'transport') {
+      const primaryLine = truncateForScribble(SCRIBBLE_TRANSPORT_LABEL, 12)
+      lines.push(
+        `Scribble ${entry.slot + 1}: "${primaryLine}" / "${songLine}"  (Play/Pause · ${entry.songName})`,
+      )
+      continue
+    }
+    const presetLine = truncateForScribble(entry.presetName, 12)
     lines.push(
       `Scribble ${entry.slot + 1}: "${presetLine}" / "${songLine}"  (${entry.presetName} · ${entry.songName})`,
     )
   }
   if (map.length >= SCRIBBLE_MAX_SLOTS) {
-    lines.push('', 'Note: only the first 128 preset slots are listed.')
+    lines.push('', 'Note: only the first 128 navigation slots are listed.')
   }
   return lines.join('\n')
 }
