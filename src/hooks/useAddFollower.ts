@@ -239,6 +239,10 @@ export function useAddFollower(): AddFollowerState {
     setMicError(null)
 
     try {
+      if (Capacitor.isNativePlatform()) {
+        setMicError('ADD mikrofon ei ole iOS-äpis veel olemas.')
+        return
+      }
       // Activate iOS media audio routing synchronously in the user gesture so
       // output goes to the Bluetooth speaker (not the phone receiver) during
       // mic capture. Web Audio alone does not trigger this route.

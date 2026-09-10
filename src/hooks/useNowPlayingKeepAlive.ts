@@ -1,6 +1,7 @@
 import { useEffect, type RefObject } from 'react'
 import { droneEngine } from '../audio/DroneEngine'
 import { useDroneStore } from '../store/useDroneStore'
+import { isCapacitorNative } from '../utils/platform'
 import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
 
 /** Keep iOS Now Playing + silent anchor continuously active so BlueTurn keydowns survive idle. */
@@ -11,9 +12,11 @@ export function useNowPlayingKeepAlive(mediaAnchorRef: RefObject<HTMLAudioElemen
     }
 
     const assertPlayingSession = () => {
-      const anchor = mediaAnchorRef.current
-      if (anchor?.paused) {
-        void anchor.play().catch(() => {})
+      if (!isCapacitorNative()) {
+        const anchor = mediaAnchorRef.current
+        if (anchor?.paused) {
+          void anchor.play().catch(() => {})
+        }
       }
       if ('mediaSession' in navigator) {
         try {

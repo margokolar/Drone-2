@@ -9,6 +9,8 @@
 
 import { dbToGain } from './audioMath'
 import { MIN_AUDIBLE_GAIN, scheduleSmoothFadeIn, scheduleSmoothFadeOut } from './fadeCurves'
+import { isNativeSynth } from './isNativeSynth'
+import { DroneSynth } from '../native/droneSynth'
 
 export const SHINE_HARMONIC_COUNT = 16
 
@@ -96,6 +98,9 @@ export class ShineEngine {
     .map((_, index) => basePanForHarmonic(index + 1))
 
   private ensureContext(): AudioContext {
+    if (isNativeSynth()) {
+      throw new Error('Web Audio is not used in the iOS app')
+    }
     if (this.context) {
       return this.context
     }
@@ -162,12 +167,29 @@ export class ShineEngine {
   }
 
   crossfadePresetApply(applyConfig: () => void): void {
-    if (!this.running || !this.context || !this.masterGain) {
+    if (!this.running || (!isNativeSynth() && (!this.context || !this.masterGain))) {
       applyConfig()
       return
     }
     const duration = this.presetCrossfadeSeconds
     if (duration <= 0) {
+      applyConfig()
+      return
+    }
+    if (isNativeSynth()) {
+      if (this.pendingPresetCrossfadeTimer !== null) {
+        window.clearTimeout(this.pendingPresetCrossfadeTimer)
+        this.pendingPresetCrossfadeTimer = null
+      }
+      this.pendingPresetCrossfadeTimer = window.setTimeout(() => {
+        this.pendingPresetCrossfadeTimer = null
+        applyConfig()
+        const resumeAt = this.nowSeconds()
+        this.gainFadeInEndTime = resumeAt + duration
+      }, duration * 1000 + 20)
+      return
+    }
+    if (!this.context || !this.masterGain) {
       applyConfig()
       return
     }
@@ -226,7 +248,22 @@ export class ShineEngine {
     }
   }
 
+  private nowSeconds(): number {
+    if (isNativeSynth()) {
+      return performance.now() / 1000
+    }
+    return this.context?.currentTime ?? 0
+  }
+
   async resume(): Promise<void> {
+    if (isNativeSynth()) {
+      try {
+        await DroneSynth.reclaim()
+      } catch {
+        // Session still held by another app.
+      }
+      return
+    }
     const context = this.ensureContext()
     if (context.state !== 'running') {
       await context.resume()
@@ -264,6 +301,23 @@ export class ShineEngine {
     this.isAudibleStopping = false
     this.gainFadeInEndTime = 0
     if (this.running) {
+      return
+    }
+    if (isNativeSynth()) {
+      const now = this.nowSeconds()
+      const fadeInSeconds = this.playbackFadeInSeconds
+      this.gainFadeInEndTime = fadeInSeconds > 0 ? now + fadeInSeconds : 0
+      for (let index = 0; index < SHINE_HARMONIC_COUNT; index += 1) {
+        this.jitterPrev[index] = 0
+        this.jitterNext[index] = randomBetween(-1, 1)
+        this.jitterStart[index] = now
+        this.jitterDuration[index] = 1 / randomBetween(AUTO_FREQ_MIN, AUTO_FREQ_MAX)
+        this.lastAutoLevel[index] = 0
+        this.bumpActive[index] = false
+      }
+      this.running = true
+      this.startScheduler()
+      this.pushNativeShine(now)
       return
     }
     if (this.oscillators.length > 0) {
@@ -350,6 +404,28 @@ export class ShineEngine {
     this.clearPendingPresetCrossfadeTimer()
     this.gainFadeInEndTime = 0
 
+    if (isNativeSynth()) {
+      const fadeOut = this.playbackFadeOutSeconds
+      if (fadeOut > 0) {
+        this.isAudibleStopping = true
+        this.clearPendingStopTimer()
+        this.pendingStopTimer = window.setTimeout(() => {
+          this.pendingStopTimer = null
+          this.isAudibleStopping = false
+          this.running = false
+          this.stopScheduler()
+          this.displayLevel.fill(0)
+          void DroneSynth.clearShine().catch(() => {})
+        }, fadeOut * 1000 + 80)
+        return
+      }
+      this.running = false
+      this.stopScheduler()
+      this.displayLevel.fill(0)
+      void DroneSynth.clearShine().catch(() => {})
+      return
+    }
+
     const context = this.context
     if (!context || !this.masterGain) {
       this.running = false
@@ -387,6 +463,11 @@ export class ShineEngine {
   private hardStopVoices(): void {
     this.isAudibleStopping = false
     this.gainFadeInEndTime = 0
+    this.displayLevel.fill(0)
+    if (isNativeSynth()) {
+      void DroneSynth.clearShine().catch(() => {})
+      return
+    }
     const context = this.context
     if (context) {
       const now = context.currentTime
@@ -416,6 +497,10 @@ export class ShineEngine {
     this.clearPendingStopTimer()
     this.clearPendingPresetCrossfadeTimer()
     this.stop()
+    if (isNativeSynth()) {
+      void DroneSynth.clearShine().catch(() => {})
+      return
+    }
     if (this.masterGain) {
       this.masterGain.disconnect()
     }
@@ -435,6 +520,9 @@ export class ShineEngine {
       return
     }
     this.baseFrequency = hz
+    if (isNativeSynth()) {
+      return
+    }
     const context = this.context
     if (!context) {
       return
@@ -471,6 +559,9 @@ export class ShineEngine {
   }
 
   private applyMasterGain(): void {
+    if (isNativeSynth()) {
+      return
+    }
     if (!this.masterGain || !this.context) {
       return
     }
@@ -499,8 +590,8 @@ export class ShineEngine {
     if (!on) {
       this.bumps[index] = false
       this.bumpActive[index] = false
-    } else if (this.context) {
-      const now = this.context.currentTime
+    } else {
+      const now = this.nowSeconds()
       this.jitterStart[index] = now
       this.jitterDuration[index] = 1 / randomBetween(AUTO_FREQ_MIN, AUTO_FREQ_MAX)
     }
@@ -551,8 +642,18 @@ export class ShineEngine {
   }
 
   private tick(): void {
+    if (!this.running) {
+      return
+    }
+    if (isNativeSynth()) {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return
+      }
+      this.pushNativeShine(this.nowSeconds())
+      return
+    }
     const context = this.context
-    if (!context || !this.running) {
+    if (!context) {
       return
     }
     const now = context.currentTime
@@ -581,6 +682,35 @@ export class ShineEngine {
       const panPosition = 0.5 + this.moveAmount * (sweep - 0.5)
       panner.pan.setTargetAtTime(panPosition * 2 - 1, now, PAN_SMOOTH_SECONDS)
     }
+  }
+
+  private pushNativeShine(now: number): void {
+    let fadeScale = 1
+    if (this.gainFadeInEndTime > 0 && now < this.gainFadeInEndTime) {
+      const duration = this.playbackFadeInSeconds
+      const elapsed = duration - (this.gainFadeInEndTime - now)
+      fadeScale = duration > 0 ? Math.min(1, Math.max(0, elapsed / duration)) : 1
+    }
+    if (this.isAudibleStopping && this.playbackFadeOutSeconds > 0) {
+      fadeScale *= 0.85
+    }
+    const master = this.effectiveMasterGain() * fadeScale
+    const items = []
+    for (let index = 0; index < SHINE_HARMONIC_COUNT; index += 1) {
+      const level = this.auto[index]
+        ? this.computeAutoLevel(index, now)
+        : this.manualLevel[index]
+      this.displayLevel[index] = Math.min(1, level)
+      const sweep =
+        (Math.sin(2 * Math.PI * (this.moveFrequency[index] * now + this.basePan[index])) + 1) / 2
+      const panPosition = 0.5 + this.moveAmount * (sweep - 0.5)
+      items.push({
+        freq: this.baseFrequency * (index + 1),
+        gain: Math.max(0, level) * master,
+        pan: panPosition * 2 - 1,
+      })
+    }
+    void DroneSynth.setShine({ items }).catch(() => {})
   }
 
   private computeAutoLevel(index: number, now: number): number {

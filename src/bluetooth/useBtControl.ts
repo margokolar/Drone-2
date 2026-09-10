@@ -36,6 +36,7 @@ import {
 } from '../utils/footPedalKeys'
 import { markMediaSessionAction, wasMediaSessionHandledRecently } from '../utils/mediaRemoteDedupe'
 import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
+import { isCapacitorNative } from '../utils/platform'
 import { runMediaSessionAction } from '../utils/restoreBleKeyboardFocus'
 
 type UseBtControlOptions = {
@@ -101,7 +102,7 @@ function setMediaSessionPlaybackState(playing: boolean): void {
 }
 
 function maintainPedalAnchor(anchor: HTMLAudioElement): void {
-  if (anchor.paused) {
+  if (!isCapacitorNative() && anchor.paused) {
     void anchor.play().catch(() => {})
   }
   setMediaSessionPlaybackState(true)
@@ -122,7 +123,7 @@ function maintainSpeakerAnchor(
   }
 
   clipRemoteHoldRef.current = false
-  if (anchor.paused) {
+  if (!isCapacitorNative() && anchor.paused) {
     void anchor.play().catch(() => {})
   }
 }
@@ -161,7 +162,7 @@ export function useBtControl({
       ) {
         return
       }
-      if (anchor.paused) {
+      if (anchor.paused && !isCapacitorNative()) {
         void anchor.play().catch(() => {})
       }
     }
@@ -602,7 +603,7 @@ export function useBtControl({
     clipRemoteHoldRef.current = false
     speakerRemotePauseUntilRef.current = 0
     const anchor = mediaAnchorRef.current
-    if (anchor?.paused) {
+    if (anchor?.paused && !isCapacitorNative()) {
       void anchor.play().catch(() => {})
     }
   }, [btControlMode, playing])

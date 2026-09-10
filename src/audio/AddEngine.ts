@@ -1,4 +1,5 @@
 import { dbToGain } from './audioMath'
+import { isNativeSynth } from './isNativeSynth'
 
 const ATTACK_SECONDS = 0.035
 const RELEASE_SECONDS = 0.08
@@ -23,6 +24,9 @@ export class AddEngine {
   private outputConnected = false
 
   ensureContext(): AudioContext {
+    if (isNativeSynth()) {
+      throw new Error('Web Audio is not used in the iOS app')
+    }
     if (this.context) {
       return this.context
     }
@@ -57,6 +61,9 @@ export class AddEngine {
   }
 
   async resume(): Promise<void> {
+    if (isNativeSynth()) {
+      return
+    }
     const context = this.ensureContext()
     if (context.state !== 'running') {
       await context.resume()
@@ -94,6 +101,9 @@ export class AddEngine {
   }
 
   startVoice(hz: number): void {
+    if (isNativeSynth()) {
+      return
+    }
     const clampedHz = clampOutputHz(hz)
     if (!Number.isFinite(clampedHz) || clampedHz <= 0) {
       return

@@ -45,6 +45,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             try session.setCategory(.playback, mode: .default, options: [])
         }
         try session.setActive(true, options: [])
+        try DroneSynthEngine.shared.reclaim()
     }
 
     private func deactivate(notifyOthers: Bool) {
@@ -65,6 +66,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         isOnScreen = false
         if firstRelease {
             notifiedRelease = true
+            DroneSynthEngine.shared.park()
             notifyListeners(
                 "interruption",
                 data: [

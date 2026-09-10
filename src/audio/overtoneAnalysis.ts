@@ -122,9 +122,8 @@ export async function analyzeWavOvertones(
   file: File,
   partialCount: number,
 ): Promise<OvertoneAnalysisResult> {
-  const context = new AudioContext()
-  try {
-    const raw = await file.arrayBuffer()
+  const context = new OfflineAudioContext(1, 1, 44100)
+  const raw = await file.arrayBuffer()
     const decoded = await context.decodeAudioData(raw.slice(0))
     const channelData = decoded.getChannelData(0)
     const analysisSamples = buildAnalysisWindow(channelData)
@@ -183,7 +182,4 @@ export async function analyzeWavOvertones(
       gainsDb,
       ratios,
     }
-  } finally {
-    void context.close()
-  }
 }

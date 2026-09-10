@@ -1,6 +1,7 @@
 import { dbToGain, partialTimbreWeights, normalizedBlend, waveformGainCompensation } from './audioMath'
 import type { DroneRuntimeConfig, EntryGlideParams, PartialConfig, ToneConfig } from './types'
 import { getFrequency } from '../music/tuning'
+import { DroneSynth } from '../native/droneSynth'
 import { recordBleDebug } from '../utils/bleDebug'
 import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
 import {
@@ -10,6 +11,8 @@ import {
   scheduleSmoothGainCrossfade,
   shouldAvoidValueCurves,
 } from './fadeCurves'
+import { isNativeSynth } from './isNativeSynth'
+import { nativeOscillatorsFromConfig } from './nativeDroneGraph'
 
 type OscBundle = {
   oscillator: OscillatorNode
@@ -109,6 +112,9 @@ export class DroneEngine {
     from: number
     to: number
   } | null = null
+  private lastConfig: DroneRuntimeConfig | null = null
+  private nativeGraphPushed = false
+  private nativeGlideNotes = new Set<string>()
 
   setPlaybackIntent(shouldPlay: boolean): void {
     this.shouldPlay = shouldPlay
@@ -154,11 +160,51 @@ export class DroneEngine {
     }
   }
 
+  private pushNativeGraph(
+    config: DroneRuntimeConfig,
+    fadeSeconds: number,
+    applyEntryGlide: boolean,
+  ): void {
+    this.lastConfig = config
+    this.updateFadeSettings(config)
+    const oscillators = nativeOscillatorsFromConfig(config)
+    const enabledNotes = new Set<string>(
+      config.tones.filter((tone) => tone.enabled).map((tone) => tone.noteId),
+    )
+    for (const noteId of [...this.nativeGlideNotes]) {
+      if (!enabledNotes.has(noteId)) {
+        this.nativeGlideNotes.delete(noteId)
+      }
+    }
+    for (const oscillator of oscillators) {
+      const noteId = oscillator.id.slice(0, oscillator.id.indexOf(':'))
+      if (!applyEntryGlide || this.nativeGlideNotes.has(noteId)) {
+        delete oscillator.glideFrom
+        delete oscillator.glideSeconds
+      } else {
+        this.nativeGlideNotes.add(noteId)
+      }
+    }
+    const audible = this.shouldPlay && this.started
+    const masterTarget = Math.max(MIN_AUDIBLE_GAIN, dbToGain(config.masterGainDb))
+    this.lastMasterTarget = masterTarget
+    this.nativeGraphPushed = audible
+    void DroneSynth.setGraph({
+      master: audible ? masterTarget : MIN_AUDIBLE_GAIN,
+      fadeSeconds,
+      oscillators: audible ? oscillators : [],
+    }).catch(() => {})
+  }
+
   /**
    * Resume the AudioContext inside a user-gesture handler without async kick.
    * iOS Safari only honours AudioContext.resume() when it runs within the gesture.
    */
   prepareContextForGesture(): void {
+    if (isNativeSynth()) {
+      void DroneSynth.reclaim().catch(() => {})
+      return
+    }
     const context = this.ensureContext()
     if (context.state !== 'running') {
       void context.resume().catch(() => {})
@@ -166,6 +212,9 @@ export class DroneEngine {
   }
   prepareContext(): void {
     this.prepareContextForGesture()
+    if (isNativeSynth()) {
+      return
+    }
     const context = this.context
     if (!context) {
       return
@@ -177,6 +226,9 @@ export class DroneEngine {
   }
 
   private ensureContext(): AudioContext {
+    if (isNativeSynth()) {
+      throw new Error('Web Audio is not used in the iOS app')
+    }
     if (this.context) {
       return this.context
     }
@@ -203,6 +255,12 @@ export class DroneEngine {
 
   /** Hardware or lock screen silenced output; next start should fade in. */
   noteInaudible(): void {
+    if (isNativeSynth()) {
+      this.resumeFromSilence = true
+      this.nativeGraphPushed = false
+      void DroneSynth.mute().catch(() => {})
+      return
+    }
     if (!this.context || !this.masterGain) {
       return
     }
@@ -211,6 +269,23 @@ export class DroneEngine {
 
   /** Restart play fade-in at the current (running) clock, after lock/app resume. */
   fadeInIfAudible(): void {
+    if (isNativeSynth()) {
+      if (!this.shouldPlay || !this.lastConfig) {
+        return
+      }
+      const duration = this.playbackFadeInSeconds > 0 ? this.playbackFadeInSeconds : 0.06
+      if (this.nativeGraphPushed) {
+        void DroneSynth.fadeMaster({
+          target: Math.max(MIN_AUDIBLE_GAIN, this.lastMasterTarget),
+          seconds: duration,
+        }).catch(() => {})
+      } else {
+        this.started = true
+        this.pushNativeGraph(this.lastConfig, duration, false)
+      }
+      this.resumeFromSilence = false
+      return
+    }
     if (!this.shouldPlay || !this.context || !this.masterGain) {
       return
     }
@@ -226,6 +301,9 @@ export class DroneEngine {
 
   async start(config: DroneRuntimeConfig): Promise<void> {
     this.ensureRunning(config)
+    if (isNativeSynth()) {
+      return
+    }
     const context = this.context
     if (context && context.state !== 'running') {
       try {
@@ -247,14 +325,34 @@ export class DroneEngine {
   ensureRunning(config: DroneRuntimeConfig): void {
     this.prepareContext()
     this.updateFadeSettings(config)
+    this.lastConfig = config
     if (!this.shouldPlay) {
       return
     }
     this.started = true
+    if (isNativeSynth()) {
+      const fadeSeconds = this.resumeFromSilence ? this.playbackFadeInSeconds : 0
+      this.pushNativeGraph(config, fadeSeconds, this.resumeFromSilence)
+      this.resumeFromSilence = false
+      return
+    }
     this.syncConfig(config, this.voiceMap.size === 0)
   }
 
   fastResume(config: DroneRuntimeConfig, options?: { skipEntryGlide?: boolean }): void {
+    if (isNativeSynth()) {
+      this.prepareContext()
+      this.updateFadeSettings(config)
+      this.lastConfig = config
+      if (!this.shouldPlay) {
+        return
+      }
+      this.started = true
+      const fadeSeconds = this.resumeFromSilence ? this.playbackFadeInSeconds : 0
+      this.pushNativeGraph(config, fadeSeconds, !options?.skipEntryGlide)
+      this.resumeFromSilence = false
+      return
+    }
     this.ensureRunning(config)
     if (!this.shouldPlay || !this.context || !this.masterGain) {
       return
@@ -366,6 +464,17 @@ export class DroneEngine {
    * PWA returns from background (bugs.webkit.org/show_bug.cgi?id=263627).
    */
   async kickContext(allowWhilePlaying = false): Promise<void> {
+    if (isNativeSynth()) {
+      try {
+        await DroneSynth.reclaim()
+      } catch {
+        return
+      }
+      if (allowWhilePlaying && this.shouldPlay) {
+        this.fadeInIfAudible()
+      }
+      return
+    }
     if (this.shouldPlay && !allowWhilePlaying) {
       return
     }
@@ -390,6 +499,17 @@ export class DroneEngine {
    * resume. We probe clock progress and only kick when stalled.
    */
   async recoverIfStalled(): Promise<void> {
+    if (isNativeSynth()) {
+      try {
+        await DroneSynth.reclaim()
+      } catch {
+        return
+      }
+      if (this.shouldPlay) {
+        this.fadeInIfAudible()
+      }
+      return
+    }
     const context = this.context
     if (!context) {
       return
@@ -436,6 +556,17 @@ export class DroneEngine {
    * interrupted context is resumed synchronously within the calling gesture.
    */
   async pokeClock(): Promise<void> {
+    if (isNativeSynth()) {
+      try {
+        await DroneSynth.reclaim()
+      } catch {
+        return
+      }
+      if (this.shouldPlay && this.resumeFromSilence) {
+        this.fadeInIfAudible()
+      }
+      return
+    }
     const context = this.context
     if (!context) {
       return
@@ -478,16 +609,25 @@ export class DroneEngine {
   }
 
   isContextRunning(): boolean {
+    if (isNativeSynth()) {
+      return this.started
+    }
     return this.context?.state === 'running'
   }
 
   /** Current master gain value, for diagnostics (1e-4 means muted). */
   masterGainValue(): number {
+    if (isNativeSynth()) {
+      return this.resumeFromSilence ? MIN_AUDIBLE_GAIN : this.lastMasterTarget
+    }
     return this.masterGain?.gain.value ?? -1
   }
 
   /** Compact context state for diagnostics: state@currentTime. */
   contextDebugLabel(): string {
+    if (isNativeSynth()) {
+      return this.nativeGraphPushed ? 'native' : 'native-idle'
+    }
     if (!this.context) {
       return 'no-ctx'
     }
@@ -586,6 +726,18 @@ export class DroneEngine {
   stop(): void {
     this.shouldPlay = false
     this.started = false
+    this.nativeGraphPushed = false
+    this.nativeGlideNotes.clear()
+    if (isNativeSynth()) {
+      this.resumeFromSilence = true
+      void DroneSynth.setGraph({
+        master: MIN_AUDIBLE_GAIN,
+        fadeSeconds: 0,
+        oscillators: [],
+      }).catch(() => {})
+      void DroneSynth.mute().catch(() => {})
+      return
+    }
     if (!this.context || !this.masterGain) {
       return
     }
@@ -600,6 +752,19 @@ export class DroneEngine {
   /** Mute quickly but keep voices alive for low-latency resume (BT media remotes). */
   pause(): void {
     this.shouldPlay = false
+    this.nativeGlideNotes.clear()
+    if (isNativeSynth()) {
+      this.resumeFromSilence = true
+      if (this.playbackFadeOutSeconds > 0) {
+        void DroneSynth.fadeMaster({
+          target: MIN_AUDIBLE_GAIN,
+          seconds: this.playbackFadeOutSeconds,
+        }).catch(() => {})
+      } else {
+        void DroneSynth.mute().catch(() => {})
+      }
+      return
+    }
     if (!this.context || !this.masterGain) {
       return
     }
@@ -622,10 +787,30 @@ export class DroneEngine {
   }
 
   canFastResume(): boolean {
+    if (isNativeSynth()) {
+      return this.started && this.lastConfig !== null
+    }
     return this.started && this.voiceMap.size > 0 && this.context !== null
   }
 
   syncConfig(config: DroneRuntimeConfig, forceRebuild = false): void {
+    this.lastConfig = config
+    if (isNativeSynth()) {
+      this.updateFadeSettings(config)
+      if (!this.started || !this.shouldPlay) {
+        this.started = false
+        this.resumeFromSilence = true
+        void DroneSynth.mute().catch(() => {})
+        return
+      }
+      const voiceTransition = this.resolveVoiceTransitionTiming()
+      const fadeSeconds = this.resumeFromSilence
+        ? this.playbackFadeInSeconds
+        : voiceTransition.updateSeconds
+      this.pushNativeGraph(config, fadeSeconds, this.resumeFromSilence)
+      this.resumeFromSilence = false
+      return
+    }
     if (!this.context || !this.masterGain) {
       return
     }
@@ -687,6 +872,10 @@ export class DroneEngine {
 
   destroy(): void {
     this.stop()
+    if (isNativeSynth()) {
+      void DroneSynth.park().catch(() => {})
+      return
+    }
     for (const tone of this.voiceMap.values()) {
       this.fadeAndStopVoice(tone, 0.01)
     }
