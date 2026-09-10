@@ -35,11 +35,15 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     private func applyExclusivePlayback() throws {
         guard isOnScreen else { return }
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playback, mode: .default, options: [])
+        let alreadyExclusive =
+            session.category == .playback && session.categoryOptions.isEmpty
+        if !alreadyExclusive {
+            try session.setCategory(.playback, mode: .default, options: [])
+        }
         try session.setActive(true, options: [])
     }
 
-    private func releaseForBackground() {
+    private func releaseWhenLeavingScreen() {
         isOnScreen = false
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
@@ -133,11 +137,21 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
         observers.append(
             center.addObserver(
+                forName: UIApplication.willResignActiveNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.releaseWhenLeavingScreen()
+            }
+        )
+
+        observers.append(
+            center.addObserver(
                 forName: UIApplication.didEnterBackgroundNotification,
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
-                self?.releaseForBackground()
+                self?.releaseWhenLeavingScreen()
             }
         )
 
