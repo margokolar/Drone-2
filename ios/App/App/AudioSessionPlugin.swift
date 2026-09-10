@@ -157,6 +157,16 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
         observers.append(
             center.addObserver(
+                forName: UIApplication.willEnterForegroundNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.reclaimAfterForeground()
+            }
+        )
+
+        observers.append(
+            center.addObserver(
                 forName: UIApplication.didBecomeActiveNotification,
                 object: nil,
                 queue: .main
@@ -242,7 +252,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         do {
             try applyExclusivePlayback()
         } catch {
-            // Ignore.
+            // Just Keys may still be releasing — retry below.
         }
         notifyListeners(
             "interruption",
@@ -252,5 +262,13 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
                 "source": "foreground",
             ]
         )
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self, self.isOnScreen else { return }
+            try? self.applyExclusivePlayback()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard let self, self.isOnScreen else { return }
+            try? self.applyExclusivePlayback()
+        }
     }
 }
