@@ -8,6 +8,7 @@ import {
   scheduleSmoothFadeIn,
   scheduleSmoothFadeOut,
   scheduleSmoothGainCrossfade,
+  shouldAvoidValueCurves,
 } from './fadeCurves'
 
 type OscBundle = {
@@ -101,6 +102,13 @@ export class DroneEngine {
   private resumeFromSilence = true
   /** Last intended master gain; WKWebView AudioParam.value is unreliable mid-curve. */
   private lastMasterTarget = MIN_AUDIBLE_GAIN
+  private masterFade: {
+    kind: 'in' | 'out'
+    startedAt: number
+    duration: number
+    from: number
+    to: number
+  } | null = null
 
   setPlaybackIntent(shouldPlay: boolean): void {
     this.shouldPlay = shouldPlay
@@ -212,9 +220,7 @@ export class DroneEngine {
     const now = this.context.currentTime
     const target = Math.max(MIN_AUDIBLE_GAIN, this.lastMasterTarget)
     const duration = this.playbackFadeInSeconds > 0 ? this.playbackFadeInSeconds : 0.06
-    this.masterGain.gain.cancelScheduledValues(now)
-    this.masterGain.gain.setValueAtTime(MIN_AUDIBLE_GAIN, now)
-    scheduleSmoothMasterFadeIn(this.masterGain.gain, target, now, duration)
+    this.scheduleMasterFadeIn(now, target, duration)
     this.resumeFromSilence = false
   }
 
@@ -272,10 +278,11 @@ export class DroneEngine {
     this.updateFadeSettings(config)
     const masterTarget = dbToGain(config.masterGainDb)
     const fadeInSeconds = this.playbackFadeInSeconds
-    this.masterGain.gain.cancelScheduledValues(now)
     if (fadeInSeconds > 0) {
-      scheduleSmoothMasterFadeIn(this.masterGain.gain, masterTarget, now, fadeInSeconds)
+      this.scheduleMasterFadeIn(now, masterTarget, fadeInSeconds)
     } else {
+      this.masterFade = null
+      this.masterGain.gain.cancelScheduledValues(now)
       this.masterGain.gain.setValueAtTime(masterTarget, now)
     }
     this.lastMasterTarget = masterTarget
@@ -498,6 +505,7 @@ export class DroneEngine {
       return
     }
     this.resumeFromSilence = true
+    this.masterFade = null
     this.masterGain.gain.cancelScheduledValues(now)
     this.masterGain.gain.setValueAtTime(0.0001, now)
     this.muteVoicesAt(now, 0.0001)
@@ -514,12 +522,53 @@ export class DroneEngine {
     }
   }
 
+  private scheduleMasterFadeIn(now: number, target: number, duration: number): void {
+    if (!this.masterGain) {
+      return
+    }
+    const to = Math.max(MIN_AUDIBLE_GAIN, target)
+    this.masterFade = {
+      kind: 'in',
+      startedAt: now,
+      duration: Math.max(0, duration),
+      from: MIN_AUDIBLE_GAIN,
+      to,
+    }
+    scheduleSmoothMasterFadeIn(this.masterGain.gain, to, now, duration)
+  }
+
+  /** Instantaneous master level, including mid fade-in/out. Do not use AudioParam.value on iOS. */
+  private currentMasterGain(now: number): number {
+    const fade = this.masterFade
+    if (!fade || fade.duration <= 0) {
+      return Math.max(MIN_AUDIBLE_GAIN, this.lastMasterTarget)
+    }
+    const t = Math.min(1, Math.max(0, (now - fade.startedAt) / fade.duration))
+    if (t >= 1) {
+      return Math.max(MIN_AUDIBLE_GAIN, fade.to)
+    }
+    if (shouldAvoidValueCurves()) {
+      return fade.from + (fade.to - fade.from) * t
+    }
+    if (fade.kind === 'in') {
+      return Math.max(MIN_AUDIBLE_GAIN, fade.to * Math.sin((t * Math.PI) / 2))
+    }
+    return Math.max(MIN_AUDIBLE_GAIN, fade.from * Math.cos((t * Math.PI) / 2))
+  }
+
   private scheduleAudibleFadeOut(now: number, fadeOutSeconds: number): void {
     if (!this.masterGain) {
       return
     }
     this.resumeFromSilence = true
-    const startGain = Math.max(this.lastMasterTarget, this.masterGain.gain.value, MIN_AUDIBLE_GAIN)
+    const startGain = this.currentMasterGain(now)
+    this.masterFade = {
+      kind: 'out',
+      startedAt: now,
+      duration: fadeOutSeconds,
+      from: startGain,
+      to: MIN_AUDIBLE_GAIN,
+    }
     scheduleSmoothMasterFadeOut(this.masterGain.gain, startGain, now, fadeOutSeconds)
     this.muteVoicesAt(now + fadeOutSeconds, MIN_AUDIBLE_GAIN)
   }
@@ -588,16 +637,13 @@ export class DroneEngine {
     // Do not trust AudioParam.value < threshold on iOS — mid-curve reads often
     // return ~0 and would restart a silence fade-in, killing the crossfade.
     if (this.resumeFromSilence && this.playbackFadeInSeconds > 0) {
-      scheduleSmoothMasterFadeIn(
-        this.masterGain.gain,
-        masterTarget,
-        now,
-        this.playbackFadeInSeconds,
-      )
+      this.scheduleMasterFadeIn(now, masterTarget, this.playbackFadeInSeconds)
     } else if (this.resumeFromSilence) {
+      this.masterFade = null
       this.masterGain.gain.cancelScheduledValues(now)
       this.masterGain.gain.setValueAtTime(masterTarget, now)
     } else if (usesSmoothCrossfade(voiceTransition.updateSeconds)) {
+      this.masterFade = null
       scheduleSmoothGainCrossfade(
         this.masterGain.gain,
         masterTarget,
@@ -606,6 +652,7 @@ export class DroneEngine {
         this.lastMasterTarget,
       )
     } else {
+      this.masterFade = null
       this.masterGain.gain.cancelScheduledValues(now)
       const start = Math.max(MIN_AUDIBLE_GAIN, this.lastMasterTarget, this.masterGain.gain.value)
       this.masterGain.gain.setValueAtTime(start, now)
