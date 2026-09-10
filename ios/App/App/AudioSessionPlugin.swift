@@ -3,9 +3,9 @@ import Capacitor
 import UIKit
 
 /**
- Holds AVAudioSession as aggressively as Web Audio allows:
- playback category (not mixWithOthers), re-activate after interruptions,
- and notify JS so Web Audio can resume.
+ Mixable playback so Drone and Just Keys can sound together.
+ Playback ignores the silent switch; mixWithOthers avoids stealing the
+ other app's session. Re-apply after WebKit/interruptions, then notify JS.
  */
 @objc(AudioSessionPlugin)
 public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -21,6 +21,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     private var observers: [NSObjectProtocol] = []
 
     override public func load() {
+        try? applyMixablePlayback()
         startObserving()
     }
 
@@ -28,13 +29,18 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         stopObserving()
     }
 
+    private func applyMixablePlayback() throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+        try session.setActive(true, options: [])
+    }
+
     @objc func configurePlayback(_ call: CAPPluginCall) {
         do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [])
-            try session.setActive(true, options: [])
+            try applyMixablePlayback()
             call.resolve([
                 "category": "playback",
+                "mixWithOthers": true,
             ])
         } catch {
             call.reject("Failed to configure playback session", nil, error)
@@ -47,7 +53,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             try session.setCategory(
                 .playAndRecord,
                 mode: .measurement,
-                options: [.defaultToSpeaker, .allowBluetooth]
+                options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers]
             )
             try session.setPreferredSampleRate(48_000)
             try session.setPreferredIOBufferDuration(0.005)
@@ -60,7 +66,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func activate(_ call: CAPPluginCall) {
         do {
-            try AVAudioSession.sharedInstance().setActive(true, options: [])
+            try applyMixablePlayback()
             call.resolve(["active": true])
         } catch {
             call.reject("Failed to activate audio session", nil, error)
@@ -145,7 +151,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             if shouldResume {
                 do {
-                    try AVAudioSession.sharedInstance().setActive(true, options: [])
+                    try applyMixablePlayback()
                 } catch {
                     // JS will still try Web Audio resume.
                 }
@@ -173,7 +179,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         // Re-claim session after route swaps (BT headset, speaker, etc.).
         do {
-            try AVAudioSession.sharedInstance().setActive(true, options: [])
+            try applyMixablePlayback()
         } catch {
             // Ignore; JS recovery still runs.
         }
@@ -187,7 +193,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func reclaimAfterForeground() {
         do {
-            try AVAudioSession.sharedInstance().setActive(true, options: [])
+            try applyMixablePlayback()
         } catch {
             // Ignore.
         }
