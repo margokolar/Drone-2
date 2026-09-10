@@ -193,6 +193,31 @@ export class DroneEngine {
     return context
   }
 
+  /** Hardware or lock screen silenced output; next start should fade in. */
+  noteInaudible(): void {
+    if (!this.context || !this.masterGain) {
+      return
+    }
+    this.forceMute(this.context.currentTime)
+  }
+
+  /** Restart play fade-in at the current (running) clock, after lock/app resume. */
+  fadeInIfAudible(): void {
+    if (!this.shouldPlay || !this.context || !this.masterGain) {
+      return
+    }
+    if (this.context.state !== 'running') {
+      return
+    }
+    const now = this.context.currentTime
+    const target = Math.max(MIN_AUDIBLE_GAIN, this.lastMasterTarget)
+    const duration = this.playbackFadeInSeconds > 0 ? this.playbackFadeInSeconds : 0.06
+    this.masterGain.gain.cancelScheduledValues(now)
+    this.masterGain.gain.setValueAtTime(MIN_AUDIBLE_GAIN, now)
+    scheduleSmoothMasterFadeIn(this.masterGain.gain, target, now, duration)
+    this.resumeFromSilence = false
+  }
+
   async start(config: DroneRuntimeConfig): Promise<void> {
     this.ensureRunning(config)
     const context = this.context
@@ -204,6 +229,7 @@ export class DroneEngine {
         // fired a synchronous resume() so we simply swallow the async echo.
       }
     }
+    this.fadeInIfAudible()
   }
 
   /**
@@ -346,6 +372,9 @@ export class DroneEngine {
     } catch {
       // Nothing actionable; the caller can decide whether to retry.
     }
+    if (allowWhilePlaying && this.shouldPlay) {
+      this.fadeInIfAudible()
+    }
   }
 
   /**
@@ -368,6 +397,9 @@ export class DroneEngine {
       }
       if ((context.state as string) === 'interrupted') {
         await this.kickContext(true)
+      }
+      if (this.shouldPlay && context.state === 'running') {
+        this.fadeInIfAudible()
       }
     }
     if (context.state !== 'running') {
@@ -402,11 +434,12 @@ export class DroneEngine {
       return
     }
     const state = context.state as AudioContextState | 'interrupted'
+    const wasInaudible = state === 'suspended' || state === 'interrupted'
     const wallNow = Date.now()
     const ctxNow = context.currentTime
     const previous = this.lastClock
     this.lastClock = { wall: wallNow, ctx: ctxNow }
-    if (state === 'suspended' || state === 'interrupted') {
+    if (wasInaudible) {
       recordBleDebug('note', `poke resume:${state}`)
       try {
         await context.resume()
@@ -417,6 +450,9 @@ export class DroneEngine {
         await this.kickContext(true)
       }
       this.lastClock = { wall: Date.now(), ctx: context.currentTime }
+      if (this.shouldPlay) {
+        this.fadeInIfAudible()
+      }
       return
     }
     if (!this.shouldPlay && previous.wall > 0) {

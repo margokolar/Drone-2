@@ -36,6 +36,7 @@ export async function startNativeAudioSessionGuard(): Promise<() => void> {
 
   const interruptionHandle = await AudioSession.addListener('interruption', (event) => {
     if (event.type === 'began') {
+      droneEngine.noteInaudible()
       return
     }
     if (!event.shouldResume || !isOnScreen()) {
