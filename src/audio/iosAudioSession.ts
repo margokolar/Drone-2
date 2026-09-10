@@ -1,8 +1,6 @@
 /**
  * Web: `navigator.audioSession` playback so Safari ignores the silent switch.
- * Native iOS: AVAudioSession playback + mixWithOthers (Drone + Just Keys together).
- * Do not set navigator.audioSession to exclusive `playback` in the Capacitor shell —
- * WKWebView would undo mixWithOthers.
+ * Native iOS: exclusive playback for the on-screen app (Drone vs Just Keys).
  */
 
 import { Capacitor } from '@capacitor/core'
@@ -42,7 +40,7 @@ export function setIosAudioSessionType(type: IosAudioSessionType): void {
   }
 }
 
-/** Claim a mixable playback session (native) or Safari playback (PWA). */
+/** Claim playback: exclusive on native iOS, Safari playback on PWA. */
 export function claimMixableAudioSession(): void {
   setIosAudioSessionType('playback')
 }

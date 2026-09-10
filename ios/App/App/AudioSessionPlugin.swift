@@ -3,9 +3,10 @@ import Capacitor
 import UIKit
 
 /**
- Mixable playback so Drone and Just Keys can sound together.
- Playback ignores the silent switch; mixWithOthers avoids stealing the
- other app's session. Re-apply after WebKit/interruptions, then notify JS.
+ Exclusive playback for the on-screen app.
+ Drone and Just Keys do not mix: leaving the screen releases the session
+ (notifyOthersOnDeactivation) so the visible app can take audio.
+ Playback still ignores the silent switch.
  */
 @objc(AudioSessionPlugin)
 public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -19,9 +20,11 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     ]
 
     private var observers: [NSObjectProtocol] = []
+    private var isOnScreen = true
 
     override public func load() {
-        try? applyMixablePlayback()
+        isOnScreen = true
+        try? applyExclusivePlayback()
         startObserving()
     }
 
@@ -29,18 +32,36 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         stopObserving()
     }
 
-    private func applyMixablePlayback() throws {
+    private func applyExclusivePlayback() throws {
+        guard isOnScreen else { return }
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+        try session.setCategory(.playback, mode: .default, options: [])
         try session.setActive(true, options: [])
+    }
+
+    private func releaseForBackground() {
+        isOnScreen = false
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+        } catch {
+            // Already inactive.
+        }
+        notifyListeners(
+            "interruption",
+            data: [
+                "type": "began",
+                "shouldResume": false,
+                "source": "background",
+            ]
+        )
     }
 
     @objc func configurePlayback(_ call: CAPPluginCall) {
         do {
-            try applyMixablePlayback()
+            try applyExclusivePlayback()
             call.resolve([
                 "category": "playback",
-                "mixWithOthers": true,
+                "onScreen": isOnScreen,
             ])
         } catch {
             call.reject("Failed to configure playback session", nil, error)
@@ -49,11 +70,15 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func configurePlayAndRecord(_ call: CAPPluginCall) {
         do {
+            guard isOnScreen else {
+                call.resolve(["category": "playAndRecord", "onScreen": false])
+                return
+            }
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(
                 .playAndRecord,
                 mode: .measurement,
-                options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers]
+                options: [.defaultToSpeaker, .allowBluetooth]
             )
             try session.setPreferredSampleRate(48_000)
             try session.setPreferredIOBufferDuration(0.005)
@@ -66,8 +91,8 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func activate(_ call: CAPPluginCall) {
         do {
-            try applyMixablePlayback()
-            call.resolve(["active": true])
+            try applyExclusivePlayback()
+            call.resolve(["active": isOnScreen])
         } catch {
             call.reject("Failed to activate audio session", nil, error)
         }
@@ -103,6 +128,16 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
                 queue: .main
             ) { [weak self] notification in
                 self?.handleRouteChange(notification)
+            }
+        )
+
+        observers.append(
+            center.addObserver(
+                forName: UIApplication.didEnterBackgroundNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.releaseForBackground()
             }
         )
 
@@ -144,14 +179,10 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
                 ]
             )
         case .ended:
-            var shouldResume = true
-            if let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt {
-                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
-                shouldResume = options.contains(.shouldResume)
-            }
+            let shouldResume = isOnScreen
             if shouldResume {
                 do {
-                    try applyMixablePlayback()
+                    try applyExclusivePlayback()
                 } catch {
                     // JS will still try Web Audio resume.
                 }
@@ -177,11 +208,12 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         {
             reason = String(describing: routeReason)
         }
-        // Re-claim session after route swaps (BT headset, speaker, etc.).
-        do {
-            try applyMixablePlayback()
-        } catch {
-            // Ignore; JS recovery still runs.
+        if isOnScreen {
+            do {
+                try applyExclusivePlayback()
+            } catch {
+                // Ignore; JS recovery still runs.
+            }
         }
         notifyListeners(
             "routeChange",
@@ -192,8 +224,9 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func reclaimAfterForeground() {
+        isOnScreen = true
         do {
-            try applyMixablePlayback()
+            try applyExclusivePlayback()
         } catch {
             // Ignore.
         }

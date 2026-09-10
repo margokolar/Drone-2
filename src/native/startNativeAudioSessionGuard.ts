@@ -3,8 +3,12 @@ import { droneEngine } from '../audio/DroneEngine'
 import { useDroneStore } from '../store/useDroneStore'
 import { AudioSession } from './audioSession'
 
+function isOnScreen(): boolean {
+  return document.visibilityState === 'visible'
+}
+
 /**
- * Capacitor-only: claim AVAudioSession and reclaim Web Audio after interruptions.
+ * Capacitor-only: exclusive AVAudioSession while this app is on screen.
  * No-op on web/PWA.
  */
 export async function startNativeAudioSessionGuard(): Promise<() => void> {
@@ -19,6 +23,9 @@ export async function startNativeAudioSessionGuard(): Promise<() => void> {
   }
 
   const reclaimWebAudio = () => {
+    if (!isOnScreen()) {
+      return
+    }
     const playing = useDroneStore.getState().playing
     if (!playing) {
       void droneEngine.recoverIfStalled()
@@ -31,7 +38,7 @@ export async function startNativeAudioSessionGuard(): Promise<() => void> {
     if (event.type === 'began') {
       return
     }
-    if (!event.shouldResume) {
+    if (!event.shouldResume || !isOnScreen()) {
       return
     }
     void AudioSession.activate()
@@ -42,6 +49,9 @@ export async function startNativeAudioSessionGuard(): Promise<() => void> {
   })
 
   const routeHandle = await AudioSession.addListener('routeChange', () => {
+    if (!isOnScreen()) {
+      return
+    }
     void AudioSession.activate()
       .catch(() => {})
       .finally(() => {
