@@ -462,6 +462,10 @@ export class DroneEngine {
       }
       return
     }
+    if (this.shouldPlay && this.resumeFromSilence) {
+      this.fadeInIfAudible()
+      return
+    }
     if (!this.shouldPlay && previous.wall > 0) {
       const wallDelta = (wallNow - previous.wall) / 1000
       const ctxDelta = ctxNow - previous.ctx

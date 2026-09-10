@@ -22,6 +22,7 @@ export async function startNativeAudioSessionGuard(): Promise<() => void> {
     // Plugin missing or session busy — keep going; Web Audio may still work.
   }
 
+  let reclaimQueued = false
   const reclaimWebAudio = () => {
     if (!isOnScreen()) {
       return
@@ -31,33 +32,37 @@ export async function startNativeAudioSessionGuard(): Promise<() => void> {
       void droneEngine.recoverIfStalled()
       return
     }
-    void droneEngine.pokeClock().then(() => droneEngine.recoverIfStalled())
+    void droneEngine.pokeClock()
+  }
+  const scheduleReclaim = () => {
+    if (reclaimQueued) {
+      return
+    }
+    reclaimQueued = true
+    queueMicrotask(() => {
+      reclaimQueued = false
+      reclaimWebAudio()
+    })
   }
 
   const interruptionHandle = await AudioSession.addListener('interruption', (event) => {
     if (event.type === 'began') {
-      droneEngine.noteInaudible()
+      if (event.source === 'background') {
+        droneEngine.noteInaudible()
+      }
       return
     }
     if (!event.shouldResume || !isOnScreen()) {
       return
     }
-    void AudioSession.activate()
-      .catch(() => {})
-      .finally(() => {
-        reclaimWebAudio()
-      })
+    scheduleReclaim()
   })
 
   const routeHandle = await AudioSession.addListener('routeChange', () => {
     if (!isOnScreen()) {
       return
     }
-    void AudioSession.activate()
-      .catch(() => {})
-      .finally(() => {
-        reclaimWebAudio()
-      })
+    scheduleReclaim()
   })
 
   reclaimWebAudio()

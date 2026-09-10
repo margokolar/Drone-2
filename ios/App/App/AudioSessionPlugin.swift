@@ -21,6 +21,10 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private var observers: [NSObjectProtocol] = []
     private var isOnScreen = true
+    private var notifiedRelease = false
+    private var notifiedReclaim = false
+    private var reclaimWork: DispatchWorkItem?
+    private var reclaimInFlight = false
 
     override public func load() {
         isOnScreen = true
@@ -43,21 +47,45 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         try session.setActive(true, options: [])
     }
 
-    private func releaseWhenLeavingScreen() {
-        isOnScreen = false
+    private func deactivate(notifyOthers: Bool) {
+        let options: AVAudioSession.SetActiveOptions = notifyOthers ? [.notifyOthersOnDeactivation] : []
         do {
-            try AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+            try AVAudioSession.sharedInstance().setActive(false, options: options)
         } catch {
-            // Already inactive.
+            // Already inactive, or Web Audio still holding I/O.
         }
-        notifyListeners(
-            "interruption",
-            data: [
-                "type": "began",
-                "shouldResume": false,
-                "source": "background",
-            ]
-        )
+    }
+
+    private func releaseWhenLeavingScreen() {
+        reclaimWork?.cancel()
+        reclaimWork = nil
+        reclaimInFlight = false
+        notifiedReclaim = false
+        let firstRelease = isOnScreen
+        isOnScreen = false
+        if firstRelease {
+            notifiedRelease = true
+            notifyListeners(
+                "interruption",
+                data: [
+                    "type": "began",
+                    "shouldResume": false,
+                    "source": "background",
+                ]
+            )
+            deactivate(notifyOthers: true)
+            scheduleSilentDeactivate(after: 0.04)
+            scheduleSilentDeactivate(after: 0.12)
+        } else {
+            deactivate(notifyOthers: false)
+        }
+    }
+
+    private func scheduleSilentDeactivate(after delay: TimeInterval) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self, !self.isOnScreen else { return }
+            self.deactivate(notifyOthers: false)
+        }
     }
 
     @objc func configurePlayback(_ call: CAPPluginCall) {
@@ -103,12 +131,8 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func deactivate(_ call: CAPPluginCall) {
-        do {
-            try AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
-            call.resolve(["active": false])
-        } catch {
-            call.reject("Failed to deactivate audio session", nil, error)
-        }
+        deactivate(notifyOthers: true)
+        call.resolve(["active": false])
     }
 
     private func startObserving() {
@@ -195,6 +219,9 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
         switch type {
         case .began:
+            if !isOnScreen {
+                return
+            }
             notifyListeners(
                 "interruption",
                 data: [
@@ -203,21 +230,13 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
                 ]
             )
         case .ended:
-            let shouldResume = isOnScreen
-            if shouldResume {
-                do {
-                    try applyExclusivePlayback()
-                } catch {
-                    // JS will still try Web Audio resume.
-                }
+            guard isOnScreen else { return }
+            do {
+                try applyExclusivePlayback()
+            } catch {
+                // JS will still try Web Audio resume.
             }
-            notifyListeners(
-                "interruption",
-                data: [
-                    "type": "ended",
-                    "shouldResume": shouldResume,
-                ]
-            )
+            notifyReclaimIfNeeded()
         @unknown default:
             break
         }
@@ -231,6 +250,12 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             let routeReason = AVAudioSession.RouteChangeReason(rawValue: reasonValue)
         {
             reason = String(describing: routeReason)
+        }
+        if reclaimInFlight {
+            if isOnScreen {
+                try? applyExclusivePlayback()
+            }
+            return
         }
         if isOnScreen {
             do {
@@ -249,11 +274,45 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func reclaimAfterForeground() {
         isOnScreen = true
+        notifiedRelease = false
+        if notifiedReclaim {
+            try? applyExclusivePlayback()
+            return
+        }
+        reclaimInFlight = true
+        attemptReclaim(attemptsLeft: 12)
+    }
+
+    private func attemptReclaim(attemptsLeft: Int) {
+        guard isOnScreen else {
+            reclaimInFlight = false
+            return
+        }
         do {
             try applyExclusivePlayback()
+            finishReclaim()
+            return
         } catch {
-            // Just Keys may still be releasing — retry below.
+            if attemptsLeft <= 0 {
+                finishReclaim()
+                return
+            }
+            let work = DispatchWorkItem { [weak self] in
+                self?.attemptReclaim(attemptsLeft: attemptsLeft - 1)
+            }
+            reclaimWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02, execute: work)
         }
+    }
+
+    private func finishReclaim() {
+        reclaimInFlight = false
+        notifyReclaimIfNeeded()
+    }
+
+    private func notifyReclaimIfNeeded() {
+        guard isOnScreen, !notifiedReclaim else { return }
+        notifiedReclaim = true
         notifyListeners(
             "interruption",
             data: [
@@ -262,13 +321,5 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
                 "source": "foreground",
             ]
         )
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let self, self.isOnScreen else { return }
-            try? self.applyExclusivePlayback()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-            guard let self, self.isOnScreen else { return }
-            try? self.applyExclusivePlayback()
-        }
     }
 }
