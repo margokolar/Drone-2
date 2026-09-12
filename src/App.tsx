@@ -393,7 +393,7 @@ function App() {
   const initialToneSetCollection = useMemo(() => loadToneSetCollection(), [])
   const initialToneSetLayout = useMemo(() => loadToneSetLayout(), [])
   const [menuOpen, setMenuOpen] = useState(false)
-  const [homeScreenOpen, setHomeScreenOpen] = useState(false)
+  const [homeScreenOpen, setHomeScreenOpen] = useState(true)
   const [activeTab, setActiveTab] = useState<TabId>('tone')
   const [toneSetLayout, setToneSetLayout] = useState<ToneSetLayout>(initialToneSetLayout)
   const [customToneSets, setCustomToneSets] = useState<ToneSetLayout[]>(initialToneSetCollection.customSets)
