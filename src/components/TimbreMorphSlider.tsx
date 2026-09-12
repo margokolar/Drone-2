@@ -2,6 +2,7 @@ import type { ChangeEvent, KeyboardEvent } from 'react'
 import clsx from 'clsx'
 import { AudioWaveform } from 'lucide-react'
 import type { TimbreBlend } from '../audio/types'
+import { blendFromMorph, morphFromBlend } from '../audio/audioMath'
 import { DEFAULT_TIMBRE_BLEND } from '../presets/defaultPresets'
 import { ResettableRangeInput } from './ResettableRangeInput'
 
@@ -18,41 +19,14 @@ type TimbreMorphSliderProps = {
   accentClassName?: string
 }
 
-function morphFromBlend(sine: number, saw: number, square: number): number {
-  const total = Math.max(0, sine) + Math.max(0, saw) + Math.max(0, square)
-  if (total <= 0) {
-    return 0
-  }
-  return (Math.max(0, sine) * 0.5 + Math.max(0, square)) / total
-}
-
 function timbreFeel(morph: number): 'Pehme' | 'Keskmine' | 'Terav' {
-  const sharpness = Math.abs(morph - 0.5) * 2
-  if (sharpness < 0.33) {
+  if (morph < 0.33) {
     return 'Pehme'
   }
-  if (sharpness > 0.66) {
+  if (morph > 0.66) {
     return 'Terav'
   }
   return 'Keskmine'
-}
-
-function blendFromMorph(morph: number): TimbreBlend {
-  const clamped = Math.max(0, Math.min(1, morph))
-  if (clamped <= 0.5) {
-    const t = clamped / 0.5
-    return {
-      sine: t,
-      saw: 1 - t,
-      square: 0,
-    }
-  }
-  const t = (clamped - 0.5) / 0.5
-  return {
-    sine: 1 - t,
-    saw: 0,
-    square: t,
-  }
 }
 
 export function TimbreMorphSlider({

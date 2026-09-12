@@ -1,4 +1,11 @@
-import { dbToGain, partialTimbreWeights, normalizedBlend, waveformGainCompensation } from './audioMath'
+import {
+  dbToGain,
+  morphFromBlend,
+  normalizedBlend,
+  partialBrightnessGain,
+  partialTimbreWeights,
+  waveformGainCompensation,
+} from './audioMath'
 import type { DroneRuntimeConfig, EntryGlideParams, PartialConfig, ToneConfig } from './types'
 import { getFrequency } from '../music/tuning'
 import { DroneSynth } from '../native/droneSynth'
@@ -416,12 +423,14 @@ export class DroneEngine {
       voice.outputGain.gain.setValueAtTime(toneGain, now)
 
       const blend = normalizedBlend(toneConfig.timbreBlend ?? config.timbreBlend)
+      const morph = morphFromBlend(blend.sine, blend.saw, blend.square)
       const activePartials = (toneConfig.partials ?? config.partials).filter((partial) => partial.enabled)
       let index = 0
       for (let partialIndex = 0; partialIndex < activePartials.length; partialIndex += 1) {
         const partial = activePartials[partialIndex]
         const partialLinear = dbToGain(partial.gainDb)
         const harmonicIndex = partialIndex + 1
+        const brightness = partialBrightnessGain(harmonicIndex, morph)
         const timbreWeights = partialTimbreWeights(harmonicIndex, blend, config.harmonicTimbreEnabled)
         const waveTypes = ['sine', 'sawtooth', 'square'] as const
         const waveTarget = [timbreWeights.sine, timbreWeights.saw, timbreWeights.square]
@@ -436,7 +445,7 @@ export class DroneEngine {
             weightedAmount > 0
               ? Math.max(
                   0.0001,
-                  partialLinear * weightedAmount * waveformGainCompensation(waveType),
+                  partialLinear * weightedAmount * waveformGainCompensation(waveType) * brightness,
                 )
               : 0.0001
           bundle.gainNode.gain.cancelScheduledValues(now)
@@ -1005,6 +1014,7 @@ export class DroneEngine {
     panner.connect(this.masterGain)
 
     const blend = normalizedBlend(toneConfig.timbreBlend ?? config.timbreBlend)
+    const morph = morphFromBlend(blend.sine, blend.saw, blend.square)
     const toneGain = dbToGain(toneConfig.gainDb)
     const toneFrequency = getFrequency(
       toneConfig.noteId,
@@ -1021,6 +1031,7 @@ export class DroneEngine {
       const ratio = Math.max(0.0625, partial.ratio)
       const fundamentalPartialGain = dbToGain(partial.gainDb)
       const harmonicIndex = partialIndex + 1
+      const brightness = partialBrightnessGain(harmonicIndex, morph)
       const timbreWeights = partialTimbreWeights(harmonicIndex, blend, config.harmonicTimbreEnabled)
       const waveGains = [
         { type: 'sine' as const, amount: timbreWeights.sine },
@@ -1045,7 +1056,8 @@ export class DroneEngine {
           waveGain:
             waveGain.amount *
             fundamentalPartialGain *
-            waveformGainCompensation(waveGain.type),
+            waveformGainCompensation(waveGain.type) *
+            brightness,
           ratio,
         })
       }
@@ -1137,6 +1149,7 @@ export class DroneEngine {
     }
 
     const blend = normalizedBlend(toneConfig.timbreBlend ?? config.timbreBlend)
+    const morph = morphFromBlend(blend.sine, blend.saw, blend.square)
     const activePartials = (toneConfig.partials ?? config.partials).filter((partial) => partial.enabled)
     let index = 0
     for (let partialIndex = 0; partialIndex < activePartials.length; partialIndex += 1) {
@@ -1144,6 +1157,7 @@ export class DroneEngine {
       const ratio = Math.max(0.0625, partial.ratio)
       const partialLinear = dbToGain(partial.gainDb)
       const harmonicIndex = partialIndex + 1
+      const brightness = partialBrightnessGain(harmonicIndex, morph)
       const timbreWeights = partialTimbreWeights(harmonicIndex, blend, config.harmonicTimbreEnabled)
       const waveTypes = ['sine', 'sawtooth', 'square'] as const
       const waveTarget = [timbreWeights.sine, timbreWeights.saw, timbreWeights.square]
@@ -1158,7 +1172,7 @@ export class DroneEngine {
           weightedAmount > 0
             ? Math.max(
                 0.0001,
-                partialLinear * weightedAmount * waveformGainCompensation(waveType),
+                partialLinear * weightedAmount * waveformGainCompensation(waveType) * brightness,
               )
             : 0.0001
         bundle.ratio = ratio

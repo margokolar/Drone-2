@@ -1,4 +1,11 @@
-import { dbToGain, partialTimbreWeights, normalizedBlend, waveformGainCompensation } from './audioMath'
+import {
+  dbToGain,
+  morphFromBlend,
+  normalizedBlend,
+  partialBrightnessGain,
+  partialTimbreWeights,
+  waveformGainCompensation,
+} from './audioMath'
 import { getFrequency } from '../music/tuning'
 import type { NativeDroneOsc } from '../native/droneSynth'
 import type { DroneRuntimeConfig, EntryGlideParams, ToneConfig } from './types'
@@ -23,6 +30,7 @@ export function nativeOscillatorsFromConfig(config: DroneRuntimeConfig): NativeD
   for (const tone of config.tones) {
     if (!tone.enabled) continue
     const blend = normalizedBlend(tone.timbreBlend ?? config.timbreBlend)
+    const morph = morphFromBlend(blend.sine, blend.saw, blend.square)
     const toneGain = dbToGain(tone.gainDb)
     const toneFrequency =
       getFrequency(
@@ -40,9 +48,11 @@ export function nativeOscillatorsFromConfig(config: DroneRuntimeConfig): NativeD
       const partialLinear = dbToGain(partial.gainDb)
       const harmonicIndex = partialIndex + 1
       const timbreWeights = partialTimbreWeights(harmonicIndex, blend, config.harmonicTimbreEnabled)
+      const brightness = partialBrightnessGain(harmonicIndex, morph)
       const gain =
         toneGain *
         partialLinear *
+        brightness *
         (timbreWeights.sine * waveformGainCompensation('sine') +
           timbreWeights.saw * waveformGainCompensation('sawtooth') +
           timbreWeights.square * waveformGainCompensation('square'))
