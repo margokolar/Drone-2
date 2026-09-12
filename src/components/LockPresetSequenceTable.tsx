@@ -43,12 +43,12 @@ export function LockPresetSequenceTable({ sequence, activeIndex }: LockPresetSeq
             {isTransport ? (
               <span
                 className={clsx(
-                  'flex min-w-0 items-center gap-2',
+                  'flex min-w-0 items-center gap-2 text-[1.65rem]',
                   isActive ? 'text-amber-100' : 'text-white/75',
                 )}
               >
-                <PlayPauseIcon size={26} className="shrink-0" />
-                <span className="truncate text-[1.65rem] font-semibold leading-none">
+                <PlayPauseIcon matchEx className="shrink-0" />
+                <span className="truncate font-semibold leading-none">
                   {name}
                 </span>
               </span>

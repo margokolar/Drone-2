@@ -68,6 +68,7 @@ import { ShineControls } from './components/ShineControls'
 import { EntryGlideControls } from './components/EntryGlideControls'
 import { FadeControls } from './components/FadeControls'
 import { LockPresetSequenceTable } from './components/LockPresetSequenceTable'
+import { PlayPauseIcon } from './components/PlayPauseIcon'
 import { useAddFollower } from './hooks/useAddFollower'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useMetronome } from './hooks/useMetronome'
@@ -2141,11 +2142,7 @@ function App() {
             >
               {isTransportMarkerKey(activeNavigationKey, presetNavigation) ? (
                 <div className="flex h-[0.9em] items-center justify-center">
-                  {playing ? (
-                    <Pause className="size-[0.9em]" strokeWidth={2.25} />
-                  ) : (
-                    <Play className="size-[0.9em]" strokeWidth={2.25} />
-                  )}
+                  <PlayPauseIcon matchEx className="shrink-0" />
                 </div>
               ) : (
                 <div className="max-w-full text-center text-balance font-bold leading-[0.9] tracking-tight break-words">
