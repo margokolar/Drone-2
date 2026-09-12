@@ -950,7 +950,7 @@ final class DroneSynthEngine {
 
             let inset: CGFloat = 56
             let textWidth = canvas.width - inset * 2
-            let contentTop: CGFloat = 56
+            let titleGap: CGFloat = 88
             let bottomPad: CGFloat = 48
             let paragraph = NSMutableParagraphStyle()
             paragraph.alignment = .center
@@ -958,7 +958,7 @@ final class DroneSynthEngine {
 
             let titleMaxHeight: CGFloat = showTable ? 280 : 320
             let titleMaxSize: CGFloat = 200
-            var afterPreset = contentTop
+            var afterPreset = titleGap
             if isTransport {
                 let symbolSize: CGFloat = 200
                 let symbolName = playing ? "pause.fill" : "play.fill"
@@ -969,12 +969,12 @@ final class DroneSynthEngine {
                     let size = symbol.size
                     let drawRect = CGRect(
                         x: (canvas.width - size.width) / 2,
-                        y: contentTop,
+                        y: titleGap,
                         width: size.width,
                         height: size.height
                     )
                     symbol.draw(in: drawRect)
-                    afterPreset = drawRect.maxY + 24
+                    afterPreset = drawRect.maxY + titleGap
                 }
             } else {
                 let titleFont = fittedFont(
@@ -1000,13 +1000,13 @@ final class DroneSynthEngine {
                 (title as NSString).draw(
                     in: CGRect(
                         x: inset,
-                        y: contentTop,
+                        y: titleGap,
                         width: textWidth,
                         height: ceil(titleBound.height) + 12
                     ),
                     withAttributes: titleAttrs
                 )
-                afterPreset = contentTop + titleBound.height + 24
+                afterPreset = titleGap + titleBound.height + titleGap
             }
 
             let artistReserve: CGFloat = showTable ? 108 : max(80, canvas.height - afterPreset - bottomPad)
