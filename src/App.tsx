@@ -48,7 +48,7 @@ import {
 import { buildRuntimeConfigFromStore } from './audio/runtimeConfigFromStore'
 import { activateTransportMarker, playNextPresetAfterTransportMarker } from './audio/presetNavigationTransport'
 import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isTransportMarkerKey, navigationEntryKey } from './presets/presetNavigation'
-import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL, windowedSlice } from './utils/nowPlayingLabels'
+import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL } from './utils/nowPlayingLabels'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
 import { AddFollowerControls, AddMicToolbarButton } from './components/AddFollowerControls'
@@ -566,11 +566,7 @@ function App() {
   })
   const homeScreenLists = useMemo(() => {
     const enabledNav = getEnabledNavigationEntries(presetNavigation, presets)
-    const activeNavIndex = enabledNav.findIndex(
-      (entry) => navigationEntryKey(entry) === activeNavigationKey,
-    )
-    const windowedNav = windowedSlice(enabledNav, Math.max(0, activeNavIndex), 4)
-    const presetsForHome: HomeScreenItem[] = windowedNav.items.map((entry, offset) => {
+    const presetsForHome: HomeScreenItem[] = enabledNav.map((entry, index) => {
       const isTransport = entry.kind === 'transport'
       const preset = isTransport
         ? undefined
@@ -578,19 +574,17 @@ function App() {
       return {
         id: navigationEntryKey(entry),
         name: isTransport ? PLAY_PAUSE_SEQUENCE_LABEL : preset?.name.trim() || 'Preset',
-        number: windowedNav.start + offset + 1,
-        isActive: offset === windowedNav.activeIndex,
+        number: index + 1,
+        isActive: navigationEntryKey(entry) === activeNavigationKey,
         isTransport,
       }
     })
     const enabledSongs = songLibrary.filter((song) => song.enabled !== false)
-    const activeSongIndex = enabledSongs.findIndex((song) => song.name === songName)
-    const windowedSongs = windowedSlice(enabledSongs, Math.max(0, activeSongIndex), 4)
-    const songsForHome: HomeScreenItem[] = windowedSongs.items.map((song, offset) => ({
+    const songsForHome: HomeScreenItem[] = enabledSongs.map((song, index) => ({
       id: song.id,
       name: song.name.trim() || 'Song',
-      number: windowedSongs.start + offset + 1,
-      isActive: offset === windowedSongs.activeIndex,
+      number: index + 1,
+      isActive: song.name === songName,
     }))
     return { presets: presetsForHome, songs: songsForHome }
   }, [activeNavigationKey, presetNavigation, presets, songLibrary, songName])

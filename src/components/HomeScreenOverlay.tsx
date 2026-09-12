@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { PlayPauseIcon } from './PlayPauseIcon'
 import { SequenceListRow } from './SequenceListRow'
 
@@ -20,10 +21,25 @@ type HomeScreenOverlayProps = {
 }
 
 const boxClass =
-  'shrink-0 overflow-hidden rounded-xl border border-white/10 bg-[#1a1825] px-3 py-3'
+  'flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#1a1825] px-3 py-3'
 
 const boxLabelClass =
-  'mb-1 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50'
+  'mb-1 shrink-0 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50'
+
+const listClass =
+  'flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain'
+
+function useScrollActiveIntoView(items: HomeScreenItem[]) {
+  const listRef = useRef<HTMLDivElement>(null)
+  const activeIndex = items.findIndex((item) => item.isActive)
+  useEffect(() => {
+    const row = listRef.current?.children[activeIndex]
+    if (row instanceof HTMLElement) {
+      row.scrollIntoView({ block: 'nearest' })
+    }
+  }, [activeIndex])
+  return listRef
+}
 
 export function HomeScreenOverlay({
   presetTitle,
@@ -34,22 +50,25 @@ export function HomeScreenOverlay({
   onSelectPreset,
   onSelectSong,
 }: HomeScreenOverlayProps) {
+  const presetListRef = useScrollActiveIntoView(presets)
+  const songListRef = useScrollActiveIntoView(songs)
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <div className={boxClass}>
         <div className={boxLabelClass}>Preset</div>
-        <div className="text-[6rem] text-white">
+        <div className="h-[1.25em] shrink-0 text-[6rem] text-white">
           {isTransport ? (
-            <div className="flex h-[1em] items-center justify-center pb-[0.25em]">
-              <PlayPauseIcon matchEx className="shrink-0" />
+            <div className="flex h-full items-center justify-center">
+              <PlayPauseIcon className="h-[0.7em] w-auto shrink-0" />
             </div>
           ) : (
-            <div className="w-full truncate pb-[0.25em] text-center font-bold leading-none tracking-tight">
+            <div className="h-full w-full truncate pb-[0.25em] text-center font-bold leading-none tracking-tight">
               {presetTitle}
             </div>
           )}
         </div>
-        <div className="mt-2 flex flex-col gap-1">
+        <div ref={presetListRef} className={`mt-2 ${listClass}`}>
           {presets.map((item) => (
             <SequenceListRow
               key={`preset-${item.id}`}
@@ -64,12 +83,12 @@ export function HomeScreenOverlay({
       </div>
       <div className={boxClass}>
         <div className={boxLabelClass}>Song</div>
-        <div className="text-[3rem] text-white/70">
-          <div className="w-full truncate pb-[0.25em] text-center font-semibold leading-none tracking-tight">
+        <div className="h-[1.25em] shrink-0 text-[3rem] text-white/70">
+          <div className="h-full w-full truncate pb-[0.25em] text-center font-semibold leading-none tracking-tight">
             {songTitle}
           </div>
         </div>
-        <div className="mt-3 flex flex-col gap-1">
+        <div ref={songListRef} className={`mt-3 ${listClass}`}>
           {songs.map((item) => (
             <SequenceListRow
               key={`song-${item.id}`}
