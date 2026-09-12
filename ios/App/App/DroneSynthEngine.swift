@@ -849,7 +849,7 @@ final class DroneSynthEngine {
         let window = windowedSequence(sequence, activeIndex: activeIndex, maxRows: maxFit)
         var y = rect.minY
 
-        let numberWidth: CGFloat = 40
+        let numberWidth: CGFloat = 68
         let nameInset: CGFloat = 12
         let nameParagraph = NSMutableParagraphStyle()
         nameParagraph.alignment = .left
@@ -873,7 +873,7 @@ final class DroneSynthEngine {
             path.lineWidth = isActive ? 2 : 1
             path.stroke()
 
-            let fontSize: CGFloat = 26
+            let fontSize: CGFloat = 44
             let font = roundedFont(size: fontSize, weight: isActive ? .bold : .semibold)
             let number = "\(window.start + offset + 1)" as NSString
             let nameText = name as NSString
@@ -899,7 +899,7 @@ final class DroneSynthEngine {
             let isTransportRow = name.compare("Play / Pause", options: .caseInsensitive) == .orderedSame
             if isTransportRow {
                 let tint = isActive ? UIColor.white : UIColor(white: 1, alpha: 0.78)
-                let config = UIImage.SymbolConfiguration(pointSize: 27, weight: .semibold)
+                let config = UIImage.SymbolConfiguration(pointSize: 46, weight: .semibold)
                 let symbolNames = ["pause.fill", "play.fill"]
                 var symbolX = nameX
                 for symbolName in symbolNames {
