@@ -50,3 +50,21 @@ export function nowPlayingLabels(state: {
   const presetName = state.presets.find((preset) => preset.id === state.activePresetId)?.name.trim()
   return { title: presetName || 'Drone', artist, sequence, activeIndex }
 }
+
+export function windowedNowPlayingSequence(
+  sequence: string[],
+  activeIndex: number,
+  maxRows: number,
+): { items: string[]; activeIndex: number; start: number } {
+  if (sequence.length <= maxRows) {
+    return { items: sequence, activeIndex, start: 0 }
+  }
+  let start = Math.max(0, activeIndex - Math.floor(maxRows / 2))
+  const end = Math.min(sequence.length, start + maxRows)
+  start = Math.max(0, end - maxRows)
+  return {
+    items: sequence.slice(start, end),
+    activeIndex: activeIndex - start,
+    start,
+  }
+}
