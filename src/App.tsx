@@ -2151,10 +2151,22 @@ function App() {
       new URLSearchParams(window.location.search).get('device') === 'iphone16pm',
     [],
   )
+  const homeScreen = (
+    <HomeScreenOverlay
+      presetTitle={lockScreenLabels.title}
+      isTransport={isTransportMarkerKey(activeNavigationKey, presetNavigation)}
+      songTitle={lockScreenLabels.artist}
+      presets={homeScreenLists.presets}
+      songs={homeScreenLists.songs}
+      onSelectPreset={handleHomePresetSelect}
+      onSelectSong={handleHomeSongSelect}
+    />
+  )
+  const iosHomeOpen = isIosApp() && homeScreenOpen
   const appShell = (
     <div
       className={`relative bg-[#111019] text-[#f2f2f7] ${
-        activeTab === 'metronome' || activeTab === 'presets'
+        iosHomeOpen || activeTab === 'metronome' || activeTab === 'presets'
           ? 'flex h-[100dvh] flex-col overflow-hidden overscroll-none'
           : activeTab === 'shine'
             ? 'landscape:flex landscape:h-[100dvh] landscape:flex-col landscape:overflow-hidden landscape:overscroll-none max-h-[500px]:flex max-h-[500px]:h-[100dvh] max-h-[500px]:flex-col max-h-[500px]:overflow-hidden max-h-[500px]:overscroll-none'
@@ -2189,34 +2201,24 @@ function App() {
           </button>
         </div>
       )}
-      {homeScreenOpen && (
+      {homeScreenOpen && !iosHomeOpen && (
         <div
           className={`fixed z-[45] overflow-hidden bg-[#111019] px-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] ${
             controlsLocked ? 'pointer-events-none' : ''
           }`}
           style={{
-            top: isIosApp()
-              ? 'calc(var(--sticky-chrome-bottom, calc(env(safe-area-inset-top, 0px) + 4.75rem)) + 0.5rem)'
-              : 'var(--sticky-chrome-bottom, calc(env(safe-area-inset-top, 0px) + 4.75rem))',
+            top: 'var(--sticky-chrome-bottom, calc(env(safe-area-inset-top, 0px) + 4.75rem))',
             bottom: 'calc(var(--bottom-chrome-height, 5.5rem) + 0.25rem)',
             left: 0,
             right: 0,
           }}
         >
-          <HomeScreenOverlay
-            presetTitle={lockScreenLabels.title}
-            isTransport={isTransportMarkerKey(activeNavigationKey, presetNavigation)}
-            songTitle={lockScreenLabels.artist}
-            presets={homeScreenLists.presets}
-            songs={homeScreenLists.songs}
-            onSelectPreset={handleHomePresetSelect}
-            onSelectSong={handleHomeSongSelect}
-          />
+          {homeScreen}
         </div>
       )}
       <div
         className={`mx-auto w-full max-w-md pt-0 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
-          activeTab === 'presets' || activeTab === 'metronome'
+          iosHomeOpen || activeTab === 'presets' || activeTab === 'metronome'
             ? 'flex min-h-0 flex-1 flex-col pb-0'
             : activeTab === 'shine'
               ? 'landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:pb-0 landscape:pt-[env(safe-area-inset-top,0px)] max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:pb-0 max-h-[500px]:pt-[env(safe-area-inset-top,0px)]'
@@ -2226,7 +2228,7 @@ function App() {
         <div
           id={TONE_STICKY_CHROME_ID}
           ref={stickyChromeRef}
-          className={`sticky top-0 z-50 -ml-[max(0.75rem,env(safe-area-inset-left,0px))] -mr-[max(0.75rem,env(safe-area-inset-right,0px))] bg-[#111019] pb-2 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] pt-[env(safe-area-inset-top,0px)] ${
+          className={`sticky top-0 z-50 shrink-0 -ml-[max(0.75rem,env(safe-area-inset-left,0px))] -mr-[max(0.75rem,env(safe-area-inset-right,0px))] bg-[#111019] pb-2 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] pt-[env(safe-area-inset-top,0px)] ${
             activeTab === 'tone' || controlsLocked || homeScreenOpen ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}
         >
@@ -2388,9 +2390,18 @@ function App() {
             </div>
           )}
         </div>
+        {iosHomeOpen && (
+          <div
+            className={`relative z-40 flex min-h-0 flex-1 flex-col overflow-hidden bg-[#111019] -ml-[max(0.75rem,env(safe-area-inset-left,0px))] -mr-[max(0.75rem,env(safe-area-inset-right,0px))] px-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] pb-[calc(var(--bottom-chrome-height,5.5rem)+0.25rem)] ${
+              controlsLocked ? 'pointer-events-none' : ''
+            }`}
+          >
+            {homeScreen}
+          </div>
+        )}
 
         <main
-          className={`landscape:pb-2 max-h-[500px]:pb-2 ${
+          className={`${iosHomeOpen ? 'hidden' : ''} landscape:pb-2 max-h-[500px]:pb-2 ${
             activeTab === 'metronome'
               ? 'pb-32'
               : activeTab === 'presets'
