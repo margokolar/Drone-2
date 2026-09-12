@@ -119,7 +119,29 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func setNowPlaying(_ call: CAPPluginCall) {
         let title = call.getString("title") ?? "Drone"
         let artist = call.getString("artist") ?? "Drone"
-        DroneSynthEngine.shared.setNowPlayingLabels(title: title, artist: artist)
+        let sequence = (call.getArray("sequence") ?? []).compactMap { item -> String? in
+            if let text = item as? String {
+                return text
+            }
+            if let text = item as? NSString {
+                return text as String
+            }
+            return nil
+        }
+        let activeIndex: Int
+        if let value = call.getInt("activeIndex") {
+            activeIndex = value
+        } else if let value = call.getDouble("activeIndex") {
+            activeIndex = Int(value)
+        } else {
+            activeIndex = -1
+        }
+        DroneSynthEngine.shared.setNowPlayingLabels(
+            title: title,
+            artist: artist,
+            sequence: sequence,
+            activeIndex: activeIndex
+        )
         call.resolve()
     }
 

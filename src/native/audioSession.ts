@@ -20,7 +20,12 @@ export type AudioSessionPlugin = {
   activate(): Promise<{ active: boolean }>
   deactivate(): Promise<{ active: boolean }>
   setKeepAwake(options: { on: boolean }): Promise<{ on: boolean }>
-  setNowPlaying(options: { title: string; artist: string }): Promise<void>
+  setNowPlaying(options: {
+    title: string
+    artist: string
+    sequence?: string[]
+    activeIndex?: number
+  }): Promise<void>
   addListener(
     eventName: 'interruption',
     listenerFunc: (event: AudioInterruptionEvent) => void,

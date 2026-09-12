@@ -78,6 +78,8 @@ final class DroneSynthEngine {
     private var storedFadeOut = 0.0
     private var nowPlayingTitle = "Drone"
     private var nowPlayingArtist = "Drone"
+    private var nowPlayingSequence: [String] = []
+    private var nowPlayingActiveIndex = -1
     private var metroEnabled = false
     private var metroMuted = false
     private var metroPeak = 0.5
@@ -175,11 +177,13 @@ final class DroneSynthEngine {
         Self.publishNowPlaying(playing: false)
     }
 
-    func setNowPlayingLabels(title: String, artist: String) {
+    func setNowPlayingLabels(title: String, artist: String, sequence: [String] = [], activeIndex: Int = -1) {
         let nextTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let nextArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
         nowPlayingTitle = nextTitle.isEmpty ? "Drone" : nextTitle
         nowPlayingArtist = nextArtist.isEmpty ? "Drone" : nextArtist
+        nowPlayingSequence = sequence.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        nowPlayingActiveIndex = activeIndex
         Self.publishNowPlaying(playing: isAudible)
     }
 
@@ -817,10 +821,111 @@ final class DroneSynthEngine {
         return roundedFont(size: minSize, weight: weight)
     }
 
-    private static func renderNowPlayingImage(title: String, artist: String, playing: Bool) -> UIImage {
+    private static func windowedSequence(
+        _ sequence: [String],
+        activeIndex: Int,
+        maxRows: Int
+    ) -> (items: [String], active: Int, start: Int) {
+        if sequence.count <= maxRows {
+            return (sequence, activeIndex, 0)
+        }
+        var start = max(0, activeIndex - maxRows / 2)
+        let end = min(sequence.count, start + maxRows)
+        start = max(0, end - maxRows)
+        return (Array(sequence[start..<end]), activeIndex - start, start)
+    }
+
+    private static func drawPresetSequenceTable(
+        sequence: [String],
+        activeIndex: Int,
+        in rect: CGRect
+    ) {
+        guard sequence.count >= 2, rect.height >= 40, rect.width >= 80 else {
+            return
+        }
+        let gap: CGFloat = 10
+        let maxRow: CGFloat = 76
+        let minRow: CGFloat = 48
+        let maxFit = max(2, Int(floor((rect.height + gap) / (minRow + gap))))
+        let window = windowedSequence(sequence, activeIndex: activeIndex, maxRows: maxFit)
+        let count = CGFloat(window.items.count)
+        let rowH = min(maxRow, max(minRow, (rect.height - gap * (count - 1)) / count))
+        let tableHeight = rowH * count + gap * max(0, count - 1)
+        var y = rect.minY
+        if tableHeight < rect.height {
+            y += min(12, (rect.height - tableHeight) / 8)
+        }
+
+        let numberWidth: CGFloat = min(72, max(44, rowH * 0.9))
+        let nameInset: CGFloat = 20
+        let nameParagraph = NSMutableParagraphStyle()
+        nameParagraph.alignment = .left
+        nameParagraph.lineBreakMode = .byTruncatingTail
+        let numberParagraph = NSMutableParagraphStyle()
+        numberParagraph.alignment = .center
+
+        for (offset, name) in window.items.enumerated() {
+            let row = CGRect(x: rect.minX, y: y, width: rect.width, height: rowH)
+            let isActive = offset == window.active
+            let fill = isActive
+                ? UIColor(red: 251 / 255, green: 191 / 255, blue: 36 / 255, alpha: 0.22)
+                : UIColor(white: 1, alpha: 0.07)
+            let stroke = isActive
+                ? UIColor(red: 252 / 255, green: 211 / 255, blue: 77 / 255, alpha: 0.9)
+                : UIColor(white: 1, alpha: 0.12)
+            let path = UIBezierPath(roundedRect: row, cornerRadius: min(22, rowH * 0.28))
+            fill.setFill()
+            path.fill()
+            stroke.setStroke()
+            path.lineWidth = isActive ? 4 : 2
+            path.stroke()
+
+            let fontSize = min(42, max(26, rowH * 0.46))
+            let font = roundedFont(size: fontSize, weight: isActive ? .bold : .semibold)
+            let number = "\(window.start + offset + 1)" as NSString
+            let nameText = name as NSString
+            let numberAttrs: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: isActive
+                    ? UIColor(red: 253 / 255, green: 230 / 255, blue: 138 / 255, alpha: 1)
+                    : UIColor(white: 1, alpha: 0.45),
+                .paragraphStyle: numberParagraph,
+            ]
+            let nameAttrs: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: isActive ? UIColor.white : UIColor(white: 1, alpha: 0.78),
+                .paragraphStyle: nameParagraph,
+            ]
+            let textHeight = font.lineHeight
+            let textY = row.midY - textHeight / 2
+            number.draw(
+                in: CGRect(x: row.minX, y: textY, width: numberWidth, height: textHeight + 6),
+                withAttributes: numberAttrs
+            )
+            nameText.draw(
+                in: CGRect(
+                    x: row.minX + numberWidth,
+                    y: textY,
+                    width: row.width - numberWidth - nameInset,
+                    height: textHeight + 6
+                ),
+                withAttributes: nameAttrs
+            )
+            y += rowH + gap
+        }
+    }
+
+    private static func renderNowPlayingImage(
+        title: String,
+        artist: String,
+        playing: Bool,
+        sequence: [String],
+        activeIndex: Int
+    ) -> UIImage {
         let canvas = CGSize(width: 1024, height: 1024)
         let renderer = UIGraphicsImageRenderer(size: canvas)
         let isTransport = title.compare("Play / Pause", options: .caseInsensitive) == .orderedSame
+        let showTable = sequence.count >= 2
         return renderer.image { rendererContext in
             let bounds = CGRect(origin: .zero, size: canvas)
             UIColor(red: 17 / 255, green: 16 / 255, blue: 25 / 255, alpha: 1).setFill()
@@ -850,10 +955,13 @@ final class DroneSynthEngine {
             paragraph.alignment = .center
             paragraph.lineBreakMode = .byWordWrapping
 
+            let titleMaxHeight: CGFloat = showTable ? 140 : 320
+            let titleMaxSize: CGFloat = showTable ? 120 : 200
             var afterPreset = afterIcon
             if isTransport {
+                let symbolSize: CGFloat = showTable ? 96 : 200
                 let symbolName = playing ? "pause.fill" : "play.fill"
-                let config = UIImage.SymbolConfiguration(pointSize: 200, weight: .bold)
+                let config = UIImage.SymbolConfiguration(pointSize: symbolSize, weight: .bold)
                 if let symbol = UIImage(systemName: symbolName, withConfiguration: config)?
                     .withTintColor(.white, renderingMode: .alwaysOriginal)
                 {
@@ -871,10 +979,10 @@ final class DroneSynthEngine {
                 let titleFont = fittedFont(
                     for: title,
                     width: textWidth,
-                    maxHeight: 320,
-                    maxSize: 200,
-                    minSize: 52,
-                    maxLines: 3,
+                    maxHeight: titleMaxHeight,
+                    maxSize: titleMaxSize,
+                    minSize: showTable ? 44 : 52,
+                    maxLines: showTable ? 2 : 3,
                     weight: .bold
                 )
                 let titleAttrs: [NSAttributedString.Key: Any] = [
@@ -883,7 +991,7 @@ final class DroneSynthEngine {
                     .paragraphStyle: paragraph,
                 ]
                 let titleBound = (title as NSString).boundingRect(
-                    with: CGSize(width: textWidth, height: 320),
+                    with: CGSize(width: textWidth, height: titleMaxHeight),
                     options: [.usesLineFragmentOrigin, .usesFontLeading],
                     attributes: titleAttrs,
                     context: nil
@@ -900,19 +1008,34 @@ final class DroneSynthEngine {
                 afterPreset = afterIcon + titleBound.height + 24
             }
 
+            let artistReserve: CGFloat = showTable ? 108 : max(80, canvas.height - afterPreset - bottomPad)
             let artistRect = CGRect(
                 x: inset,
-                y: afterPreset,
+                y: canvas.height - bottomPad - artistReserve,
                 width: textWidth,
-                height: max(80, canvas.height - afterPreset - bottomPad)
+                height: artistReserve
             )
+            if showTable {
+                let tableRect = CGRect(
+                    x: inset,
+                    y: afterPreset,
+                    width: textWidth,
+                    height: max(40, artistRect.minY - afterPreset - 20)
+                )
+                drawPresetSequenceTable(
+                    sequence: sequence,
+                    activeIndex: activeIndex,
+                    in: tableRect
+                )
+            }
+
             let artistFont = fittedFont(
                 for: artist,
                 width: textWidth,
                 maxHeight: artistRect.height,
-                maxSize: 118,
-                minSize: 40,
-                maxLines: 3,
+                maxSize: showTable ? 64 : 118,
+                minSize: 32,
+                maxLines: 2,
                 weight: .semibold
             )
             let artistAttrs: [NSAttributedString.Key: Any] = [
@@ -938,13 +1061,26 @@ final class DroneSynthEngine {
         }
     }
 
-    private static func nowPlayingArtwork(title: String, artist: String, playing: Bool) -> MPMediaItemArtwork {
+    private static func nowPlayingArtwork(
+        title: String,
+        artist: String,
+        playing: Bool,
+        sequence: [String],
+        activeIndex: Int
+    ) -> MPMediaItemArtwork {
         let isTransport = title.compare("Play / Pause", options: .caseInsensitive) == .orderedSame
-        let key = "\(title)\u{0}\(artist)\u{0}\(isTransport && playing ? "1" : "0")"
+        let sequenceKey = sequence.joined(separator: "\u{1f}")
+        let key = "\(title)\u{0}\(artist)\u{0}\(isTransport && playing ? "1" : "0")\u{0}\(sequenceKey)\u{0}\(activeIndex)"
         if key == cachedArtworkKey, let cached = cachedArtwork {
             return cached
         }
-        let image = renderNowPlayingImage(title: title, artist: artist, playing: playing)
+        let image = renderNowPlayingImage(
+            title: title,
+            artist: artist,
+            playing: playing,
+            sequence: sequence,
+            activeIndex: activeIndex
+        )
         let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
         cachedArtwork = artwork
         cachedArtworkKey = key
@@ -954,10 +1090,18 @@ final class DroneSynthEngine {
     private static func publishNowPlaying(playing: Bool) {
         let title = shared.nowPlayingTitle
         let artist = shared.nowPlayingArtist
+        let sequence = shared.nowPlayingSequence
+        let activeIndex = shared.nowPlayingActiveIndex
         DispatchQueue.main.async {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = [
                 MPMediaItemPropertyTitle: "Drone",
-                MPMediaItemPropertyArtwork: nowPlayingArtwork(title: title, artist: artist, playing: playing),
+                MPMediaItemPropertyArtwork: nowPlayingArtwork(
+                    title: title,
+                    artist: artist,
+                    playing: playing,
+                    sequence: sequence,
+                    activeIndex: activeIndex
+                ),
                 MPNowPlayingInfoPropertyPlaybackRate: playing ? 1.0 : 0.0,
                 MPNowPlayingInfoPropertyIsLiveStream: true,
             ]

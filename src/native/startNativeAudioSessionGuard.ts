@@ -130,7 +130,7 @@ export async function startNativeAudioSessionGuard(): Promise<() => void> {
   let lastNowPlaying = ''
   const syncNowPlaying = () => {
     const labels = nowPlayingLabels(useDroneStore.getState())
-    const key = `${labels.title}\0${labels.artist}`
+    const key = `${labels.title}\0${labels.artist}\0${labels.sequence.join('\0')}\0${labels.activeIndex}`
     if (key === lastNowPlaying) {
       return
     }
