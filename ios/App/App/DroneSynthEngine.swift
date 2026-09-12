@@ -899,16 +899,25 @@ final class DroneSynthEngine {
             let isTransportRow = name.compare("Play / Pause", options: .caseInsensitive) == .orderedSame
             if isTransportRow {
                 let tint = isActive ? UIColor.white : UIColor(white: 1, alpha: 0.78)
-                let iconH = font.xHeight
-                let iconW = iconH * (Self.playPauseViewWidth / Self.playPauseViewHeight)
-                let symbolRect = CGRect(
-                    x: nameX,
-                    y: row.midY - iconH / 2,
-                    width: iconW,
-                    height: iconH
-                )
-                drawPlayPauseIcon(in: symbolRect, color: tint)
-                nameX = symbolRect.maxX + 10
+                let config = UIImage.SymbolConfiguration(pointSize: 46, weight: .semibold)
+                let symbolNames = ["pause.fill", "play.fill"]
+                var symbolX = nameX
+                for symbolName in symbolNames {
+                    if let symbol = UIImage(systemName: symbolName, withConfiguration: config)?
+                        .withTintColor(tint, renderingMode: .alwaysOriginal)
+                    {
+                        let size = symbol.size
+                        let symbolRect = CGRect(
+                            x: symbolX,
+                            y: row.midY - size.height / 2,
+                            width: size.width,
+                            height: size.height
+                        )
+                        symbol.draw(in: symbolRect)
+                        symbolX = symbolRect.maxX + 4
+                    }
+                }
+                nameX = symbolX + 8
             }
             nameText.draw(
                 in: CGRect(
@@ -923,69 +932,10 @@ final class DroneSynthEngine {
         }
     }
 
-    /// Matches `PlayPauseIcon` viewBox in `src/components/PlayPauseIcon.tsx`.
-    private static let playPauseViewWidth: CGFloat = 34
-    private static let playPauseViewHeight: CGFloat = 24
-
-    private static func roundedPolygon(_ points: [CGPoint], cornerRadius: CGFloat) -> UIBezierPath {
-        let path = UIBezierPath()
-        let count = points.count
-        guard count >= 3 else { return path }
-        for index in 0..<count {
-            let previous = points[(index - 1 + count) % count]
-            let current = points[index]
-            let next = points[(index + 1) % count]
-            let toPrevious = CGPoint(x: previous.x - current.x, y: previous.y - current.y)
-            let toNext = CGPoint(x: next.x - current.x, y: next.y - current.y)
-            let previousLength = hypot(toPrevious.x, toPrevious.y)
-            let nextLength = hypot(toNext.x, toNext.y)
-            guard previousLength > 0, nextLength > 0 else { continue }
-            let radiusPrevious = min(cornerRadius, previousLength / 2)
-            let radiusNext = min(cornerRadius, nextLength / 2)
-            let start = CGPoint(
-                x: current.x + toPrevious.x / previousLength * radiusPrevious,
-                y: current.y + toPrevious.y / previousLength * radiusPrevious
-            )
-            let end = CGPoint(
-                x: current.x + toNext.x / nextLength * radiusNext,
-                y: current.y + toNext.y / nextLength * radiusNext
-            )
-            if path.isEmpty {
-                path.move(to: start)
-            } else {
-                path.addLine(to: start)
-            }
-            path.addQuadCurve(to: end, controlPoint: current)
-        }
-        path.close()
-        return path
-    }
-
-    private static func drawPlayPauseIcon(in rect: CGRect, color: UIColor) {
-        guard rect.width > 0, rect.height > 0, let context = UIGraphicsGetCurrentContext() else {
-            return
-        }
-        context.saveGState()
-        context.translateBy(x: rect.minX, y: rect.minY)
-        context.scaleBy(x: rect.width / playPauseViewWidth, y: rect.height / playPauseViewHeight)
-        color.setFill()
-        UIBezierPath(roundedRect: CGRect(x: 0, y: 3, width: 5, height: 18), cornerRadius: 1).fill()
-        UIBezierPath(roundedRect: CGRect(x: 9, y: 3, width: 5, height: 18), cornerRadius: 1).fill()
-        roundedPolygon(
-            [
-                CGPoint(x: 18, y: 5),
-                CGPoint(x: 33, y: 12),
-                CGPoint(x: 18, y: 19),
-            ],
-            cornerRadius: 2
-        ).fill()
-        context.restoreGState()
-    }
-
     private static func renderNowPlayingImage(
         title: String,
         artist: String,
-        playing _: Bool,
+        playing: Bool,
         sequence: [String],
         activeIndex: Int
     ) -> UIImage {
@@ -1010,18 +960,22 @@ final class DroneSynthEngine {
             let titleMaxSize: CGFloat = 200
             var afterPreset = titleGap
             if isTransport {
-                let titleFont = roundedFont(size: titleMaxSize, weight: .bold)
-                let slotH = titleMaxSize
-                let iconH = titleFont.xHeight
-                let iconW = iconH * (playPauseViewWidth / playPauseViewHeight)
-                let drawRect = CGRect(
-                    x: (canvas.width - iconW) / 2,
-                    y: titleGap + (slotH - iconH) / 2,
-                    width: iconW,
-                    height: iconH
-                )
-                drawPlayPauseIcon(in: drawRect, color: .white)
-                afterPreset = titleGap + slotH + titleGap
+                let symbolSize: CGFloat = 200
+                let symbolName = playing ? "pause.fill" : "play.fill"
+                let config = UIImage.SymbolConfiguration(pointSize: symbolSize, weight: .bold)
+                if let symbol = UIImage(systemName: symbolName, withConfiguration: config)?
+                    .withTintColor(.white, renderingMode: .alwaysOriginal)
+                {
+                    let size = symbol.size
+                    let drawRect = CGRect(
+                        x: (canvas.width - size.width) / 2,
+                        y: titleGap,
+                        width: size.width,
+                        height: size.height
+                    )
+                    symbol.draw(in: drawRect)
+                    afterPreset = drawRect.maxY + titleGap
+                }
             } else {
                 let titleFont = fittedFont(
                     for: title,
@@ -1115,8 +1069,9 @@ final class DroneSynthEngine {
         sequence: [String],
         activeIndex: Int
     ) -> MPMediaItemArtwork {
+        let isTransport = title.compare("Play / Pause", options: .caseInsensitive) == .orderedSame
         let sequenceKey = sequence.joined(separator: "\u{1f}")
-        let key = "\(title)\u{0}\(artist)\u{0}\(sequenceKey)\u{0}\(activeIndex)"
+        let key = "\(title)\u{0}\(artist)\u{0}\(isTransport && playing ? "1" : "0")\u{0}\(sequenceKey)\u{0}\(activeIndex)"
         if key == cachedArtworkKey, let cached = cachedArtwork {
             return cached
         }
