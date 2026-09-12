@@ -2128,7 +2128,11 @@ function App() {
           }}
         >
           <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#1a1825] px-3 pb-[calc(var(--bottom-chrome-height,5.5rem)+1.25rem)] pt-6">
-            <div className="mt-[0.5em] shrink-0 text-[13.5rem] text-white">
+            <div
+              className={`flex min-h-0 items-center justify-center text-[13.5rem] text-white ${
+                lockScreenLabels.sequence.length >= 2 ? 'flex-1' : 'mt-[0.5em] shrink-0'
+              }`}
+            >
               {isTransportMarkerKey(activeNavigationKey, presetNavigation) ? (
                 <div className="flex h-[0.9em] items-center justify-center">
                   {playing ? (
@@ -2147,7 +2151,13 @@ function App() {
               sequence={lockScreenLabels.sequence}
               activeIndex={lockScreenLabels.activeIndex}
             />
-            <div className="flex min-h-0 flex-1 items-center justify-center">
+            <div
+              className={`flex justify-center ${
+                lockScreenLabels.sequence.length >= 2
+                  ? 'shrink-0 py-3'
+                  : 'min-h-0 flex-1 items-center'
+              }`}
+            >
               <div className="max-w-full text-center text-balance text-[3rem] font-semibold leading-tight break-words text-white/70">
                 {lockScreenLabels.artist}
               </div>

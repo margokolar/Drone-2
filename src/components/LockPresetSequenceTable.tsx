@@ -18,7 +18,7 @@ export function LockPresetSequenceTable({ sequence, activeIndex }: LockPresetSeq
   }
   const windowed = windowedNowPlayingSequence(sequence, activeIndex, MAX_LOCK_SEQUENCE_ROWS)
   return (
-    <div className="mt-3 flex shrink-0 flex-col gap-1">
+    <div className="flex shrink-0 flex-col gap-1">
       {windowed.items.map((name, offset) => {
         const isActive = offset === windowed.activeIndex
         const isTransport = name === PLAY_PAUSE_SEQUENCE_LABEL

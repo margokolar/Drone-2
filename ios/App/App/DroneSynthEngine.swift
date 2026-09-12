@@ -835,6 +835,17 @@ final class DroneSynthEngine {
         return (Array(sequence[start..<end]), activeIndex - start, start)
     }
 
+    private static func sequenceTableHeight(sequence: [String], maxHeight: CGFloat) -> CGFloat {
+        guard sequence.count >= 2, maxHeight >= 40 else {
+            return 0
+        }
+        let gap: CGFloat = 6
+        let rowH: CGFloat = 48
+        let maxFit = max(2, Int(floor((maxHeight + gap) / (rowH + gap))))
+        let visible = min(sequence.count, maxFit)
+        return CGFloat(visible) * rowH + CGFloat(max(0, visible - 1)) * gap
+    }
+
     private static func drawPresetSequenceTable(
         sequence: [String],
         activeIndex: Int,
@@ -972,11 +983,55 @@ final class DroneSynthEngine {
             paragraph.alignment = .center
             paragraph.lineBreakMode = .byWordWrapping
 
-            let titleMaxHeight: CGFloat = 280
+            let artistReserve: CGFloat = 108
+            let artistRect: CGRect
+            let tableRect: CGRect
+            let titleBand: CGRect
+            if showTable {
+                let reservedArtist = CGRect(
+                    x: inset,
+                    y: canvas.height - bottomPad - artistReserve,
+                    width: textWidth,
+                    height: artistReserve
+                )
+                let tableHeight = sequenceTableHeight(
+                    sequence: sequence,
+                    maxHeight: max(40, reservedArtist.minY - afterIcon - 40)
+                )
+                tableRect = CGRect(
+                    x: inset,
+                    y: reservedArtist.minY - 20 - tableHeight,
+                    width: textWidth,
+                    height: tableHeight
+                )
+                titleBand = CGRect(
+                    x: inset,
+                    y: afterIcon,
+                    width: textWidth,
+                    height: max(80, tableRect.minY - afterIcon)
+                )
+                artistRect = reservedArtist
+            } else {
+                tableRect = .zero
+                titleBand = CGRect(
+                    x: inset,
+                    y: afterIcon,
+                    width: textWidth,
+                    height: min(320, max(80, canvas.height - afterIcon - bottomPad - 80))
+                )
+                artistRect = CGRect(
+                    x: inset,
+                    y: titleBand.maxY,
+                    width: textWidth,
+                    height: max(80, canvas.height - bottomPad - titleBand.maxY)
+                )
+            }
+            let titleMaxHeight = titleBand.height
             let titleMaxSize: CGFloat = 200
-            var afterPreset = afterIcon
+            let centerTitle = showTable
+
             if isTransport {
-                let symbolSize: CGFloat = 200
+                let symbolSize: CGFloat = min(200, titleMaxHeight * 0.85)
                 let symbolName = playing ? "pause.fill" : "play.fill"
                 let config = UIImage.SymbolConfiguration(pointSize: symbolSize, weight: .bold)
                 if let symbol = UIImage(systemName: symbolName, withConfiguration: config)?
@@ -985,12 +1040,13 @@ final class DroneSynthEngine {
                     let size = symbol.size
                     let drawRect = CGRect(
                         x: (canvas.width - size.width) / 2,
-                        y: afterIcon,
+                        y: centerTitle
+                            ? titleBand.midY - size.height / 2
+                            : titleBand.minY,
                         width: size.width,
                         height: size.height
                     )
                     symbol.draw(in: drawRect)
-                    afterPreset = drawRect.maxY + 24
                 }
             } else {
                 let titleFont = fittedFont(
@@ -1016,29 +1072,17 @@ final class DroneSynthEngine {
                 (title as NSString).draw(
                     in: CGRect(
                         x: inset,
-                        y: afterIcon,
+                        y: centerTitle
+                            ? titleBand.minY + max(0, (titleBand.height - titleBound.height) / 2)
+                            : titleBand.minY,
                         width: textWidth,
                         height: ceil(titleBound.height) + 12
                     ),
                     withAttributes: titleAttrs
                 )
-                afterPreset = afterIcon + titleBound.height + 24
             }
 
-            let artistReserve: CGFloat = showTable ? 108 : max(80, canvas.height - afterPreset - bottomPad)
-            let artistRect = CGRect(
-                x: inset,
-                y: canvas.height - bottomPad - artistReserve,
-                width: textWidth,
-                height: artistReserve
-            )
             if showTable {
-                let tableRect = CGRect(
-                    x: inset,
-                    y: afterPreset,
-                    width: textWidth,
-                    height: max(40, artistRect.minY - afterPreset - 20)
-                )
                 drawPresetSequenceTable(
                     sequence: sequence,
                     activeIndex: activeIndex,
