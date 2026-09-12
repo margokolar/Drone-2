@@ -1,7 +1,8 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { droneEngine } from '../audio/DroneEngine'
 import {
-  transportNextPreset,
+  transportMediaNextPress,
+  transportMediaPreviousPress,
   transportPause,
   transportPauseFromRemote,
   transportPlay,
@@ -36,6 +37,7 @@ import {
 } from '../utils/footPedalKeys'
 import { markMediaSessionAction, wasMediaSessionHandledRecently } from '../utils/mediaRemoteDedupe'
 import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
+import { nowPlayingLabels } from '../utils/nowPlayingLabels'
 import { isCapacitorNative } from '../utils/platform'
 import { runMediaSessionAction } from '../utils/restoreBleKeyboardFocus'
 
@@ -146,6 +148,8 @@ export function useBtControl({
   const pageUpTimeoutRef = useRef<number | null>(null)
   const btControlMode = useDroneStore((state) => state.btControlMode)
   const playing = useDroneStore((state) => state.playing)
+  const activeNavigationKey = useDroneStore((state) => state.activeNavigationKey)
+  const presetNavigation = useDroneStore((state) => state.presetNavigation)
 
   useEffect(() => {
     if (!needsIosMediaRemoteIntegration()) {
@@ -188,18 +192,27 @@ export function useBtControl({
     if (!needsIosMediaRemoteIntegration() || !('mediaSession' in navigator)) {
       return
     }
-    const activePresetName =
-      presets.find((preset) => preset.id === activePresetId)?.name ?? 'Drone'
+    const labels = nowPlayingLabels({
+      songName,
+      presets,
+      activePresetId,
+      activeNavigationKey,
+      presetNavigation,
+    })
     try {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: activePresetName,
-        artist: songName || 'Drone',
-        album: 'Drone App',
-      })
+      navigator.mediaSession.metadata = new MediaMetadata(
+        isCapacitorNative()
+          ? { title: 'Drone' }
+          : {
+              title: labels.title,
+              artist: labels.artist,
+              album: 'Drone',
+            },
+      )
     } catch {
       // Some browsers reject MediaMetadata before user gesture; ignore.
     }
-  }, [activePresetId, presets, songName])
+  }, [activeNavigationKey, activePresetId, presetNavigation, presets, songName])
 
   useEffect(() => {
     if (!needsIosMediaRemoteIntegration()) {
@@ -234,6 +247,10 @@ export function useBtControl({
       if (matchesFootPedalKey(event, UNIVERSAL_VOLUME_UP_KEYS)) {
         event.preventDefault()
         event.stopPropagation()
+        if (wasMediaSessionHandledRecently('volup')) {
+          return
+        }
+        markMediaSessionAction('volup')
         void droneEngine.pokeClock()
         transportVolumeUp()
         return
@@ -242,6 +259,10 @@ export function useBtControl({
       if (matchesFootPedalKey(event, UNIVERSAL_VOLUME_DOWN_KEYS)) {
         event.preventDefault()
         event.stopPropagation()
+        if (wasMediaSessionHandledRecently('voldown')) {
+          return
+        }
+        markMediaSessionAction('voldown')
         void droneEngine.pokeClock()
         transportVolumeDown()
       }
@@ -300,22 +321,39 @@ export function useBtControl({
       })
       setActionHandler('nexttrack', () => {
         recordBleDebug('mediasession', 'pedal nexttrack')
-        if (wasMediaSessionHandledRecently('next')) {
-          return
-        }
-        markMediaSessionAction('next')
         runMediaSessionAction(() => {
           void droneEngine.pokeClock()
-          transportNextPreset(latestRuntimeConfigRef.current)
+          transportMediaNextPress(latestRuntimeConfigRef.current)
         })
       })
       setActionHandler('previoustrack', () => {
         recordBleDebug('mediasession', 'pedal previoustrack')
         runMediaSessionAction(() => {
           void droneEngine.pokeClock()
-          transportPreviousPreset(latestRuntimeConfigRef.current)
+          transportMediaPreviousPress()
         })
       })
+      if (isCapacitorNative()) {
+        setActionHandler('seekforward', null)
+        setActionHandler('seekbackward', null)
+      } else {
+        setActionHandler('seekforward', () => {
+          recordBleDebug('mediasession', 'pedal seekforward vol+')
+          if (wasMediaSessionHandledRecently('volup')) {
+            return
+          }
+          markMediaSessionAction('volup')
+          runMediaSessionAction(transportVolumeUp)
+        })
+        setActionHandler('seekbackward', () => {
+          recordBleDebug('mediasession', 'pedal seekbackward vol-')
+          if (wasMediaSessionHandledRecently('voldown')) {
+            return
+          }
+          markMediaSessionAction('voldown')
+          runMediaSessionAction(transportVolumeDown)
+        })
+      }
     }
 
     const markSpeakerRemotePause = () => {
@@ -363,16 +401,37 @@ export function useBtControl({
         recordBleDebug('mediasession', 'speaker nexttrack')
         runMediaSessionAction(() => {
           void droneEngine.pokeClock()
-          transportNextPreset(latestRuntimeConfigRef.current)
+          transportMediaNextPress(latestRuntimeConfigRef.current)
         })
       })
       setActionHandler('previoustrack', () => {
         recordBleDebug('mediasession', 'speaker previoustrack')
         runMediaSessionAction(() => {
           void droneEngine.pokeClock()
-          transportPreviousPreset(latestRuntimeConfigRef.current)
+          transportMediaPreviousPress()
         })
       })
+      if (isCapacitorNative()) {
+        setActionHandler('seekforward', null)
+        setActionHandler('seekbackward', null)
+      } else {
+        setActionHandler('seekforward', () => {
+          recordBleDebug('mediasession', 'speaker seekforward vol+')
+          if (wasMediaSessionHandledRecently('volup')) {
+            return
+          }
+          markMediaSessionAction('volup')
+          runMediaSessionAction(transportVolumeUp)
+        })
+        setActionHandler('seekbackward', () => {
+          recordBleDebug('mediasession', 'speaker seekbackward vol-')
+          if (wasMediaSessionHandledRecently('voldown')) {
+            return
+          }
+          markMediaSessionAction('voldown')
+          runMediaSessionAction(transportVolumeDown)
+        })
+      }
     }
 
     const onPedalAnchorPause = () => {
@@ -521,7 +580,7 @@ export function useBtControl({
           event.preventDefault()
           event.stopPropagation()
           void droneEngine.pokeClock()
-          transportPreviousPreset(latestRuntimeConfigRef.current)
+          transportMediaPreviousPress()
           return
         }
 
@@ -530,16 +589,10 @@ export function useBtControl({
             event.preventDefault()
             return
           }
-          if (wasMediaSessionHandledRecently('next')) {
-            event.preventDefault()
-            event.stopPropagation()
-            return
-          }
           event.preventDefault()
           event.stopPropagation()
           void droneEngine.pokeClock()
-          markMediaSessionAction('next')
-          transportNextPreset(latestRuntimeConfigRef.current)
+          transportMediaNextPress(latestRuntimeConfigRef.current)
           return
         }
 
@@ -582,6 +635,8 @@ export function useBtControl({
       setActionHandler('pause', null)
       setActionHandler('nexttrack', null)
       setActionHandler('previoustrack', null)
+      setActionHandler('seekforward', null)
+      setActionHandler('seekbackward', null)
     }
   }, [btControlMode, handleTogglePlay, handlePresetPedalPress, latestRuntimeConfigRef])
 

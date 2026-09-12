@@ -58,6 +58,7 @@ xcodebuild \
   -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA" \
   -allowProvisioningUpdates \
+  SWIFT_OPTIMIZATION_LEVEL=-O \
   build
 
 APP_PATH="$DERIVED_DATA/Build/Products/Debug-iphoneos/App.app"

@@ -43,7 +43,8 @@ import {
   transportTogglePlay,
 } from './audio/transportControls'
 import { activateTransportMarker } from './audio/presetNavigationTransport'
-import { buildPresetNavigationPickerItems, getEnabledNavigationEntries } from './presets/presetNavigation'
+import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isTransportMarkerKey } from './presets/presetNavigation'
+import { nowPlayingLabels } from './utils/nowPlayingLabels'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
 import { AddFollowerControls, AddMicToolbarButton } from './components/AddFollowerControls'
@@ -548,6 +549,13 @@ function App() {
     [presetNavigation, presets],
   )
   const canNavigateSongs = songLibrary.filter((song) => song.enabled !== false).length > 1
+  const lockScreenLabels = nowPlayingLabels({
+    songName,
+    presets,
+    activePresetId,
+    activeNavigationKey,
+    presetNavigation,
+  })
   const visibleTabs = useMemo(
     () => (micFeaturesEnabled ? TABS : TABS.filter((tab) => tab.id !== 'add')),
     [micFeaturesEnabled],
@@ -1394,22 +1402,30 @@ function App() {
   const handleMetronomeEnabledChange = useCallback(
     (enabled: boolean) => {
       if (enabled) {
+        if (useDroneStore.getState().metronomeMuted) {
+          setMetronomeMuted(false)
+        }
         metronomeEngine.prepareContext()
+      } else {
+        metronomeEngine.stopFromGesture()
       }
       setMetronomeEnabled(enabled)
     },
-    [setMetronomeEnabled],
+    [setMetronomeEnabled, setMetronomeMuted],
   )
 
   const handleMetronomeSyncChange = useCallback(
     (enabled: boolean) => {
       setMetronomeSyncEnabled(enabled)
       if (enabled && playing) {
+        if (useDroneStore.getState().metronomeMuted) {
+          setMetronomeMuted(false)
+        }
         metronomeEngine.prepareContext()
         setMetronomeEnabled(true)
       }
     },
-    [playing, setMetronomeEnabled, setMetronomeSyncEnabled],
+    [playing, setMetronomeEnabled, setMetronomeMuted, setMetronomeSyncEnabled],
   )
 
   const activeTones = useMemo(() => tonesInToneSet.filter((tone) => tone.enabled), [tonesInToneSet])
@@ -1969,7 +1985,7 @@ function App() {
       window.visualViewport?.removeEventListener('resize', update)
       window.visualViewport?.removeEventListener('scroll', update)
     }
-  }, [activeTab])
+  }, [activeTab, controlsLocked])
 
   useEffect(() => {
     if (activeTab !== 'presets') {
@@ -2098,12 +2114,41 @@ function App() {
       )}
       {controlsLocked && (
         <div
-          className="fixed inset-0 z-40 touch-none"
+          className="fixed z-40 touch-none px-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))]"
+          style={{
+            top: 'calc(var(--sticky-chrome-bottom, calc(env(safe-area-inset-top, 0px) + 4.75rem)) + 0.5rem)',
+            bottom: 0,
+            left: 0,
+            right: 0,
+          }}
           aria-hidden="true"
           onPointerDown={(event) => {
             event.preventDefault()
           }}
-        />
+        >
+          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#1a1825] px-3 pb-[calc(var(--bottom-chrome-height,5.5rem)+1.25rem)] pt-6">
+            <div className="mt-[0.5em] shrink-0 text-[13.5rem] text-white">
+              {isTransportMarkerKey(activeNavigationKey, presetNavigation) ? (
+                <div className="flex h-[0.9em] items-center justify-center">
+                  {playing ? (
+                    <Pause className="size-[0.9em]" strokeWidth={2.25} />
+                  ) : (
+                    <Play className="size-[0.9em]" strokeWidth={2.25} />
+                  )}
+                </div>
+              ) : (
+                <div className="max-w-full text-center text-balance font-bold leading-[0.9] tracking-tight break-words">
+                  {lockScreenLabels.title}
+                </div>
+              )}
+            </div>
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <div className="max-w-full text-center text-balance text-[3rem] font-semibold leading-tight break-words text-white/70">
+                {lockScreenLabels.artist}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
       <div
         className={`mx-auto w-full max-w-md pt-0 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
@@ -2118,11 +2163,11 @@ function App() {
           id={TONE_STICKY_CHROME_ID}
           ref={stickyChromeRef}
           className={`sticky top-0 z-50 -ml-[max(0.75rem,env(safe-area-inset-left,0px))] -mr-[max(0.75rem,env(safe-area-inset-right,0px))] bg-[#111019] pb-2 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] pt-[env(safe-area-inset-top,0px)] ${
-            activeTab === 'tone' ? '' : 'landscape:hidden max-h-[500px]:hidden'
+            activeTab === 'tone' || controlsLocked ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}
         >
-          <header className={`mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 landscape:hidden max-h-[500px]:hidden md:max-w-[62.5rem] ${
-            controlsLocked ? 'pointer-events-none' : ''
+          <header className={`mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 md:max-w-[62.5rem] ${
+            controlsLocked ? 'pointer-events-none' : 'landscape:hidden max-h-[500px]:hidden'
           }`}>
             <button
               type="button"
@@ -2192,7 +2237,7 @@ function App() {
             <div className="text-4xl font-extrabold leading-none text-fuchsia-100">{currentTime}</div>
           </div>
         </header>
-          {activeTab === 'tone' && (
+          {activeTab === 'tone' && !controlsLocked && (
             <div
               className={`mx-auto mt-3 grid max-w-[26.5rem] grid-cols-2 gap-3 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem] ${
                 controlsLocked ? 'pointer-events-none' : ''
@@ -2749,13 +2794,15 @@ function App() {
         </main>
       </div>
       <div
-        className="fixed bottom-0 left-0 right-0 z-30 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]"
+        className={`fixed bottom-0 left-0 right-0 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] ${
+          controlsLocked ? 'pointer-events-none z-50 bg-[#111019]' : 'z-30'
+        }`}
         data-app-bottom-nav
       >
         <div className="mx-auto w-full max-w-[26.5rem] space-y-0 ios-app:space-y-1.5 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-[62.5rem]">
           <nav
             className={`overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm ios-app:overflow-x-hidden ios-app:p-2 ${
-              activeTab !== 'overtones' ? 'landscape:hidden max-h-[500px]:hidden' : ''
+              controlsLocked ? 'hidden' : activeTab !== 'overtones' ? 'landscape:hidden max-h-[500px]:hidden' : ''
             }`}
             aria-label="App sections"
           >
@@ -2872,7 +2919,11 @@ function App() {
               )}
             </div>
           </nav>
-          <div className="rounded-xl border border-white/10 bg-[#111019]/95 p-2 backdrop-blur-sm">
+          <div
+            className={`rounded-xl border border-white/10 p-2 ${
+              controlsLocked ? 'bg-[#111019]' : 'bg-[#111019]/95 backdrop-blur-sm'
+            }`}
+          >
               <div
                 className={`grid gap-1.5 ${
                   micFeaturesEnabled
@@ -2900,12 +2951,11 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  className="button-safe inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-fuchsia-300/60 bg-fuchsia-400/15 px-3 py-2 text-sm font-semibold whitespace-nowrap text-white transition hover:bg-fuchsia-300/25"
+                  className="button-safe inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-fuchsia-300/60 bg-fuchsia-400/15 text-white transition hover:bg-fuchsia-300/25"
                   onClick={handleTogglePlay}
                   aria-label={playing ? 'Pause' : 'Play'}
                 >
-                  {(playing && <Pause size={22} />) || <Play size={22} />}
-                  <span>{playing ? 'Pause' : 'Play'}</span>
+                  {playing ? <Pause size={22} /> : <Play size={22} />}
                 </button>
                 <button
                   type="button"

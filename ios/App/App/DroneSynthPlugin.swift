@@ -13,20 +13,18 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "fadeMaster", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "mute", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "click", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setMetronome", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setShine", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearShine", returnType: CAPPluginReturnPromise),
     ]
 
     @objc func reclaim(_ call: CAPPluginCall) {
-        guard UIApplication.shared.applicationState == .active else {
-            call.resolve(["active": false])
-            return
-        }
         do {
             try DroneSynthEngine.shared.reclaim()
             call.resolve(["active": true])
         } catch {
-            call.reject("Failed to start native drone", nil, error)
+            NSLog("DroneSynth reclaim: \(error.localizedDescription)")
+            call.resolve(["active": false])
         }
     }
 
@@ -36,24 +34,21 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func setGraph(_ call: CAPPluginCall) {
-        guard UIApplication.shared.applicationState == .active else {
-            call.resolve()
-            return
-        }
-        let master = Double(call.getFloat("master") ?? 0.0001)
-        let fadeSeconds = Double(call.getFloat("fadeSeconds") ?? 0)
+        let packed = call.getString("packed") ?? ""
         DroneSynthEngine.shared.setGraph(
-            master: master,
-            fadeSeconds: fadeSeconds,
-            oscillators: Self.dicts(call, "oscillators")
+            master: Self.number(call, "master", 0.3),
+            fadeSeconds: Self.number(call, "fadeSeconds", 0),
+            fadeInSeconds: Self.number(call, "fadeInSeconds", 0),
+            fadeOutSeconds: Self.number(call, "fadeOutSeconds", 0),
+            oscillators: Self.parsePacked(packed)
         )
         call.resolve()
     }
 
     @objc func fadeMaster(_ call: CAPPluginCall) {
         DroneSynthEngine.shared.fadeMaster(
-            to: Double(call.getFloat("target") ?? 0.0001),
-            seconds: Double(call.getFloat("seconds") ?? 0)
+            to: Self.number(call, "target", 0.0001),
+            seconds: Self.number(call, "seconds", 0)
         )
         call.resolve()
     }
@@ -64,23 +59,27 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func click(_ call: CAPPluginCall) {
-        guard UIApplication.shared.applicationState == .active else {
-            call.resolve()
-            return
-        }
         DroneSynthEngine.shared.click(
-            frequency: Double(call.getFloat("frequency") ?? 1240),
-            peak: Double(call.getFloat("peak") ?? 0.2)
+            frequency: Self.number(call, "frequency", 1240),
+            peak: Self.number(call, "peak", 0.2)
+        )
+        call.resolve()
+    }
+
+    @objc func setMetronome(_ call: CAPPluginCall) {
+        let on = Self.number(call, "on", Self.flag(call, "enabled") ? 1 : 0) > 0.5
+        let mute = Self.number(call, "mute", Self.flag(call, "muted") ? 1 : 0) > 0.5
+        DroneSynthEngine.shared.setMetronome(
+            enabled: on,
+            bpm: Self.number(call, "bpm", 72),
+            volumeDb: Self.number(call, "volumeDb", -6),
+            muted: mute
         )
         call.resolve()
     }
 
     @objc func setShine(_ call: CAPPluginCall) {
-        guard UIApplication.shared.applicationState == .active else {
-            call.resolve()
-            return
-        }
-        DroneSynthEngine.shared.setShine(items: Self.dicts(call, "items"))
+        DroneSynthEngine.shared.setShine(items: Self.parseShinePacked(call.getString("packed") ?? ""))
         call.resolve()
     }
 
@@ -89,8 +88,70 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve()
     }
 
-    private static func dicts(_ call: CAPPluginCall, _ key: String) -> [[String: Any]] {
-        guard let raw = call.getArray(key) else { return [] }
-        return raw.compactMap { $0 as? [String: Any] }
+    private static func flag(_ call: CAPPluginCall, _ key: String) -> Bool {
+        if let value = call.getBool(key) {
+            return value
+        }
+        if let value = call.getInt(key) {
+            return value != 0
+        }
+        if let value = call.getDouble(key) {
+            return value != 0
+        }
+        return false
+    }
+
+    private static func number(_ call: CAPPluginCall, _ key: String, _ fallback: Double) -> Double {
+        if let value = call.getDouble(key) {
+            return value
+        }
+        if let value = call.getFloat(key) {
+            return Double(value)
+        }
+        if let value = call.getInt(key) {
+            return Double(value)
+        }
+        if let value = call.options[key] as? NSNumber {
+            return value.doubleValue
+        }
+        if let value = call.options[key] as? String, let parsed = Double(value) {
+            return parsed
+        }
+        return fallback
+    }
+
+    /// `id \t wave \t freq \t gain \t pan \t glideFrom \t glideSeconds`, lines split by `\n`.
+    private static func parsePacked(_ packed: String) -> [DroneSynthEngine.OscSpec] {
+        guard !packed.isEmpty else { return [] }
+        var out: [DroneSynthEngine.OscSpec] = []
+        packed.split(separator: "\n", omittingEmptySubsequences: true).forEach { line in
+            let parts = line.split(separator: "\t", omittingEmptySubsequences: false)
+            guard parts.count >= 5 else { return }
+            out.append(
+                DroneSynthEngine.OscSpec(
+                    id: String(parts[0]),
+                    wave: Int(parts[1]) ?? 0,
+                    freq: Double(parts[2]) ?? 0,
+                    gain: Double(parts[3]) ?? 0,
+                    pan: Double(parts[4]) ?? 0,
+                    glideFrom: parts.count > 5 ? (Double(parts[5]) ?? 0) : 0,
+                    glideSeconds: parts.count > 6 ? (Double(parts[6]) ?? 0) : 0
+                )
+            )
+        }
+        return out
+    }
+
+    private static func parseShinePacked(_ packed: String) -> [[String: Any]] {
+        guard !packed.isEmpty else { return [] }
+        return packed.split(separator: "\n", omittingEmptySubsequences: true).compactMap { line -> [String: Any]? in
+            let parts = line.split(separator: "\t", omittingEmptySubsequences: false)
+            guard parts.count >= 3 else { return nil }
+            return [
+                "freq": Double(parts[0]) ?? 0,
+                "gain": Double(parts[1]) ?? 0,
+                "pan": Double(parts[2]) ?? 0,
+            ]
+        }
     }
 }

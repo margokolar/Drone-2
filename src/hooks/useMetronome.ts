@@ -9,7 +9,8 @@ type MetronomeConfig = {
 }
 
 export function useMetronome(config: MetronomeConfig): void {
+  const { enabled, bpm, volumeDb, muted } = config
   useEffect(() => {
-    void metronomeEngine.setConfig(config)
-  }, [config])
+    void metronomeEngine.setConfig({ enabled, bpm, volumeDb, muted })
+  }, [bpm, enabled, muted, volumeDb])
 }

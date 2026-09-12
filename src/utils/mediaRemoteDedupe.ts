@@ -1,6 +1,6 @@
 const DEDUPE_MS = 120
 
-export type MediaRemoteAction = 'play' | 'pause' | 'next' | 'prev'
+export type MediaRemoteAction = 'play' | 'pause' | 'next' | 'prev' | 'volup' | 'voldown'
 
 let lastHandled: { t: number; action: MediaRemoteAction } | null = null
 

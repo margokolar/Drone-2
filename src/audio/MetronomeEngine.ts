@@ -43,10 +43,12 @@ export class MetronomeEngine {
     return this.context
   }
 
-  /** Synchronous resume for user-gesture handlers (iOS Safari). */
+  /** Synchronous resume for user-gesture handlers (iOS Safari / Capacitor). */
   prepareContext(): void {
     if (isNativeSynth()) {
+      this.config = { ...this.config, enabled: true, muted: false }
       void DroneSynth.reclaim().catch(() => {})
+      this.pushNative(true)
       return
     }
     const context = this.ensureContext()
@@ -55,6 +57,25 @@ export class MetronomeEngine {
         // iOS can reject resume() outside a gesture; the toggle click may retry.
       })
     }
+  }
+
+  stopFromGesture(): void {
+    this.config = { ...this.config, enabled: false }
+    this.stopScheduler()
+    if (isNativeSynth()) {
+      this.pushNative(false)
+    }
+  }
+
+  private pushNative(enabled: boolean): void {
+    void DroneSynth.setMetronome({
+      on: enabled ? 1 : 0,
+      enabled,
+      bpm: this.config.bpm,
+      volumeDb: this.config.volumeDb,
+      mute: this.config.muted ? 1 : 0,
+      muted: this.config.muted,
+    }).catch(() => {})
   }
 
   /** Fires once per scheduled click, aligned to audio playback time. */
@@ -67,14 +88,10 @@ export class MetronomeEngine {
 
   async setConfig(config: MetronomeConfig): Promise<void> {
     this.config = config
-    if (!config.enabled) {
-      this.stopScheduler()
-      return
-    }
     if (isNativeSynth()) {
-      try {
-        await DroneSynth.reclaim()
-      } catch {
+      this.pushNative(config.enabled)
+      if (!config.enabled) {
+        this.stopScheduler()
         return
       }
       if (this.schedulerTimer === null) {
@@ -83,6 +100,10 @@ export class MetronomeEngine {
           this.scheduleTicks()
         }, LOOKAHEAD_MS)
       }
+      return
+    }
+    if (!config.enabled) {
+      this.stopScheduler()
       return
     }
     const context = this.ensureContext()
@@ -129,33 +150,23 @@ export class MetronomeEngine {
   }
 
   private playClickAt(when: number): void {
-    if (!this.config.muted) {
+    if (!this.config.muted && !isNativeSynth() && this.context) {
       const peakGain = dbToGain(this.config.volumeDb) * 1.35
-      if (isNativeSynth()) {
-        const delayMs = Math.max(0, (when - this.audioClock()) * 1000)
-        window.setTimeout(() => {
-          if (!this.config.enabled || this.config.muted) {
-            return
-          }
-          void DroneSynth.click({ frequency: 1240, peak: peakGain }).catch(() => {})
-        }, delayMs)
-      } else if (this.context) {
-        const oscillator = this.context.createOscillator()
-        const gainNode = this.context.createGain()
-        const clickPitch = 1240
-        const attack = 0.001
-        const release = 0.05
+      const oscillator = this.context.createOscillator()
+      const gainNode = this.context.createGain()
+      const clickPitch = 1240
+      const attack = 0.001
+      const release = 0.05
 
-        oscillator.type = 'square'
-        oscillator.frequency.setValueAtTime(clickPitch, when)
-        oscillator.connect(gainNode)
-        gainNode.connect(this.context.destination)
-        gainNode.gain.setValueAtTime(0.0001, when)
-        gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakGain), when + attack)
-        gainNode.gain.exponentialRampToValueAtTime(0.0001, when + release)
-        oscillator.start(when)
-        oscillator.stop(when + release + 0.02)
-      }
+      oscillator.type = 'square'
+      oscillator.frequency.setValueAtTime(clickPitch, when)
+      oscillator.connect(gainNode)
+      gainNode.connect(this.context.destination)
+      gainNode.gain.setValueAtTime(0.0001, when)
+      gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakGain), when + attack)
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, when + release)
+      oscillator.start(when)
+      oscillator.stop(when + release + 0.02)
     }
     this.notifyBeatAt(when)
   }

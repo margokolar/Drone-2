@@ -169,6 +169,54 @@ export function transportPreviousSong(): void {
   useDroneStore.getState().selectPreviousSong()
 }
 
+const MEDIA_BOUNCE_MS = 90
+const MEDIA_DOUBLE_MS = 320
+
+function createDoublePressController(label: string): (primary: () => void, reverse: () => void) => void {
+  let pending: ReturnType<typeof setTimeout> | null = null
+  let lastAt = 0
+  return (primary, reverse) => {
+    const now = Date.now()
+    if (now - lastAt < MEDIA_BOUNCE_MS) {
+      recordBleDebug('note', `${label} bounce`)
+      return
+    }
+    lastAt = now
+    if (pending !== null) {
+      clearTimeout(pending)
+      pending = null
+      recordBleDebug('note', `${label} double`)
+      reverse()
+      return
+    }
+    pending = setTimeout(() => {
+      pending = null
+      recordBleDebug('note', `${label} single`)
+      primary()
+    }, MEDIA_DOUBLE_MS)
+  }
+}
+
+const mediaNextPress = createDoublePressController('mediaNext')
+const mediaPrevPress = createDoublePressController('mediaPrev')
+
+/** Media next: single → next preset, double → previous preset. */
+export function transportMediaNextPress(config: DroneRuntimeConfig): void {
+  mediaNextPress(
+    () => {
+      transportNextPreset(config)
+    },
+    () => {
+      transportPreviousPreset(config)
+    },
+  )
+}
+
+/** Media prev: single → next song, double → previous song. */
+export function transportMediaPreviousPress(): void {
+  mediaPrevPress(transportNextSong, transportPreviousSong)
+}
+
 const MASTER_GAIN_STEP_DB = 2
 
 export function transportVolumeUp(): void {

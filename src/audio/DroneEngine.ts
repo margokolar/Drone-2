@@ -115,6 +115,8 @@ export class DroneEngine {
   private lastConfig: DroneRuntimeConfig | null = null
   private nativeGraphPushed = false
   private nativeGlideNotes = new Set<string>()
+  private lastNativePacked = ''
+  private lastNativeMaster = -1
 
   setPlaybackIntent(shouldPlay: boolean): void {
     this.shouldPlay = shouldPlay
@@ -189,10 +191,28 @@ export class DroneEngine {
     const masterTarget = Math.max(MIN_AUDIBLE_GAIN, dbToGain(config.masterGainDb))
     this.lastMasterTarget = masterTarget
     this.nativeGraphPushed = audible
+    const rows = audible
+      ? oscillators.map(
+          (osc) =>
+            `${osc.id}\t${osc.wave}\t${osc.freq}\t${osc.gain}\t${osc.pan}\t${osc.glideFrom ?? 0}\t${osc.glideSeconds ?? 0}`,
+        )
+      : []
+    const packed = rows.join('\n')
+    if (
+      packed === this.lastNativePacked &&
+      Math.abs(masterTarget - this.lastNativeMaster) < 1e-6 &&
+      audible
+    ) {
+      return
+    }
+    this.lastNativePacked = packed
+    this.lastNativeMaster = masterTarget
     void DroneSynth.setGraph({
       master: audible ? masterTarget : MIN_AUDIBLE_GAIN,
       fadeSeconds,
-      oscillators: audible ? oscillators : [],
+      fadeInSeconds: this.playbackFadeInSeconds,
+      fadeOutSeconds: this.playbackFadeOutSeconds,
+      packed,
     }).catch(() => {})
   }
 
@@ -728,12 +748,16 @@ export class DroneEngine {
     this.started = false
     this.nativeGraphPushed = false
     this.nativeGlideNotes.clear()
+    this.lastNativePacked = ''
+    this.lastNativeMaster = -1
     if (isNativeSynth()) {
       this.resumeFromSilence = true
       void DroneSynth.setGraph({
         master: MIN_AUDIBLE_GAIN,
         fadeSeconds: 0,
-        oscillators: [],
+        fadeInSeconds: this.playbackFadeInSeconds,
+        fadeOutSeconds: this.playbackFadeOutSeconds,
+        packed: '',
       }).catch(() => {})
       void DroneSynth.mute().catch(() => {})
       return
@@ -755,14 +779,15 @@ export class DroneEngine {
     this.nativeGlideNotes.clear()
     if (isNativeSynth()) {
       this.resumeFromSilence = true
-      if (this.playbackFadeOutSeconds > 0) {
-        void DroneSynth.fadeMaster({
-          target: MIN_AUDIBLE_GAIN,
-          seconds: this.playbackFadeOutSeconds,
-        }).catch(() => {})
-      } else {
-        void DroneSynth.mute().catch(() => {})
-      }
+      this.lastNativePacked = ''
+      this.lastNativeMaster = -1
+      void DroneSynth.setGraph({
+        master: MIN_AUDIBLE_GAIN,
+        fadeSeconds: this.playbackFadeOutSeconds,
+        fadeInSeconds: this.playbackFadeInSeconds,
+        fadeOutSeconds: this.playbackFadeOutSeconds,
+        packed: '',
+      }).catch(() => {})
       return
     }
     if (!this.context || !this.masterGain) {
@@ -806,7 +831,9 @@ export class DroneEngine {
       const voiceTransition = this.resolveVoiceTransitionTiming()
       const fadeSeconds = this.resumeFromSilence
         ? this.playbackFadeInSeconds
-        : voiceTransition.updateSeconds
+        : voiceTransition.updateSeconds > PARAM_SMOOTH_SECONDS + 0.01
+          ? voiceTransition.updateSeconds
+          : 0
       this.pushNativeGraph(config, fadeSeconds, this.resumeFromSilence)
       this.resumeFromSilence = false
       return

@@ -8,12 +8,6 @@ const DEFAULT_ENTRY_GLIDE: EntryGlideParams = {
   seconds: 2,
 }
 
-function waveIndex(type: 'sine' | 'sawtooth' | 'square'): 0 | 1 | 2 {
-  if (type === 'sawtooth') return 1
-  if (type === 'square') return 2
-  return 0
-}
-
 function entryGlide(config: DroneRuntimeConfig, tone: ToneConfig): EntryGlideParams | null {
   if (config.lowestToneGlideNoteId && config.lowestToneGlideNoteId === tone.noteId) {
     return config.lowestToneGlide ?? DEFAULT_ENTRY_GLIDE
@@ -46,32 +40,27 @@ export function nativeOscillatorsFromConfig(config: DroneRuntimeConfig): NativeD
       const partialLinear = dbToGain(partial.gainDb)
       const harmonicIndex = partialIndex + 1
       const timbreWeights = partialTimbreWeights(harmonicIndex, blend, config.harmonicTimbreEnabled)
-      const waves = [
-        { type: 'sine' as const, amount: timbreWeights.sine },
-        { type: 'sawtooth' as const, amount: timbreWeights.saw },
-        { type: 'square' as const, amount: timbreWeights.square },
-      ]
-      for (const wave of waves) {
-        const gain =
-          wave.amount > 0
-            ? toneGain * partialLinear * wave.amount * waveformGainCompensation(wave.type)
-            : 0
-        if (gain < 0.0002) continue
-        const freq = Math.max(1, toneFrequency * ratio)
-        const osc: NativeDroneOsc = {
-          id: `${tone.noteId}:${partial.id}:${wave.type}`,
-          freq,
-          gain,
-          pan: tone.pan,
-          wave: waveIndex(wave.type),
-        }
-        if (glide && glide.cents !== 0 && glide.seconds > 0) {
-          const centRatio = 2 ** (Math.abs(glide.cents) / 1200)
-          osc.glideFrom = Math.max(1, glide.cents > 0 ? freq * centRatio : freq / centRatio)
-          osc.glideSeconds = glide.seconds
-        }
-        out.push(osc)
+      const gain =
+        toneGain *
+        partialLinear *
+        (timbreWeights.sine * waveformGainCompensation('sine') +
+          timbreWeights.saw * waveformGainCompensation('sawtooth') +
+          timbreWeights.square * waveformGainCompensation('square'))
+      if (gain < 0.0002) continue
+      const freq = Math.max(1, toneFrequency * ratio)
+      const osc: NativeDroneOsc = {
+        id: `${tone.noteId}:${partial.id}:sine`,
+        freq,
+        gain,
+        pan: tone.pan,
+        wave: 0,
       }
+      if (glide && glide.cents !== 0 && glide.seconds > 0) {
+        const centRatio = 2 ** (Math.abs(glide.cents) / 1200)
+        osc.glideFrom = Math.max(1, glide.cents > 0 ? freq * centRatio : freq / centRatio)
+        osc.glideSeconds = glide.seconds
+      }
+      out.push(osc)
     }
   }
   return out

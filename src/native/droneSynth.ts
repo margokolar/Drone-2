@@ -22,12 +22,22 @@ export type NativeDroneSynthPlugin = {
   setGraph(options: {
     master: number
     fadeSeconds: number
-    oscillators: NativeDroneOsc[]
+    fadeInSeconds?: number
+    fadeOutSeconds?: number
+    packed: string
   }): Promise<void>
   fadeMaster(options: { target: number; seconds: number }): Promise<void>
   mute(): Promise<void>
   click(options: { frequency: number; peak: number }): Promise<void>
-  setShine(options: { items: NativeShinePartial[] }): Promise<void>
+  setMetronome(options: {
+    on?: number
+    enabled?: boolean
+    bpm: number
+    volumeDb: number
+    mute?: number
+    muted?: boolean
+  }): Promise<void>
+  setShine(options: { packed: string }): Promise<void>
   clearShine(): Promise<void>
 }
 
