@@ -5,7 +5,7 @@ import {
   windowedNowPlayingSequence,
 } from '../utils/nowPlayingLabels'
 
-const MAX_LOCK_SEQUENCE_ROWS = 12
+const MAX_LOCK_SEQUENCE_ROWS = 6
 
 type LockPresetSequenceTableProps = {
   sequence: string[]

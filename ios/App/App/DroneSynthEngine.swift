@@ -845,7 +845,7 @@ final class DroneSynthEngine {
         }
         let gap: CGFloat = 9
         let rowH: CGFloat = 72
-        let maxFit = max(2, Int(floor((rect.height + gap) / (rowH + gap))))
+        let maxFit = min(6, max(2, Int(floor((rect.height + gap) / (rowH + gap)))))
         let window = windowedSequence(sequence, activeIndex: activeIndex, maxRows: maxFit)
         var y = rect.minY
 
