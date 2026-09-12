@@ -57,18 +57,18 @@ export function HomeScreenOverlay({
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <div className={boxClass}>
         <div className={boxLabelClass}>Preset</div>
-        <div className="h-[1.25em] shrink-0 text-[6rem] text-white">
+        <div className="h-[1.2em] shrink-0 text-[4.5rem] text-white">
           {isTransport ? (
             <div className="flex h-full items-center justify-center">
               <PlayPauseIcon className="h-[0.7em] w-auto shrink-0" />
             </div>
           ) : (
-            <div className="h-full w-full truncate pb-[0.25em] text-center font-bold leading-none tracking-tight">
+            <div className="h-full w-full truncate pb-[0.2em] text-center font-bold leading-none tracking-tight">
               {presetTitle}
             </div>
           )}
         </div>
-        <div ref={presetListRef} className={`mt-2 ${listClass}`}>
+        <div ref={presetListRef} className={`mt-1.5 ${listClass}`}>
           {presets.map((item) => (
             <SequenceListRow
               key={`preset-${item.id}`}
