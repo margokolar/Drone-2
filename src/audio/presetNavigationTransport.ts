@@ -86,15 +86,21 @@ export function activateTransportMarker(markerId: string): void {
   useDroneStore.setState({ activeNavigationKey: markerId })
 }
 
+/** Load the preset after this play/pause marker and start it. */
+export function playNextPresetAfterTransportMarker(markerId: string): void {
+  const state = useDroneStore.getState()
+  if (!isTransportMarkerKey(markerId, state.presetNavigation)) {
+    return
+  }
+  const enabledEntries = getEnabledNavigationEntries(state.presetNavigation, state.presets)
+  advancePastTransportMarker('next', markerId, enabledEntries)
+}
+
 /** Play/pause marker is active: load the next preset in navigation and start it. */
 export function playNextPresetFromTransportMarker(): void {
   const state = useDroneStore.getState()
   const activeKey = state.activeNavigationKey || state.activePresetId
-  if (!isTransportMarkerKey(activeKey, state.presetNavigation)) {
-    return
-  }
-  const enabledEntries = getEnabledNavigationEntries(state.presetNavigation, state.presets)
-  advancePastTransportMarker('next', activeKey, enabledEntries)
+  playNextPresetAfterTransportMarker(activeKey)
 }
 
 function resolveNavigationActiveKey(

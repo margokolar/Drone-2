@@ -53,20 +53,28 @@ export function nowPlayingLabels(state: {
   return { title: presetName || 'Drone', artist, sequence, activeIndex }
 }
 
+export function windowedSlice<T>(
+  items: T[],
+  activeIndex: number,
+  maxRows: number,
+): { items: T[]; activeIndex: number; start: number } {
+  if (items.length <= maxRows) {
+    return { items, activeIndex, start: 0 }
+  }
+  let start = Math.max(0, activeIndex - Math.floor(maxRows / 2))
+  const end = Math.min(items.length, start + maxRows)
+  start = Math.max(0, end - maxRows)
+  return {
+    items: items.slice(start, end),
+    activeIndex: activeIndex - start,
+    start,
+  }
+}
+
 export function windowedNowPlayingSequence(
   sequence: string[],
   activeIndex: number,
   maxRows: number,
 ): { items: string[]; activeIndex: number; start: number } {
-  if (sequence.length <= maxRows) {
-    return { items: sequence, activeIndex, start: 0 }
-  }
-  let start = Math.max(0, activeIndex - Math.floor(maxRows / 2))
-  const end = Math.min(sequence.length, start + maxRows)
-  start = Math.max(0, end - maxRows)
-  return {
-    items: sequence.slice(start, end),
-    activeIndex: activeIndex - start,
-    start,
-  }
+  return windowedSlice(sequence, activeIndex, maxRows)
 }

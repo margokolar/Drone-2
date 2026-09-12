@@ -1,5 +1,4 @@
-import clsx from 'clsx'
-import { PlayPauseIcon } from './PlayPauseIcon'
+import { SequenceListRow } from './SequenceListRow'
 import {
   PLAY_PAUSE_SEQUENCE_LABEL,
   windowedNowPlayingSequence,
@@ -21,48 +20,14 @@ export function LockPresetSequenceTable({ sequence, activeIndex }: LockPresetSeq
     <div className="flex shrink-0 flex-col gap-1">
       {windowed.items.map((name, offset) => {
         const isActive = offset === windowed.activeIndex
-        const isTransport = name === PLAY_PAUSE_SEQUENCE_LABEL
         return (
-          <div
+          <SequenceListRow
             key={`${windowed.start}-${offset}-${name}`}
-            className={clsx(
-              'flex min-w-0 items-center gap-2 rounded-lg border px-2.5 py-1.5',
-              isActive
-                ? 'border-amber-300/70 bg-amber-300/15'
-                : 'border-white/10 bg-white/5',
-            )}
-          >
-            <span
-              className={clsx(
-                'w-8 shrink-0 text-center text-[1.65rem] font-bold tabular-nums leading-none',
-                isActive ? 'text-amber-200' : 'text-white/40',
-              )}
-            >
-              {windowed.start + offset + 1}
-            </span>
-            {isTransport ? (
-              <span
-                className={clsx(
-                  'flex min-w-0 items-center gap-2 text-[1.65rem]',
-                  isActive ? 'text-amber-100' : 'text-white/75',
-                )}
-              >
-                <PlayPauseIcon matchEx className="shrink-0" />
-                <span className="truncate font-semibold leading-none">
-                  {name}
-                </span>
-              </span>
-            ) : (
-              <span
-                className={clsx(
-                  'min-w-0 truncate text-[1.65rem] font-semibold leading-none',
-                  isActive ? 'text-white' : 'text-white/75',
-                )}
-              >
-                {name}
-              </span>
-            )}
-          </div>
+            number={windowed.start + offset + 1}
+            name={name}
+            isActive={isActive}
+            isTransport={name === PLAY_PAUSE_SEQUENCE_LABEL}
+          />
         )
       })}
     </div>

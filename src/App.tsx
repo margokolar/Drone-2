@@ -6,6 +6,7 @@ import {
   Copy,
   Download,
   Globe,
+  Home,
   Info,
   Lock,
   LockOpen,
@@ -38,13 +39,16 @@ import { metronomeEngine } from './audio/MetronomeEngine'
 import { claimMixableAudioSession } from './audio/iosAudioSession'
 import {
   transportNextPreset,
+  transportPause,
+  transportPlay,
   transportPreviousPreset,
   transportPresetPedalPress,
   transportTogglePlay,
 } from './audio/transportControls'
-import { activateTransportMarker } from './audio/presetNavigationTransport'
-import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isTransportMarkerKey } from './presets/presetNavigation'
-import { nowPlayingLabels } from './utils/nowPlayingLabels'
+import { buildRuntimeConfigFromStore } from './audio/runtimeConfigFromStore'
+import { activateTransportMarker, playNextPresetAfterTransportMarker } from './audio/presetNavigationTransport'
+import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isTransportMarkerKey, navigationEntryKey } from './presets/presetNavigation'
+import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL, windowedSlice } from './utils/nowPlayingLabels'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
 import { AddFollowerControls, AddMicToolbarButton } from './components/AddFollowerControls'
@@ -68,6 +72,7 @@ import { ShineControls } from './components/ShineControls'
 import { EntryGlideControls } from './components/EntryGlideControls'
 import { FadeControls } from './components/FadeControls'
 import { LockPresetSequenceTable } from './components/LockPresetSequenceTable'
+import { HomeScreenOverlay, type HomeScreenItem } from './components/HomeScreenOverlay'
 import { PlayPauseIcon } from './components/PlayPauseIcon'
 import { useAddFollower } from './hooks/useAddFollower'
 import { useAudioEngine } from './hooks/useAudioEngine'
@@ -388,6 +393,7 @@ function App() {
   const initialToneSetCollection = useMemo(() => loadToneSetCollection(), [])
   const initialToneSetLayout = useMemo(() => loadToneSetLayout(), [])
   const [menuOpen, setMenuOpen] = useState(false)
+  const [homeScreenOpen, setHomeScreenOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<TabId>('tone')
   const [toneSetLayout, setToneSetLayout] = useState<ToneSetLayout>(initialToneSetLayout)
   const [customToneSets, setCustomToneSets] = useState<ToneSetLayout[]>(initialToneSetCollection.customSets)
@@ -558,6 +564,36 @@ function App() {
     activeNavigationKey,
     presetNavigation,
   })
+  const homeScreenLists = useMemo(() => {
+    const enabledNav = getEnabledNavigationEntries(presetNavigation, presets)
+    const activeNavIndex = enabledNav.findIndex(
+      (entry) => navigationEntryKey(entry) === activeNavigationKey,
+    )
+    const windowedNav = windowedSlice(enabledNav, Math.max(0, activeNavIndex), 4)
+    const presetsForHome: HomeScreenItem[] = windowedNav.items.map((entry, offset) => {
+      const isTransport = entry.kind === 'transport'
+      const preset = isTransport
+        ? undefined
+        : presets.find((item) => item.id === entry.presetId)
+      return {
+        id: navigationEntryKey(entry),
+        name: isTransport ? PLAY_PAUSE_SEQUENCE_LABEL : preset?.name.trim() || 'Preset',
+        number: windowedNav.start + offset + 1,
+        isActive: offset === windowedNav.activeIndex,
+        isTransport,
+      }
+    })
+    const enabledSongs = songLibrary.filter((song) => song.enabled !== false)
+    const activeSongIndex = enabledSongs.findIndex((song) => song.name === songName)
+    const windowedSongs = windowedSlice(enabledSongs, Math.max(0, activeSongIndex), 4)
+    const songsForHome: HomeScreenItem[] = windowedSongs.items.map((song, offset) => ({
+      id: song.id,
+      name: song.name.trim() || 'Song',
+      number: windowedSongs.start + offset + 1,
+      isActive: offset === windowedSongs.activeIndex,
+    }))
+    return { presets: presetsForHome, songs: songsForHome }
+  }, [activeNavigationKey, presetNavigation, presets, songLibrary, songName])
   const visibleTabs = useMemo(
     () => (micFeaturesEnabled ? TABS : TABS.filter((tab) => tab.id !== 'add')),
     [micFeaturesEnabled],
@@ -1721,6 +1757,48 @@ function App() {
     [loadPreset, presetNavigation],
   )
 
+  const startsWithPause = useCallback(() => {
+    const state = useDroneStore.getState()
+    return getEnabledNavigationEntries(state.presetNavigation, state.presets)[0]?.kind === 'transport'
+  }, [])
+
+  const handleHomePresetSelect = useCallback(
+    (id: string) => {
+      const selectedTransport = presetNavigation.some(
+        (entry) => entry.kind === 'transport' && entry.id === id,
+      )
+      if (selectedTransport) {
+        if (useDroneStore.getState().playing) {
+          activateTransportMarker(id)
+          return
+        }
+        playNextPresetAfterTransportMarker(id)
+        return
+      }
+      const state = useDroneStore.getState()
+      const isCurrent =
+        state.activeNavigationKey === id || state.activePresetId === id
+      if (isCurrent && state.playing) {
+        transportPause()
+        return
+      }
+      handlePresetPickerSelect(id)
+      transportPlay(buildRuntimeConfigFromStore(useDroneStore.getState()))
+    },
+    [handlePresetPickerSelect, presetNavigation],
+  )
+
+  const handleHomeSongSelect = useCallback(
+    (songId: string) => {
+      loadSongFromLibrary(songId)
+      if (startsWithPause()) {
+        return
+      }
+      transportPlay(buildRuntimeConfigFromStore(useDroneStore.getState()))
+    },
+    [loadSongFromLibrary, startsWithPause],
+  )
+
   const handleTogglePlay = useCallback(() => {
     transportTogglePlay(latestRuntimeConfigRef.current)
   }, [])
@@ -1987,7 +2065,7 @@ function App() {
       window.visualViewport?.removeEventListener('resize', update)
       window.visualViewport?.removeEventListener('scroll', update)
     }
-  }, [activeTab, controlsLocked])
+  }, [activeTab, controlsLocked, homeScreenOpen])
 
   useEffect(() => {
     if (activeTab !== 'presets') {
@@ -2114,7 +2192,28 @@ function App() {
           </button>
         </div>
       )}
-      {controlsLocked && (
+      {homeScreenOpen && (
+        <div
+          className="fixed z-[45] overflow-hidden bg-[#111019] px-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))]"
+          style={{
+            top: 'var(--sticky-chrome-bottom, calc(env(safe-area-inset-top, 0px) + 4.75rem))',
+            bottom: 'calc(var(--bottom-chrome-height, 5.5rem) + 0.25rem)',
+            left: 0,
+            right: 0,
+          }}
+        >
+          <HomeScreenOverlay
+            presetTitle={lockScreenLabels.title}
+            isTransport={isTransportMarkerKey(activeNavigationKey, presetNavigation)}
+            songTitle={lockScreenLabels.artist}
+            presets={homeScreenLists.presets}
+            songs={homeScreenLists.songs}
+            onSelectPreset={handleHomePresetSelect}
+            onSelectSong={handleHomeSongSelect}
+          />
+        </div>
+      )}
+      {controlsLocked && !homeScreenOpen && (
         <div
           className="fixed z-40 touch-none px-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))]"
           style={{
@@ -2175,11 +2274,13 @@ function App() {
           id={TONE_STICKY_CHROME_ID}
           ref={stickyChromeRef}
           className={`sticky top-0 z-50 -ml-[max(0.75rem,env(safe-area-inset-left,0px))] -mr-[max(0.75rem,env(safe-area-inset-right,0px))] bg-[#111019] pb-2 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] pt-[env(safe-area-inset-top,0px)] ${
-            activeTab === 'tone' || controlsLocked ? '' : 'landscape:hidden max-h-[500px]:hidden'
+            activeTab === 'tone' || controlsLocked || homeScreenOpen ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}
         >
           <header className={`mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 md:max-w-[62.5rem] ${
-            controlsLocked ? 'pointer-events-none' : 'landscape:hidden max-h-[500px]:hidden'
+            controlsLocked && !homeScreenOpen ? 'pointer-events-none' : ''
+          } ${
+            controlsLocked || homeScreenOpen ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}>
             <button
               type="button"
@@ -2224,7 +2325,24 @@ function App() {
             >
               Drone
             </button>
-          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              className={`relative z-50 flex min-h-[44px] items-center justify-center rounded-xl border transition ${
+                homeScreenOpen
+                  ? 'pointer-events-auto min-w-[44px] border-amber-300/50 bg-amber-300/15 px-2.5 text-amber-100'
+                  : 'pointer-events-auto min-w-[44px] border-white/10 bg-white/5 p-2 text-white/70 hover:bg-white/10'
+              }`}
+              onClick={() => setHomeScreenOpen((open) => !open)}
+              aria-label={homeScreenOpen ? 'Edit drone' : 'Open home screen'}
+              aria-pressed={homeScreenOpen}
+            >
+              {homeScreenOpen ? (
+                <span className="text-sm font-semibold tracking-wide">EDIT</span>
+              ) : (
+                <Home size={20} />
+              )}
+            </button>
+            <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
               className={`relative z-50 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border p-2 transition ${
@@ -2249,7 +2367,7 @@ function App() {
             <div className="text-4xl font-extrabold leading-none text-fuchsia-100">{currentTime}</div>
           </div>
         </header>
-          {activeTab === 'tone' && !controlsLocked && (
+          {activeTab === 'tone' && !controlsLocked && !homeScreenOpen && (
             <div
               className={`mx-auto mt-3 grid max-w-[26.5rem] grid-cols-2 gap-3 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem] ${
                 controlsLocked ? 'pointer-events-none' : ''
@@ -2323,7 +2441,7 @@ function App() {
           onTouchStart={handleSwipeTouchStart}
           onTouchEnd={handleSwipeTouchEnd}
         >
-          <div className="space-y-3" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone'}>
+          <div className="space-y-3" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone' || homeScreenOpen}>
             <SectionCard title="Global controls" className="[&>header]:hidden">
               <div className="space-y-3">
                 <TopControls
@@ -2798,14 +2916,18 @@ function App() {
       </div>
       <div
         className={`fixed bottom-0 left-0 right-0 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] ${
-          controlsLocked ? 'pointer-events-none z-50 bg-[#111019]' : 'z-30'
+          controlsLocked
+            ? 'pointer-events-none z-50 bg-[#111019]'
+            : homeScreenOpen
+              ? 'z-50 bg-[#111019]'
+              : 'z-30'
         }`}
         data-app-bottom-nav
       >
         <div className="mx-auto w-full max-w-[26.5rem] space-y-0 ios-app:space-y-1.5 landscape:max-w-none max-h-[500px]:max-w-none md:max-w-[62.5rem]">
           <nav
             className={`overflow-x-auto rounded-xl border border-white/10 bg-[#111019]/95 p-1 backdrop-blur-sm ios-app:overflow-x-hidden ios-app:p-2 ${
-              controlsLocked ? 'hidden' : activeTab !== 'overtones' ? 'landscape:hidden max-h-[500px]:hidden' : ''
+              controlsLocked || homeScreenOpen ? 'hidden' : activeTab !== 'overtones' ? 'landscape:hidden max-h-[500px]:hidden' : ''
             }`}
             aria-label="App sections"
           >
