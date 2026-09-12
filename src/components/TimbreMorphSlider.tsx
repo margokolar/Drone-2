@@ -26,6 +26,17 @@ function morphFromBlend(sine: number, saw: number, square: number): number {
   return (Math.max(0, sine) * 0.5 + Math.max(0, square)) / total
 }
 
+function timbreFeel(morph: number): 'Pehme' | 'Keskmine' | 'Terav' {
+  const sharpness = Math.abs(morph - 0.5) * 2
+  if (sharpness < 0.33) {
+    return 'Pehme'
+  }
+  if (sharpness > 0.66) {
+    return 'Terav'
+  }
+  return 'Keskmine'
+}
+
 function blendFromMorph(morph: number): TimbreBlend {
   const clamped = Math.max(0, Math.min(1, morph))
   if (clamped <= 0.5) {
@@ -103,8 +114,19 @@ export function TimbreMorphSlider({
     onReset: restoreToDefault,
     onTripleReset: restoreToSineOnly,
     'aria-label':
-      'Timbre morph from saw to sine to square. Double-click or double-tap to reset to default. Triple-click or triple-tap for sine only.',
+      'Timbre. Double-click or double-tap to reset to default. Triple-click or triple-tap for sine only.',
+    'aria-valuetext': timbreFeel(timbreMorph),
   }
+
+  const justKeysRange = (
+    <label className={clsx('timbre-slider', className)}>
+      <span className="timbre-slider__label">Timbre</span>
+      <ResettableRangeInput
+        {...sharedRangeProps}
+        className={clsx('timbre-slider__range', accentClassName)}
+      />
+    </label>
+  )
 
   if (orientation === 'vertical') {
     if (variant === 'mixer') {
@@ -154,49 +176,8 @@ export function TimbreMorphSlider({
       )
     }
 
-    return (
-      <div
-        className={`flex flex-col gap-1 rounded-xl border border-white/10 bg-[#111019]/90 p-2 shadow-lg backdrop-blur-sm ${className}`}
-      >
-        <div className="flex h-44 w-10 flex-col">
-          <span className="flex h-5 shrink-0 items-center justify-center text-[10px] font-semibold tracking-[0.12em] text-white/60">
-            Square
-          </span>
-          <div className="relative flex min-h-0 flex-1 items-center justify-center">
-            <ResettableRangeInput
-              {...sharedRangeProps}
-              className={`absolute left-1/2 top-1/2 h-2 w-[calc(11rem-1.25rem)] -translate-x-1/2 -translate-y-1/2 -rotate-90 ${accentClassName}`}
-            />
-          </div>
-        </div>
-        <span className="flex h-7 shrink-0 items-center justify-center text-[10px] font-semibold tracking-[0.12em] text-white/60">
-          Saw
-        </span>
-      </div>
-    )
+    return justKeysRange
   }
 
-  if (variant === 'mixer') {
-    return (
-      <div className={`grid grid-cols-[1fr_auto] items-center gap-2 text-sm ${className}`}>
-        <span className="col-span-2 flex items-center justify-between text-white/60">
-          <span>Saw</span>
-          <span>Sine</span>
-          <span>Square</span>
-        </span>
-        <ResettableRangeInput {...sharedRangeProps} className={`col-span-2 h-2 w-full ${accentClassName}`} />
-      </div>
-    )
-  }
-
-  return (
-    <div className={`space-y-2 rounded-xl border border-white/10 bg-white/5 p-3 ${className}`}>
-      <div className="flex items-center justify-between text-sm text-white/60">
-        <span>Saw</span>
-        <span>Sine</span>
-        <span>Square</span>
-      </div>
-      <ResettableRangeInput {...sharedRangeProps} className={`h-2 w-full ${accentClassName}`} />
-    </div>
-  )
+  return justKeysRange
 }

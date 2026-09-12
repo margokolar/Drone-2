@@ -2612,7 +2612,7 @@ function App() {
                   Analyse audio
                 </button>
               </div>
-              <div className="mt-3 landscape:hidden max-h-[500px]:hidden">
+              <div className="mt-3">
                 <TimbreMorphSlider
                   variant="mixer"
                   timbreBlend={selectedOvertoneTimbreBlend}
@@ -2622,15 +2622,6 @@ function App() {
                 />
               </div>
             </SectionCard>
-            <div className="hidden shrink-0 landscape:block max-h-[500px]:block">
-              <TimbreMorphSlider
-                orientation="vertical"
-                timbreBlend={selectedOvertoneTimbreBlend}
-                onSetTimbreValue={setSelectedOvertoneTimbreValue}
-                onTimbreChangeStart={beginTimbreMorphChange}
-                onTimbreChangeEnd={endTimbreMorphChange}
-              />
-            </div>
             </div>
             <SectionCard title="Partials">
               <PartialEditor
