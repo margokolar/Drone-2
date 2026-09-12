@@ -948,25 +948,9 @@ final class DroneSynthEngine {
             UIColor(red: 17 / 255, green: 16 / 255, blue: 25 / 255, alpha: 1).setFill()
             rendererContext.fill(bounds)
 
-            let iconSize: CGFloat = 112
-            let iconTop: CGFloat = 56
-            let iconBottom = iconTop + iconSize
-            if let icon = UIImage(named: "NowPlaying") {
-                let iconRect = CGRect(
-                    x: (canvas.width - iconSize) / 2,
-                    y: iconTop,
-                    width: iconSize,
-                    height: iconSize
-                )
-                rendererContext.cgContext.saveGState()
-                UIBezierPath(roundedRect: iconRect, cornerRadius: 26).addClip()
-                icon.draw(in: iconRect)
-                rendererContext.cgContext.restoreGState()
-            }
-
             let inset: CGFloat = 56
             let textWidth = canvas.width - inset * 2
-            let afterIcon: CGFloat = iconBottom + 36
+            let contentTop: CGFloat = 56
             let bottomPad: CGFloat = 48
             let paragraph = NSMutableParagraphStyle()
             paragraph.alignment = .center
@@ -974,7 +958,7 @@ final class DroneSynthEngine {
 
             let titleMaxHeight: CGFloat = showTable ? 280 : 320
             let titleMaxSize: CGFloat = 200
-            var afterPreset = afterIcon
+            var afterPreset = contentTop
             if isTransport {
                 let symbolSize: CGFloat = 200
                 let symbolName = playing ? "pause.fill" : "play.fill"
@@ -985,7 +969,7 @@ final class DroneSynthEngine {
                     let size = symbol.size
                     let drawRect = CGRect(
                         x: (canvas.width - size.width) / 2,
-                        y: afterIcon,
+                        y: contentTop,
                         width: size.width,
                         height: size.height
                     )
@@ -1016,13 +1000,13 @@ final class DroneSynthEngine {
                 (title as NSString).draw(
                     in: CGRect(
                         x: inset,
-                        y: afterIcon,
+                        y: contentTop,
                         width: textWidth,
                         height: ceil(titleBound.height) + 12
                     ),
                     withAttributes: titleAttrs
                 )
-                afterPreset = afterIcon + titleBound.height + 24
+                afterPreset = contentTop + titleBound.height + 24
             }
 
             let artistReserve: CGFloat = showTable ? 108 : max(80, canvas.height - afterPreset - bottomPad)
