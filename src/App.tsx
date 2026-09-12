@@ -2127,11 +2127,17 @@ function App() {
             event.preventDefault()
           }}
         >
-          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#1a1825] px-3 pb-[calc(var(--bottom-chrome-height,5.5rem)+1.25rem)] pt-6">
+          <div
+            className={`flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#1a1825] px-3 pb-[calc(var(--bottom-chrome-height,5.5rem)+1.25rem)] ${
+              lockScreenLabels.sequence.length >= 2 ? 'pt-0' : 'pt-6'
+            }`}
+          >
             <div
-              className={`flex min-h-0 items-center justify-center text-[13.5rem] text-white ${
-                lockScreenLabels.sequence.length >= 2 ? 'flex-1' : 'mt-[0.5em] shrink-0'
-              }`}
+              className={
+                lockScreenLabels.sequence.length >= 2
+                  ? 'shrink-0 py-[calc(1.125rem+0.25em)] text-[13.5rem] text-white'
+                  : 'shrink-0 text-[13.5rem] text-white'
+              }
             >
               {isTransportMarkerKey(activeNavigationKey, presetNavigation) ? (
                 <div className="flex h-[0.9em] items-center justify-center">
@@ -2151,13 +2157,7 @@ function App() {
               sequence={lockScreenLabels.sequence}
               activeIndex={lockScreenLabels.activeIndex}
             />
-            <div
-              className={`flex justify-center ${
-                lockScreenLabels.sequence.length >= 2
-                  ? 'shrink-0 py-3'
-                  : 'min-h-0 flex-1 items-center'
-              }`}
-            >
+            <div className="flex min-h-0 flex-1 items-center justify-center">
               <div className="max-w-full text-center text-balance text-[3rem] font-semibold leading-tight break-words text-white/70">
                 {lockScreenLabels.artist}
               </div>
@@ -2822,6 +2822,7 @@ function App() {
             aria-label="App sections"
           >
             <div className="flex w-max min-w-full items-center justify-center gap-1 ios-app:w-full ios-app:max-w-full ios-app:gap-1.5 ios-app:justify-stretch landscape:w-full max-h-[500px]:w-full">
+              <div className="flex min-w-0 w-full flex-1 items-center justify-center gap-1 ios-app:gap-1.5 landscape:hidden max-h-[500px]:hidden">
               {visibleTabs.map(({ id, label }) => (
                 <button
                   key={id}
@@ -2830,7 +2831,7 @@ function App() {
                   aria-selected={activeTab === id}
                   aria-controls={`panel-${id}`}
                   id={`tab-${id}`}
-                  className={`button-safe shrink-0 rounded-lg border px-3 py-2 text-center text-sm font-medium transition ios-app:flex ios-app:h-11 ios-app:min-w-0 ios-app:flex-1 ios-app:items-center ios-app:justify-center ios-app:rounded-xl ios-app:px-1 ios-app:py-0 ios-app:text-sm ios-app:leading-none ios-app:tracking-tight ios-app:font-semibold landscape:hidden max-h-[500px]:hidden ${
+                  className={`button-safe shrink-0 rounded-lg border px-3 py-2 text-center text-sm font-medium transition ios-app:flex ios-app:h-11 ios-app:min-w-0 ios-app:flex-1 ios-app:items-center ios-app:justify-center ios-app:rounded-xl ios-app:px-1 ios-app:py-0 ios-app:text-sm ios-app:leading-none ios-app:tracking-tight ios-app:font-semibold ${
                     activeTab === id
                       ? 'border-white/25 bg-white/15 text-white ios-app:border-fuchsia-300/60 ios-app:bg-fuchsia-400/15 ios-app:text-white'
                       : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 ios-app:border-white/15 ios-app:bg-white/5 ios-app:text-white ios-app:hover:bg-white/10'
@@ -2840,6 +2841,7 @@ function App() {
                   {label}
                 </button>
               ))}
+              </div>
               {activeTab === 'overtones' && (
                 <div className="hidden w-full min-w-0 items-center gap-1.5 landscape:flex max-h-[500px]:flex">
                   <div className="flex shrink-0 items-center gap-1.5">
