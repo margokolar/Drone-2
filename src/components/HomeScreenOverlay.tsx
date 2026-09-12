@@ -68,7 +68,7 @@ export function HomeScreenOverlay({
             </div>
           )}
         </div>
-        <div ref={presetListRef} className={`mt-1.5 ${listClass}`}>
+        <div ref={presetListRef} className={`mt-3 ${listClass}`}>
           {presets.map((item) => (
             <SequenceListRow
               key={`preset-${item.id}`}
