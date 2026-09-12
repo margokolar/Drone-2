@@ -71,9 +71,7 @@ import { TopControls } from './components/TopControls'
 import { ShineControls } from './components/ShineControls'
 import { EntryGlideControls } from './components/EntryGlideControls'
 import { FadeControls } from './components/FadeControls'
-import { LockPresetSequenceTable } from './components/LockPresetSequenceTable'
 import { HomeScreenOverlay, type HomeScreenItem } from './components/HomeScreenOverlay'
-import { PlayPauseIcon } from './components/PlayPauseIcon'
 import { useAddFollower } from './hooks/useAddFollower'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useMetronome } from './hooks/useMetronome'
@@ -104,6 +102,7 @@ import {
   syncStickyChromeLayoutOffsets,
 } from './utils/scrollBelowStickyChrome'
 import { triggerSaveFlash } from './utils/saveFlash'
+import { isIosApp } from './utils/platform'
 
 type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'add' | 'midi' | 'shine'
 
@@ -2134,6 +2133,10 @@ function App() {
     touchLockLongPressTimerRef.current = window.setTimeout(() => {
       touchLockLongPressTimerRef.current = null
       touchLockLongPressFiredRef.current = true
+      const locking = !useDroneStore.getState().controlsLocked
+      if (locking) {
+        setHomeScreenOpen(true)
+      }
       toggleControlsLocked()
     }, TOUCH_LOCK_LONG_PRESS_MS)
   }, [clearTouchLockLongPressTimer, toggleControlsLocked])
@@ -2188,9 +2191,13 @@ function App() {
       )}
       {homeScreenOpen && (
         <div
-          className="fixed z-[45] overflow-hidden bg-[#111019] px-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))]"
+          className={`fixed z-[45] overflow-hidden bg-[#111019] px-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] ${
+            controlsLocked ? 'pointer-events-none' : ''
+          }`}
           style={{
-            top: 'var(--sticky-chrome-bottom, calc(env(safe-area-inset-top, 0px) + 4.75rem))',
+            top: isIosApp()
+              ? 'calc(var(--sticky-chrome-bottom, calc(env(safe-area-inset-top, 0px) + 4.75rem)) + 0.5rem)'
+              : 'var(--sticky-chrome-bottom, calc(env(safe-area-inset-top, 0px) + 4.75rem))',
             bottom: 'calc(var(--bottom-chrome-height, 5.5rem) + 0.25rem)',
             left: 0,
             right: 0,
@@ -2205,54 +2212,6 @@ function App() {
             onSelectPreset={handleHomePresetSelect}
             onSelectSong={handleHomeSongSelect}
           />
-        </div>
-      )}
-      {controlsLocked && !homeScreenOpen && (
-        <div
-          className="fixed z-40 touch-none px-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))]"
-          style={{
-            top: 'calc(var(--sticky-chrome-bottom, calc(env(safe-area-inset-top, 0px) + 4.75rem)) + 0.5rem)',
-            bottom: 0,
-            left: 0,
-            right: 0,
-          }}
-          aria-hidden="true"
-          onPointerDown={(event) => {
-            event.preventDefault()
-          }}
-        >
-          <div
-            className={`flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#1a1825] px-3 pb-[calc(var(--bottom-chrome-height,5.5rem)+1.25rem)] ${
-              lockScreenLabels.sequence.length >= 2 ? 'pt-0' : 'pt-6'
-            }`}
-          >
-            <div
-              className={
-                lockScreenLabels.sequence.length >= 2
-                  ? 'shrink-0 py-[calc(1.125rem+0.25em)] text-[13.5rem] text-white'
-                  : 'shrink-0 text-[13.5rem] text-white'
-              }
-            >
-              {isTransportMarkerKey(activeNavigationKey, presetNavigation) ? (
-                <div className="flex h-[0.9em] items-center justify-center">
-                  <PlayPauseIcon matchEx className="shrink-0" />
-                </div>
-              ) : (
-                <div className="max-w-full text-center text-balance font-bold leading-[0.9] tracking-tight break-words">
-                  {lockScreenLabels.title}
-                </div>
-              )}
-            </div>
-            <LockPresetSequenceTable
-              sequence={lockScreenLabels.sequence}
-              activeIndex={lockScreenLabels.activeIndex}
-            />
-            <div className="flex min-h-0 flex-1 items-center justify-center">
-              <div className="max-w-full text-center text-balance text-[3rem] font-semibold leading-tight break-words text-white/70">
-                {lockScreenLabels.artist}
-              </div>
-            </div>
-          </div>
         </div>
       )}
       <div
@@ -2272,7 +2231,7 @@ function App() {
           }`}
         >
           <header className={`mx-auto flex max-w-[26.5rem] items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 md:max-w-[62.5rem] ${
-            controlsLocked && !homeScreenOpen ? 'pointer-events-none' : ''
+            controlsLocked ? 'pointer-events-none' : ''
           } ${
             controlsLocked || homeScreenOpen ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}>
@@ -2322,13 +2281,21 @@ function App() {
             <button
               type="button"
               className={`relative z-50 flex min-h-[44px] items-center justify-center rounded-xl border transition ${
-                homeScreenOpen
-                  ? 'pointer-events-auto min-w-[44px] border-amber-300/50 bg-amber-300/15 px-2.5 text-amber-100'
-                  : 'pointer-events-auto min-w-[44px] border-white/10 bg-white/5 p-2 text-white/70 hover:bg-white/10'
+                controlsLocked
+                  ? 'min-w-[44px] cursor-not-allowed border-white/10 bg-white/5 px-2.5 text-white/40 opacity-40'
+                  : homeScreenOpen
+                    ? 'pointer-events-auto min-w-[44px] border-amber-300/50 bg-amber-300/15 px-2.5 text-amber-100'
+                    : 'pointer-events-auto min-w-[44px] border-white/10 bg-white/5 p-2 text-white/70 hover:bg-white/10'
               }`}
-              onClick={() => setHomeScreenOpen((open) => !open)}
+              onClick={() => {
+                if (controlsLocked) {
+                  return
+                }
+                setHomeScreenOpen((open) => !open)
+              }}
               aria-label={homeScreenOpen ? 'Edit drone' : 'Open home screen'}
               aria-pressed={homeScreenOpen}
+              aria-disabled={controlsLocked}
             >
               {homeScreenOpen ? (
                 <span className="text-sm font-semibold tracking-wide">EDIT</span>
