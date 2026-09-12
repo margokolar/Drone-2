@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { droneEngine } from '../audio/DroneEngine'
+import { useDroneStore } from '../store/useDroneStore'
 import type { DroneRuntimeConfig } from '../audio/types'
 
 export function useAudioEngine(
@@ -9,13 +10,19 @@ export function useAudioEngine(
 ): void {
   const latestConfigRef = useRef<DroneRuntimeConfig>(config)
   const previousPresetIdRef = useRef(activePresetId)
+  const songName = useDroneStore((state) => state.songName)
+  const previousSongNameRef = useRef(songName)
 
   useEffect(() => {
-    if (previousPresetIdRef.current !== activePresetId) {
+    if (
+      previousPresetIdRef.current !== activePresetId ||
+      previousSongNameRef.current !== songName
+    ) {
       droneEngine.markPresetTransition()
       previousPresetIdRef.current = activePresetId
+      previousSongNameRef.current = songName
     }
-  }, [activePresetId])
+  }, [activePresetId, songName])
 
   useEffect(() => {
     droneEngine.setPlaybackFadeSettings(

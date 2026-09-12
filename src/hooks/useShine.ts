@@ -55,6 +55,7 @@ export function useShine(
   const shine = useDroneStore((state) => state.shine)
   const setShine = useDroneStore((state) => state.setShine)
   const activePresetId = useDroneStore((state) => state.activePresetId)
+  const songName = useDroneStore((state) => state.songName)
   const playbackFadeEnabled = useDroneStore((state) => state.playbackFadeEnabled)
   const playbackFadeInSeconds = useDroneStore((state) => state.playbackFadeInSeconds)
   const playbackFadeOutSeconds = useDroneStore((state) => state.playbackFadeOutSeconds)
@@ -70,6 +71,7 @@ export function useShine(
   const rafRef = useRef<number | null>(null)
   const lastMeterUpdateRef = useRef(0)
   const previousPresetIdRef = useRef(activePresetId)
+  const previousSongNameRef = useRef(songName)
   const previousShineEnabledRef = useRef(enabled)
 
   useEffect(() => {
@@ -86,11 +88,15 @@ export function useShine(
   ])
 
   useEffect(() => {
-    if (previousPresetIdRef.current !== activePresetId) {
+    if (
+      previousPresetIdRef.current !== activePresetId ||
+      previousSongNameRef.current !== songName
+    ) {
       shineEngine.markPresetTransition()
       previousPresetIdRef.current = activePresetId
+      previousSongNameRef.current = songName
     }
-  }, [activePresetId])
+  }, [activePresetId, songName])
 
   const applyEngineConfig = useCallback(() => {
     shineEngine.setBaseFrequency(baseFrequency(noteIndex, octaveIndex, a4Hz))
@@ -103,10 +109,21 @@ export function useShine(
 
   useEffect(() => {
     if (!isActive) {
-      shineEngine.clearPresetTransition()
-      applyEngineConfig()
+      const isSongOrPresetTransition = shineEngine.consumePresetTransition()
       previousShineEnabledRef.current = enabled
-      shineEngine.stop()
+      if (shineEngine.isRunning()) {
+        const fadeOutSeconds = isSongOrPresetTransition
+          ? Math.max(
+              playbackFadeEnabled ? playbackFadeOutSeconds : 0,
+              playbackFadeEnabled ? presetCrossfadeSeconds : 0,
+            )
+          : undefined
+        shineEngine.stop(
+          fadeOutSeconds !== undefined ? { fadeOutSeconds } : undefined,
+        )
+      } else {
+        applyEngineConfig()
+      }
       return
     }
 
@@ -146,6 +163,7 @@ export function useShine(
     isActive,
     playbackFadeEnabled,
     playbackFadeInSeconds,
+    playbackFadeOutSeconds,
     presetCrossfadeSeconds,
   ])
 

@@ -69,6 +69,8 @@ export class ShineEngine {
   private playbackFadeInSeconds = 0
   private playbackFadeOutSeconds = 0
   private presetCrossfadeSeconds = 0
+  private activeFadeOutSeconds = 0
+  private activeFadeInSeconds = 0
   private shineStopAt = 0
 
   private baseFrequency = 65.7
@@ -178,7 +180,7 @@ export class ShineEngine {
       return
     }
     if (isNativeSynth()) {
-      applyConfig()
+      this.beginNativeGainCrossfade(applyConfig, duration)
       return
     }
     if (!this.context || !this.masterGain) {
@@ -223,6 +225,25 @@ export class ShineEngine {
         gainNode.gain.setValueAtTime(MIN_AUDIBLE_GAIN, resumeAt)
         scheduleSmoothFadeIn(gainNode.gain, harmonicTarget, resumeAt, duration)
       })
+    }, duration * 1000 + 20)
+  }
+
+  private beginNativeGainCrossfade(applyConfig: () => void, duration: number): void {
+    this.clearPendingStopTimer()
+    this.clearPendingPresetCrossfadeTimer()
+    this.isAudibleStopping = true
+    this.activeFadeOutSeconds = duration
+    this.gainFadeInEndTime = 0
+    this.shineStopAt = this.nowSeconds()
+    this.pendingPresetCrossfadeTimer = window.setTimeout(() => {
+      this.pendingPresetCrossfadeTimer = null
+      this.isAudibleStopping = false
+      this.activeFadeOutSeconds = 0
+      applyConfig()
+      const now = this.nowSeconds()
+      this.activeFadeInSeconds = duration
+      this.gainFadeInEndTime = now + duration
+      this.pushNativeShine(now)
     }, duration * 1000 + 20)
   }
 
@@ -292,6 +313,7 @@ export class ShineEngine {
     this.clearPendingStopTimer()
     this.clearPendingPresetCrossfadeTimer()
     this.isAudibleStopping = false
+    this.activeFadeOutSeconds = 0
     this.gainFadeInEndTime = 0
     if (this.running) {
       return
@@ -299,6 +321,7 @@ export class ShineEngine {
     if (isNativeSynth()) {
       const now = this.nowSeconds()
       const fadeInSeconds = this.playbackFadeInSeconds
+      this.activeFadeInSeconds = fadeInSeconds
       this.gainFadeInEndTime = fadeInSeconds > 0 ? now + fadeInSeconds : 0
       for (let index = 0; index < SHINE_HARMONIC_COUNT; index += 1) {
         this.jitterPrev[index] = 0
@@ -327,6 +350,7 @@ export class ShineEngine {
 
     const now = context.currentTime
     const fadeInSeconds = this.playbackFadeInSeconds
+    this.activeFadeInSeconds = fadeInSeconds
     const targetMaster = this.effectiveMasterGain()
     if (this.masterGain) {
       this.masterGain.gain.cancelScheduledValues(now)
@@ -386,7 +410,7 @@ export class ShineEngine {
     this.startScheduler()
   }
 
-  stop(): void {
+  stop(options?: { fadeOutSeconds?: number }): void {
     if (!this.running && !this.isAudibleStopping) {
       return
     }
@@ -396,16 +420,21 @@ export class ShineEngine {
 
     this.clearPendingPresetCrossfadeTimer()
     this.gainFadeInEndTime = 0
+    const fadeOut =
+      options?.fadeOutSeconds !== undefined
+        ? Math.max(0, options.fadeOutSeconds)
+        : this.playbackFadeOutSeconds
 
     if (isNativeSynth()) {
-      const fadeOut = this.playbackFadeOutSeconds
       if (fadeOut > 0) {
         this.isAudibleStopping = true
+        this.activeFadeOutSeconds = fadeOut
         this.shineStopAt = this.nowSeconds()
         this.clearPendingStopTimer()
         this.pendingStopTimer = window.setTimeout(() => {
           this.pendingStopTimer = null
           this.isAudibleStopping = false
+          this.activeFadeOutSeconds = 0
           this.running = false
           this.stopScheduler()
           this.displayLevel.fill(0)
@@ -429,9 +458,9 @@ export class ShineEngine {
     }
 
     const now = context.currentTime
-    const fadeOut = this.playbackFadeOutSeconds
     if (fadeOut > 0) {
       this.isAudibleStopping = true
+      this.activeFadeOutSeconds = fadeOut
       scheduleSmoothFadeOut(this.masterGain.gain, now, fadeOut)
       this.gains.forEach((gainNode) => {
         if (gainNode) {
@@ -442,6 +471,7 @@ export class ShineEngine {
       this.pendingStopTimer = window.setTimeout(() => {
         this.pendingStopTimer = null
         this.isAudibleStopping = false
+        this.activeFadeOutSeconds = 0
         this.running = false
         this.stopScheduler()
         this.hardStopVoices()
@@ -456,6 +486,8 @@ export class ShineEngine {
 
   private hardStopVoices(): void {
     this.isAudibleStopping = false
+    this.activeFadeOutSeconds = 0
+    this.activeFadeInSeconds = 0
     this.gainFadeInEndTime = 0
     this.displayLevel.fill(0)
     if (isNativeSynth()) {
@@ -515,7 +547,7 @@ export class ShineEngine {
     }
     this.baseFrequency = hz
     if (isNativeSynth()) {
-      if (this.running) {
+      if (this.running && !this.isAudibleStopping) {
         this.pushNativeShine(this.nowSeconds())
       }
       return
@@ -557,7 +589,7 @@ export class ShineEngine {
 
   private applyMasterGain(): void {
     if (isNativeSynth()) {
-      if (this.running) {
+      if (this.running && !this.isAudibleStopping) {
         this.pushNativeShine(this.nowSeconds())
       }
       return
@@ -684,13 +716,18 @@ export class ShineEngine {
   private pushNativeShine(now: number): void {
     let fadeScale = 1
     if (this.gainFadeInEndTime > 0 && now < this.gainFadeInEndTime) {
-      const duration = this.playbackFadeInSeconds
+      const duration =
+        this.activeFadeInSeconds > 0 ? this.activeFadeInSeconds : this.playbackFadeInSeconds
       const elapsed = duration - (this.gainFadeInEndTime - now)
       fadeScale = duration > 0 ? Math.min(1, Math.max(0, elapsed / duration)) : 1
     }
-    if (this.isAudibleStopping && this.playbackFadeOutSeconds > 0) {
-      const elapsed = now - this.shineStopAt
-      fadeScale *= Math.max(0, 1 - elapsed / this.playbackFadeOutSeconds)
+    if (this.isAudibleStopping) {
+      const fadeOut =
+        this.activeFadeOutSeconds > 0 ? this.activeFadeOutSeconds : this.playbackFadeOutSeconds
+      if (fadeOut > 0) {
+        const elapsed = now - this.shineStopAt
+        fadeScale *= Math.max(0, 1 - elapsed / fadeOut)
+      }
     }
     const master = this.effectiveMasterGain() * fadeScale
     const items = []
