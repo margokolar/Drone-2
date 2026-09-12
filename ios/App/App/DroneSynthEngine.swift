@@ -843,21 +843,14 @@ final class DroneSynthEngine {
         guard sequence.count >= 2, rect.height >= 40, rect.width >= 80 else {
             return
         }
-        let gap: CGFloat = 10
-        let maxRow: CGFloat = 76
-        let minRow: CGFloat = 48
-        let maxFit = max(2, Int(floor((rect.height + gap) / (minRow + gap))))
+        let gap: CGFloat = 6
+        let rowH: CGFloat = 36
+        let maxFit = max(2, Int(floor((rect.height + gap) / (rowH + gap))))
         let window = windowedSequence(sequence, activeIndex: activeIndex, maxRows: maxFit)
-        let count = CGFloat(window.items.count)
-        let rowH = min(maxRow, max(minRow, (rect.height - gap * (count - 1)) / count))
-        let tableHeight = rowH * count + gap * max(0, count - 1)
         var y = rect.minY
-        if tableHeight < rect.height {
-            y += min(12, (rect.height - tableHeight) / 8)
-        }
 
-        let numberWidth: CGFloat = min(72, max(44, rowH * 0.9))
-        let nameInset: CGFloat = 20
+        let numberWidth: CGFloat = 32
+        let nameInset: CGFloat = 12
         let nameParagraph = NSMutableParagraphStyle()
         nameParagraph.alignment = .left
         nameParagraph.lineBreakMode = .byTruncatingTail
@@ -873,14 +866,14 @@ final class DroneSynthEngine {
             let stroke = isActive
                 ? UIColor(red: 252 / 255, green: 211 / 255, blue: 77 / 255, alpha: 0.9)
                 : UIColor(white: 1, alpha: 0.12)
-            let path = UIBezierPath(roundedRect: row, cornerRadius: min(22, rowH * 0.28))
+            let path = UIBezierPath(roundedRect: row, cornerRadius: 8)
             fill.setFill()
             path.fill()
             stroke.setStroke()
-            path.lineWidth = isActive ? 4 : 2
+            path.lineWidth = isActive ? 2 : 1
             path.stroke()
 
-            let fontSize = min(42, max(26, rowH * 0.46))
+            let fontSize: CGFloat = 18
             let font = roundedFont(size: fontSize, weight: isActive ? .bold : .semibold)
             let number = "\(window.start + offset + 1)" as NSString
             let nameText = name as NSString
@@ -955,11 +948,11 @@ final class DroneSynthEngine {
             paragraph.alignment = .center
             paragraph.lineBreakMode = .byWordWrapping
 
-            let titleMaxHeight: CGFloat = showTable ? 140 : 320
-            let titleMaxSize: CGFloat = showTable ? 120 : 200
+            let titleMaxHeight: CGFloat = 280
+            let titleMaxSize: CGFloat = 200
             var afterPreset = afterIcon
             if isTransport {
-                let symbolSize: CGFloat = showTable ? 96 : 200
+                let symbolSize: CGFloat = 200
                 let symbolName = playing ? "pause.fill" : "play.fill"
                 let config = UIImage.SymbolConfiguration(pointSize: symbolSize, weight: .bold)
                 if let symbol = UIImage(systemName: symbolName, withConfiguration: config)?
@@ -981,8 +974,8 @@ final class DroneSynthEngine {
                     width: textWidth,
                     maxHeight: titleMaxHeight,
                     maxSize: titleMaxSize,
-                    minSize: showTable ? 44 : 52,
-                    maxLines: showTable ? 2 : 3,
+                    minSize: 52,
+                    maxLines: 3,
                     weight: .bold
                 )
                 let titleAttrs: [NSAttributedString.Key: Any] = [
