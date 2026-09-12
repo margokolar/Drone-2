@@ -81,7 +81,7 @@ export function AddMicToolbarButton({
   return (
     <button
       type="button"
-      className={`button-safe flex min-h-[44px] items-center justify-center rounded-xl border px-2 py-3 transition ${
+      className={`button-safe flex h-11 w-full items-center justify-center rounded-xl border px-2 transition ${
         showError
           ? 'border-rose-300/80 bg-rose-300/15 text-rose-100'
           : listening

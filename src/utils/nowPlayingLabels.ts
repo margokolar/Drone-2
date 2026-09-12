@@ -1,9 +1,12 @@
 import {
-  isNavigationEnabled,
+  getEnabledNavigationEntries,
   isTransportMarkerKey,
+  navigationEntryKey,
   type PresetNavigationEntry,
 } from '../presets/presetNavigation'
 import type { Preset } from '../presets/defaultPresets'
+
+export const PLAY_PAUSE_SEQUENCE_LABEL = 'Play / Pause'
 
 export type NowPlayingLabels = {
   title: string
@@ -14,23 +17,22 @@ export type NowPlayingLabels = {
 
 export function nowPlayingSequence(state: {
   presets: Preset[]
-  activePresetId: string
+  activeNavigationKey: string
   presetNavigation: PresetNavigationEntry[]
 }): { sequence: string[]; activeIndex: number } {
   const sequence: string[] = []
   let activeIndex = -1
-  for (const entry of state.presetNavigation) {
-    if (entry.kind !== 'preset') {
+  const enabled = getEnabledNavigationEntries(state.presetNavigation, state.presets)
+  for (const entry of enabled) {
+    if (navigationEntryKey(entry) === state.activeNavigationKey) {
+      activeIndex = sequence.length
+    }
+    if (entry.kind === 'transport') {
+      sequence.push(PLAY_PAUSE_SEQUENCE_LABEL)
       continue
     }
     const preset = state.presets.find((item) => item.id === entry.presetId)
-    if (!preset || !isNavigationEnabled(preset)) {
-      continue
-    }
-    if (preset.id === state.activePresetId) {
-      activeIndex = sequence.length
-    }
-    sequence.push(preset.name.trim() || 'Preset')
+    sequence.push(preset?.name.trim() || 'Preset')
   }
   return { sequence, activeIndex }
 }
@@ -45,7 +47,7 @@ export function nowPlayingLabels(state: {
   const artist = state.songName.trim() || 'Drone'
   const { sequence, activeIndex } = nowPlayingSequence(state)
   if (isTransportMarkerKey(state.activeNavigationKey, state.presetNavigation)) {
-    return { title: 'Play / Pause', artist, sequence, activeIndex }
+    return { title: PLAY_PAUSE_SEQUENCE_LABEL, artist, sequence, activeIndex }
   }
   const presetName = state.presets.find((preset) => preset.id === state.activePresetId)?.name.trim()
   return { title: presetName || 'Drone', artist, sequence, activeIndex }

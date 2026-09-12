@@ -4,6 +4,7 @@ import { buildRuntimeConfigFromStore } from '../audio/runtimeConfigFromStore'
 import { transportPauseFromRemote, transportPlayFromRemote, transportMediaNextPress, transportMediaPreviousPress, transportVolumeDown, transportVolumeUp } from '../audio/transportControls'
 import { markMediaSessionAction, wasMediaSessionHandledRecently } from '../utils/mediaRemoteDedupe'
 import { nowPlayingLabels } from '../utils/nowPlayingLabels'
+import { flashTransport } from '../utils/transportFlash'
 import { useDroneStore } from '../store/useDroneStore'
 import { AudioSession } from './audioSession'
 
@@ -77,10 +78,12 @@ export async function startNativeAudioSessionGuard(): Promise<() => void> {
     const action = event.action
     const config = buildRuntimeConfigFromStore(useDroneStore.getState())
     if (action === 'pause') {
+      flashTransport('play')
       transportPauseFromRemote()
       return
     }
     if (action === 'play') {
+      flashTransport('play')
       transportPlayFromRemote(config)
       return
     }
@@ -109,8 +112,10 @@ export async function startNativeAudioSessionGuard(): Promise<() => void> {
       return
     }
     if (useDroneStore.getState().playing) {
+      flashTransport('play')
       transportPauseFromRemote()
     } else {
+      flashTransport('play')
       transportPlayFromRemote(config)
     }
   })

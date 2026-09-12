@@ -6,6 +6,7 @@ import { isTransportMarkerKey } from '../presets/presetNavigation'
 import { useDroneStore } from '../store/useDroneStore'
 import { recordBleDebug } from '../utils/bleDebug'
 import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
+import { flashTransport } from '../utils/transportFlash'
 
 /** Shared play/pause/preset actions for UI, BlueTurn keyboard, and Media Session. */
 
@@ -57,6 +58,7 @@ export function transportPlay(config: DroneRuntimeConfig): void {
 
 /** Low-latency play for BT media remotes (Clip 5, lock screen). */
 export function transportPlayFromRemote(config: DroneRuntimeConfig): void {
+  flashTransport('play')
   if (useDroneStore.getState().playing) {
     return
   }
@@ -93,6 +95,7 @@ export function transportPause(): void {
 
 /** Low-latency pause for BT media remotes. */
 export function transportPauseFromRemote(): void {
+  flashTransport('play')
   if (!useDroneStore.getState().playing) {
     return
   }
@@ -204,9 +207,11 @@ const mediaPrevPress = createDoublePressController('mediaPrev')
 export function transportMediaNextPress(config: DroneRuntimeConfig): void {
   mediaNextPress(
     () => {
+      flashTransport('preset-next')
       transportNextPreset(config)
     },
     () => {
+      flashTransport('preset-prev')
       transportPreviousPreset(config)
     },
   )
@@ -214,7 +219,16 @@ export function transportMediaNextPress(config: DroneRuntimeConfig): void {
 
 /** Media prev: single → next song, double → previous song. */
 export function transportMediaPreviousPress(): void {
-  mediaPrevPress(transportNextSong, transportPreviousSong)
+  mediaPrevPress(
+    () => {
+      flashTransport('song-next')
+      transportNextSong()
+    },
+    () => {
+      flashTransport('song-prev')
+      transportPreviousSong()
+    },
+  )
 }
 
 const MASTER_GAIN_STEP_DB = 2
@@ -239,10 +253,12 @@ export function transportPresetPedalPress(
   if (pendingTimeoutRef.current !== null) {
     window.clearTimeout(pendingTimeoutRef.current)
     pendingTimeoutRef.current = null
+    flashTransport('preset-prev')
     transportPreviousPreset(config)
     return
   }
   pendingTimeoutRef.current = window.setTimeout(() => {
+    flashTransport('preset-next')
     transportNextPreset(config)
     pendingTimeoutRef.current = null
   }, windowMs)
@@ -256,10 +272,12 @@ export function transportSongPedalPress(
   if (pendingTimeoutRef.current !== null) {
     window.clearTimeout(pendingTimeoutRef.current)
     pendingTimeoutRef.current = null
+    flashTransport('song-prev')
     transportPreviousSong()
     return
   }
   pendingTimeoutRef.current = window.setTimeout(() => {
+    flashTransport('song-next')
     transportNextSong()
     pendingTimeoutRef.current = null
   }, windowMs)

@@ -38,6 +38,7 @@ import {
 import { markMediaSessionAction, wasMediaSessionHandledRecently } from '../utils/mediaRemoteDedupe'
 import { needsIosMediaRemoteIntegration } from '../utils/mediaSessionEnvironment'
 import { nowPlayingLabels } from '../utils/nowPlayingLabels'
+import { flashTransport } from '../utils/transportFlash'
 import { isCapacitorNative } from '../utils/platform'
 import { runMediaSessionAction } from '../utils/restoreBleKeyboardFocus'
 
@@ -241,6 +242,7 @@ export function useBtControl({
         event.stopPropagation()
         void droneEngine.pokeClock()
         transportPreviousPreset(latestRuntimeConfigRef.current)
+        flashTransport('preset-prev')
         return
       }
 
@@ -305,6 +307,7 @@ export function useBtControl({
       setActionHandler('play', () => {
         recordBleDebug('mediasession', `pedal play (playing=${useDroneStore.getState().playing})`)
         runMediaSessionAction(() => {
+          flashTransport('play')
           if (useDroneStore.getState().playing) {
             transportPause()
             return
@@ -317,7 +320,10 @@ export function useBtControl({
       })
       setActionHandler('pause', () => {
         recordBleDebug('mediasession', 'pedal pause')
-        runMediaSessionAction(transportPause)
+        runMediaSessionAction(() => {
+          flashTransport('play')
+          transportPause()
+        })
       })
       setActionHandler('nexttrack', () => {
         recordBleDebug('mediasession', 'pedal nexttrack')
@@ -563,11 +569,13 @@ export function useBtControl({
         }
 
         if (isKeyboardPlayPause) {
+          flashTransport('play')
           handleTogglePlay()
           return
         }
 
         if (isPlayPedal) {
+          flashTransport('play')
           handleTogglePlay()
           return
         }
@@ -603,16 +611,19 @@ export function useBtControl({
 
         if (matchesFootPedalKey(event, MEDIA_PLAY_PAUSE_KEYS)) {
           event.preventDefault()
+          flashTransport('play')
           handleTogglePlay()
           return
         }
         if (matchesFootPedalKey(event, MEDIA_PLAY_KEYS)) {
           event.preventDefault()
+          flashTransport('play')
           transportResume(latestRuntimeConfigRef.current)
           return
         }
         if (matchesFootPedalKey(event, MEDIA_PAUSE_KEYS)) {
           event.preventDefault()
+          flashTransport('play')
           transportPause()
         }
       }

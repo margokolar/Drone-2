@@ -2931,13 +2931,12 @@ function App() {
           >
               <div
                 className={`grid gap-1.5 ${
-                  micFeaturesEnabled
-                    ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)_auto]'
-                    : 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)]'
+                  micFeaturesEnabled ? 'grid-cols-6' : 'grid-cols-5'
                 }`}
               >
                 <button
                   type="button"
+                  data-transport="song-prev"
                   className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
                   onClick={selectPreviousSong}
                   disabled={!canNavigateSongs}
@@ -2947,6 +2946,7 @@ function App() {
                 </button>
                 <button
                   type="button"
+                  data-transport="preset-prev"
                   className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
                   onClick={handlePreviousPreset}
                   disabled={!canNavigatePresets}
@@ -2956,7 +2956,8 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  className="button-safe inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-fuchsia-300/60 bg-fuchsia-400/15 text-white transition hover:bg-fuchsia-300/25"
+                  data-transport="play"
+                  className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-fuchsia-300/60 bg-fuchsia-400/15 text-white transition hover:bg-fuchsia-300/25"
                   onClick={handleTogglePlay}
                   aria-label={playing ? 'Pause' : 'Play'}
                 >
@@ -2964,6 +2965,7 @@ function App() {
                 </button>
                 <button
                   type="button"
+                  data-transport="preset-next"
                   className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
                   onClick={handleNextPreset}
                   disabled={!canNavigatePresets}
@@ -2973,6 +2975,7 @@ function App() {
                 </button>
                 <button
                   type="button"
+                  data-transport="song-next"
                   className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
                   onClick={selectNextSong}
                   disabled={!canNavigateSongs}

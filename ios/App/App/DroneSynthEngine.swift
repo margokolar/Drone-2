@@ -844,12 +844,12 @@ final class DroneSynthEngine {
             return
         }
         let gap: CGFloat = 6
-        let rowH: CGFloat = 36
+        let rowH: CGFloat = 48
         let maxFit = max(2, Int(floor((rect.height + gap) / (rowH + gap))))
         let window = windowedSequence(sequence, activeIndex: activeIndex, maxRows: maxFit)
         var y = rect.minY
 
-        let numberWidth: CGFloat = 32
+        let numberWidth: CGFloat = 40
         let nameInset: CGFloat = 12
         let nameParagraph = NSMutableParagraphStyle()
         nameParagraph.alignment = .left
@@ -873,7 +873,7 @@ final class DroneSynthEngine {
             path.lineWidth = isActive ? 2 : 1
             path.stroke()
 
-            let fontSize: CGFloat = 18
+            let fontSize: CGFloat = 26
             let font = roundedFont(size: fontSize, weight: isActive ? .bold : .semibold)
             let number = "\(window.start + offset + 1)" as NSString
             let nameText = name as NSString
@@ -895,11 +895,35 @@ final class DroneSynthEngine {
                 in: CGRect(x: row.minX, y: textY, width: numberWidth, height: textHeight + 6),
                 withAttributes: numberAttrs
             )
+            var nameX = row.minX + numberWidth
+            let isTransportRow = name.compare("Play / Pause", options: .caseInsensitive) == .orderedSame
+            if isTransportRow {
+                let tint = isActive ? UIColor.white : UIColor(white: 1, alpha: 0.78)
+                let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+                let symbolNames = ["pause.fill", "play.fill"]
+                var symbolX = nameX
+                for symbolName in symbolNames {
+                    if let symbol = UIImage(systemName: symbolName, withConfiguration: config)?
+                        .withTintColor(tint, renderingMode: .alwaysOriginal)
+                    {
+                        let size = symbol.size
+                        let symbolRect = CGRect(
+                            x: symbolX,
+                            y: row.midY - size.height / 2,
+                            width: size.width,
+                            height: size.height
+                        )
+                        symbol.draw(in: symbolRect)
+                        symbolX = symbolRect.maxX + 4
+                    }
+                }
+                nameX = symbolX + 8
+            }
             nameText.draw(
                 in: CGRect(
-                    x: row.minX + numberWidth,
+                    x: nameX,
                     y: textY,
-                    width: row.width - numberWidth - nameInset,
+                    width: max(40, row.maxX - nameX - nameInset),
                     height: textHeight + 6
                 ),
                 withAttributes: nameAttrs
