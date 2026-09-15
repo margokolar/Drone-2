@@ -263,8 +263,10 @@ final class DroneSynthEngine {
 
         let hasLive = snapshot.contains { $0.active && $0.gain > 0.00005 }
         let audible = currentMaster > 0.01 && hasLive
-        let fromSilence = fadeSeconds > 0.001 && !hasLive
-        let overlap = fadeSeconds > 0.025 && audible
+        // Fade voices whenever a duration is set. Requiring master > 0.01 made
+        // play-after-mute snap oscillators to full gain (a pop) while master ramped.
+        let fromSilence = fadeSeconds > 0.001 && (!hasLive || currentMaster <= 0.01)
+        let overlap = fadeSeconds > 0.025 && hasLive
         let fadeIn = overlap || fromSilence
 
         if oscillators.isEmpty {

@@ -358,7 +358,8 @@ export class DroneEngine {
     }
     this.started = true
     if (isNativeSynth()) {
-      const fadeSeconds = this.resumeFromSilence ? this.playbackFadeInSeconds : 0
+      const fadeSeconds =
+        this.resumeFromSilence || !this.nativeGraphPushed ? this.playbackFadeInSeconds : 0
       this.pushNativeGraph(config, fadeSeconds, this.resumeFromSilence)
       this.resumeFromSilence = false
       return
@@ -375,7 +376,8 @@ export class DroneEngine {
         return
       }
       this.started = true
-      const fadeSeconds = this.resumeFromSilence ? this.playbackFadeInSeconds : 0
+      const fadeSeconds =
+        this.resumeFromSilence || !this.nativeGraphPushed ? this.playbackFadeInSeconds : 0
       this.pushNativeGraph(config, fadeSeconds, !options?.skipEntryGlide)
       this.resumeFromSilence = false
       return
@@ -763,7 +765,7 @@ export class DroneEngine {
       this.resumeFromSilence = true
       void DroneSynth.setGraph({
         master: MIN_AUDIBLE_GAIN,
-        fadeSeconds: 0,
+        fadeSeconds: this.playbackFadeOutSeconds,
         fadeInSeconds: this.playbackFadeInSeconds,
         fadeOutSeconds: this.playbackFadeOutSeconds,
         packed: '',
@@ -788,6 +790,7 @@ export class DroneEngine {
     this.nativeGlideNotes.clear()
     if (isNativeSynth()) {
       this.resumeFromSilence = true
+      this.nativeGraphPushed = false
       this.lastNativePacked = ''
       this.lastNativeMaster = -1
       void DroneSynth.setGraph({
