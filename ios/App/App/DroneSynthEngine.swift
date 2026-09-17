@@ -71,6 +71,7 @@ final class DroneSynthEngine {
     private var masterInc = 0.0
     private var lpL = Biquad()
     private var lpR = Biquad()
+    private var waves = BandLimitedWaves()
     private var limiterEnv = 0.0
     private var heldMaster = 0.3
     private var mixGain = 1.0
@@ -94,6 +95,78 @@ final class DroneSynthEngine {
     private static let ioBufferDuration: TimeInterval = 0.023
     private static let lowpassHz = 6500.0
     private static let limiterThreshold = pow(10.0, -1.0 / 20.0)
+
+    /// Web Audio OscillatorNode saw/square: Fourier sine series, peak-normalized,
+    /// band-limited by frequency. Starts at 0 with positive slope, in phase with sine.
+    private struct BandLimitedWaves {
+        private let size = 4096
+        private let mask = 4095
+        private let counts = [256, 128, 64, 32, 16, 8, 4, 2]
+        private var saw: [[Double]] = []
+        private var square: [[Double]] = []
+
+        mutating func prepare() {
+            if !saw.isEmpty { return }
+            saw = counts.map { makeTable(harmonics: $0, square: false) }
+            square = counts.map { makeTable(harmonics: $0, square: true) }
+            normalize(&saw)
+            normalize(&square)
+        }
+
+        func sample(isSquare: Bool, phase: Double, freq: Double, sampleRate: Double) -> Double {
+            let tables = isSquare ? square : saw
+            guard !tables.isEmpty else { return 0 }
+            let allowed = max(1, Int(sampleRate * 0.49 / max(freq, 1)))
+            var index = counts.count - 1
+            for i in counts.indices where counts[i] <= allowed {
+                index = i
+                break
+            }
+            let table = tables[index]
+            let pos = phase * Double(size)
+            let i0 = Int(pos) & mask
+            let frac = pos - floor(pos)
+            let i1 = (i0 + 1) & mask
+            return table[i0] + (table[i1] - table[i0]) * frac
+        }
+
+        private func makeTable(harmonics: Int, square: Bool) -> [Double] {
+            var table = Array(repeating: 0.0, count: size)
+            let stepBase = 2.0 * Double.pi / Double(size)
+            for harmonic in 1...harmonics {
+                let piFactor = 2.0 / (Double(harmonic) * Double.pi)
+                let b: Double
+                if square {
+                    guard (harmonic & 1) == 1 else { continue }
+                    b = 2 * piFactor
+                } else {
+                    b = piFactor * ((harmonic & 1) == 1 ? 1.0 : -1.0)
+                }
+                let step = stepBase * Double(harmonic)
+                var phase = 0.0
+                for i in 0..<size {
+                    table[i] += b * sin(phase)
+                    phase += step
+                }
+            }
+            return table
+        }
+
+        private func normalize(_ tables: inout [[Double]]) {
+            guard let richest = tables.first else { return }
+            var peak = 0.0
+            for sample in richest {
+                peak = max(peak, abs(sample))
+            }
+            guard peak > 0 else { return }
+            let scale = 1.0 / peak
+            for t in tables.indices {
+                for i in tables[t].indices {
+                    tables[t][i] *= scale
+                }
+            }
+        }
+    }
 
     private struct Biquad {
         var b0 = 1.0
@@ -542,6 +615,7 @@ final class DroneSynthEngine {
                 lpL.setLowpass(freq: Self.lowpassHz, q: 0.7, sampleRate: runningRate)
                 lpR.setLowpass(freq: Self.lowpassHz, q: 0.7, sampleRate: runningRate)
             }
+            waves.prepare()
         }
     }
 
@@ -554,6 +628,7 @@ final class DroneSynthEngine {
             hwRate = session.sampleRate > 0 ? session.sampleRate : 48_000
         }
         sampleRate = hwRate
+        waves.prepare()
         lpL.setLowpass(freq: Self.lowpassHz, q: 0.7, sampleRate: hwRate)
         lpR.setLowpass(freq: Self.lowpassHz, q: 0.7, sampleRate: hwRate)
         limiterEnv = 0
@@ -700,7 +775,7 @@ final class DroneSynthEngine {
                 if oscs[i].freq >= nyquist { continue }
                 let dt = oscs[i].freq * invSr
                 oscs[i].phase = wrap01(oscs[i].phase + dt)
-                let sample = waveform(oscs[i].wave, phase: oscs[i].phase, dt: dt) * oscs[i].gain
+                let sample = waveform(oscs[i].wave, phase: oscs[i].phase, freq: oscs[i].freq) * oscs[i].gain
                 let pan = oscs[i].pan
                 mixL += sample * sqrt((1 - pan) * 0.5)
                 mixR += sample * sqrt((1 + pan) * 0.5)
@@ -778,31 +853,16 @@ final class DroneSynthEngine {
         return phase
     }
 
-    /// 0 = sine, 1 = saw, 2 = square. Saw/square use PolyBLEP so they stay
-    /// bright without the harsh aliasing of a naive ramp/pulse.
-    private func waveform(_ wave: Int, phase: Double, dt: Double) -> Double {
+    /// 0 = sine, 1 = saw, 2 = square — same Fourier series as Web Audio OscillatorNode.
+    private func waveform(_ wave: Int, phase: Double, freq: Double) -> Double {
         switch wave {
         case 1:
-            return (2 * phase - 1) - polyBlep(phase, dt: dt)
+            return waves.sample(isSquare: false, phase: phase, freq: freq, sampleRate: sampleRate)
         case 2:
-            let naive = phase < 0.5 ? 1.0 : -1.0
-            return naive + polyBlep(phase, dt: dt) - polyBlep(wrap01(phase + 0.5), dt: dt)
+            return waves.sample(isSquare: true, phase: phase, freq: freq, sampleRate: sampleRate)
         default:
             return sin(phase * twoPi)
         }
-    }
-
-    private func polyBlep(_ t: Double, dt: Double) -> Double {
-        if dt <= 0 { return 0 }
-        if t < dt {
-            let x = t / dt
-            return x + x - x * x - 1
-        }
-        if t > 1 - dt {
-            let x = (t - 1) / dt
-            return x * x + x + x + 1
-        }
-        return 0
     }
 
     private static var cachedArtwork: MPMediaItemArtwork?
