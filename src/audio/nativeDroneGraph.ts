@@ -15,6 +15,12 @@ const DEFAULT_ENTRY_GLIDE: EntryGlideParams = {
   seconds: 2,
 }
 
+const WAVES: { id: 'sine' | 'saw' | 'square'; wave: 0 | 1 | 2; type: OscillatorType }[] = [
+  { id: 'sine', wave: 0, type: 'sine' },
+  { id: 'saw', wave: 1, type: 'sawtooth' },
+  { id: 'square', wave: 2, type: 'square' },
+]
+
 function entryGlide(config: DroneRuntimeConfig, tone: ToneConfig): EntryGlideParams | null {
   if (config.lowestToneGlideNoteId && config.lowestToneGlideNoteId === tone.noteId) {
     return config.lowestToneGlide ?? DEFAULT_ENTRY_GLIDE
@@ -49,28 +55,27 @@ export function nativeOscillatorsFromConfig(config: DroneRuntimeConfig): NativeD
       const harmonicIndex = partialIndex + 1
       const timbreWeights = partialTimbreWeights(harmonicIndex, blend, config.harmonicTimbreEnabled)
       const brightness = partialBrightnessGain(harmonicIndex, morph)
-      const gain =
-        toneGain *
-        partialLinear *
-        brightness *
-        (timbreWeights.sine * waveformGainCompensation('sine') +
-          timbreWeights.saw * waveformGainCompensation('sawtooth') +
-          timbreWeights.square * waveformGainCompensation('square'))
-      if (gain < 0.0002) continue
       const freq = Math.max(1, toneFrequency * ratio)
-      const osc: NativeDroneOsc = {
-        id: `${tone.noteId}:${partial.id}:sine`,
-        freq,
-        gain,
-        pan: tone.pan,
-        wave: 0,
+      for (const spec of WAVES) {
+        const amount = timbreWeights[spec.id]
+        if (amount <= 0) continue
+        const gain =
+          toneGain * partialLinear * brightness * amount * waveformGainCompensation(spec.type)
+        if (gain < 0.0002) continue
+        const osc: NativeDroneOsc = {
+          id: `${tone.noteId}:${partial.id}:${spec.id}`,
+          freq,
+          gain,
+          pan: tone.pan,
+          wave: spec.wave,
+        }
+        if (glide && glide.cents !== 0 && glide.seconds > 0) {
+          const centRatio = 2 ** (Math.abs(glide.cents) / 1200)
+          osc.glideFrom = Math.max(1, glide.cents > 0 ? freq * centRatio : freq / centRatio)
+          osc.glideSeconds = glide.seconds
+        }
+        out.push(osc)
       }
-      if (glide && glide.cents !== 0 && glide.seconds > 0) {
-        const centRatio = 2 ** (Math.abs(glide.cents) / 1200)
-        osc.glideFrom = Math.max(1, glide.cents > 0 ? freq * centRatio : freq / centRatio)
-        osc.glideSeconds = glide.seconds
-      }
-      out.push(osc)
     }
   }
   return out

@@ -62,7 +62,7 @@ final class DroneSynthEngine {
         var active = false
     }
 
-    private var oscs = Array(repeating: Osc(), count: 384)
+    private var oscs = Array(repeating: Osc(), count: 768)
     private var shine = Array(repeating: Shine(), count: 16)
     private var clicks = Array(repeating: Click(), count: 4)
     private var liveOsc = 0
@@ -700,7 +700,7 @@ final class DroneSynthEngine {
                 if oscs[i].freq >= nyquist { continue }
                 let dt = oscs[i].freq * invSr
                 oscs[i].phase = wrap01(oscs[i].phase + dt)
-                let sample = sin(oscs[i].phase * twoPi) * oscs[i].gain
+                let sample = waveform(oscs[i].wave, phase: oscs[i].phase, dt: dt) * oscs[i].gain
                 let pan = oscs[i].pan
                 mixL += sample * sqrt((1 - pan) * 0.5)
                 mixR += sample * sqrt((1 + pan) * 0.5)
@@ -776,6 +776,33 @@ final class DroneSynthEngine {
         if phase >= 1 { phase -= floor(phase) }
         if phase < 0 { phase += 1 }
         return phase
+    }
+
+    /// 0 = sine, 1 = saw, 2 = square. Saw/square use PolyBLEP so they stay
+    /// bright without the harsh aliasing of a naive ramp/pulse.
+    private func waveform(_ wave: Int, phase: Double, dt: Double) -> Double {
+        switch wave {
+        case 1:
+            return (2 * phase - 1) - polyBlep(phase, dt: dt)
+        case 2:
+            let naive = phase < 0.5 ? 1.0 : -1.0
+            return naive + polyBlep(phase, dt: dt) - polyBlep(wrap01(phase + 0.5), dt: dt)
+        default:
+            return sin(phase * twoPi)
+        }
+    }
+
+    private func polyBlep(_ t: Double, dt: Double) -> Double {
+        if dt <= 0 { return 0 }
+        if t < dt {
+            let x = t / dt
+            return x + x - x * x - 1
+        }
+        if t > 1 - dt {
+            let x = (t - 1) / dt
+            return x * x + x + x + 1
+        }
+        return 0
     }
 
     private static var cachedArtwork: MPMediaItemArtwork?
