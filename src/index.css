@@ -49,6 +49,16 @@
   html:not(.ios-app) .home-screen-overlay .home-screen-row-label {
     font-size: 1.38rem;
   }
+
+  html:not(.ios-app) .title-bar {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0;
+  }
+
+  html:not(.ios-app) .title-bar-end {
+    display: contents;
+  }
 }
 
 body {
