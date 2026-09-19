@@ -15,6 +15,13 @@
   text-size-adjust: 100%;
 }
 
+/* PWA phone only: shrink rem-based UI so the large title-bar clock fits. */
+@media (max-width: 480px) {
+  html:not(.ios-app) {
+    font-size: 14px;
+  }
+}
+
 body {
   margin: 0;
   min-width: 320px;
