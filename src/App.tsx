@@ -2232,7 +2232,7 @@ function App() {
             activeTab === 'tone' || controlsLocked || homeScreenOpen ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}
         >
-          <header className={`mx-auto flex max-w-[26.5rem] min-w-0 flex-nowrap items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 max-[480px]:gap-1.5 max-[480px]:px-2 max-[480px]:py-1.5 md:max-w-[62.5rem] ios-app:gap-3 ios-app:px-3 ios-app:py-2 ${
+          <header className={`mx-auto flex max-w-[26.5rem] min-w-0 flex-nowrap items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 max-[480px]:gap-2 max-[480px]:px-2 max-[480px]:py-1.5 md:max-w-[62.5rem] ios-app:gap-3 ios-app:px-3 ios-app:py-2 ${
             controlsLocked ? 'pointer-events-none' : ''
           } ${
             controlsLocked || homeScreenOpen ? '' : 'landscape:hidden max-h-[500px]:hidden'
@@ -2242,7 +2242,7 @@ function App() {
               aria-label={controlsLocked ? 'Menu locked while touch lock is on' : menuLabel}
               aria-disabled={controlsLocked}
               disabled={controlsLocked}
-              className={`flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 max-[480px]:min-h-9 max-[480px]:min-w-9 max-[480px]:p-1.5 ios-app:min-h-[44px] ios-app:min-w-[44px] ios-app:p-2 ${
+              className={`flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 max-[480px]:min-h-10 max-[480px]:min-w-10 max-[480px]:p-1.5 ios-app:min-h-[44px] ios-app:min-w-[44px] ios-app:p-2 ${
                 controlsLocked ? 'cursor-not-allowed opacity-40' : ''
               }`}
               onClick={() => {
@@ -2256,7 +2256,7 @@ function App() {
             </button>
             <button
               type="button"
-              className="min-w-0 shrink select-none rounded-lg px-1 py-1 text-xl font-semibold tracking-wide text-white transition hover:bg-white/10 max-[480px]:text-lg ios-app:text-xl"
+              className="min-w-0 shrink select-none rounded-lg px-0 py-1 text-xl font-semibold tracking-wide text-white transition hover:bg-white/10"
               onPointerDown={() => {
                 droneTitleLongPressFiredRef.current = false
                 clearDroneTitleLongPressTimer()
@@ -2282,12 +2282,12 @@ function App() {
             </button>
             <button
               type="button"
-              className={`relative z-50 flex min-h-[44px] shrink-0 items-center justify-center rounded-xl border transition max-[480px]:min-h-9 ios-app:min-h-[44px] ${
+              className={`relative z-50 flex min-h-[44px] shrink-0 items-center justify-center rounded-xl border transition max-[480px]:min-h-10 ios-app:min-h-[44px] ${
                 controlsLocked
-                  ? 'min-w-[44px] cursor-not-allowed border-white/10 bg-white/5 px-2.5 text-white/40 opacity-40 max-[480px]:min-w-9 max-[480px]:px-2 ios-app:min-w-[44px] ios-app:px-2.5'
+                  ? 'min-w-[44px] cursor-not-allowed border-white/10 bg-white/5 px-2.5 text-white/40 opacity-40 max-[480px]:min-w-10 max-[480px]:px-2 ios-app:min-w-[44px] ios-app:px-2.5'
                   : homeScreenOpen
-                    ? 'pointer-events-auto min-w-[44px] border-amber-300/50 bg-amber-300/15 px-2.5 text-amber-100 max-[480px]:min-w-9 max-[480px]:px-2 ios-app:min-w-[44px] ios-app:px-2.5'
-                    : 'pointer-events-auto min-w-[44px] border-white/10 bg-white/5 p-2 text-white/70 hover:bg-white/10 max-[480px]:min-w-9 max-[480px]:p-1.5 ios-app:min-w-[44px] ios-app:p-2'
+                    ? 'pointer-events-auto min-w-[44px] border-amber-300/50 bg-amber-300/15 px-2.5 text-amber-100 max-[480px]:min-w-10 max-[480px]:px-2 ios-app:min-w-[44px] ios-app:px-2.5'
+                    : 'pointer-events-auto min-w-[44px] border-white/10 bg-white/5 p-2 text-white/70 hover:bg-white/10 max-[480px]:min-w-10 max-[480px]:p-1.5 ios-app:min-w-[44px] ios-app:p-2'
               }`}
               onClick={() => {
                 if (controlsLocked) {
@@ -2305,10 +2305,10 @@ function App() {
                 <Home size={20} />
               )}
             </button>
-            <div className="ml-auto flex shrink-0 items-center gap-2 max-[480px]:gap-1 ios-app:gap-2">
+            <div className="ml-auto flex shrink-0 items-center gap-3 max-[480px]:gap-2 ios-app:gap-3">
             <button
               type="button"
-              className={`relative z-50 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border p-2 transition max-[480px]:min-h-9 max-[480px]:min-w-9 max-[480px]:p-1.5 ios-app:min-h-[44px] ios-app:min-w-[44px] ios-app:p-2 ${
+              className={`relative z-50 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border p-2 transition max-[480px]:min-h-10 max-[480px]:min-w-10 max-[480px]:p-1.5 ios-app:min-h-[44px] ios-app:min-w-[44px] ios-app:p-2 ${
                 controlsLocked
                   ? 'pointer-events-auto border-amber-300/50 bg-amber-300/15 text-amber-100'
                   : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'

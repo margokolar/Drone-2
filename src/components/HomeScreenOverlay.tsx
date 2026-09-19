@@ -21,7 +21,7 @@ type HomeScreenOverlayProps = {
 }
 
 const boxClass =
-  'flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#1a1825] px-3 py-3'
+  'home-screen-box flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#1a1825] px-3 py-3'
 
 const boxLabelClass =
   'mb-1 shrink-0 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50'
@@ -54,10 +54,10 @@ export function HomeScreenOverlay({
   const songListRef = useScrollActiveIntoView(songs)
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+    <div className="home-screen-overlay flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <div className={boxClass}>
         <div className={boxLabelClass}>Preset</div>
-        <div className="h-[1em] shrink-0 text-[6rem] text-white">
+        <div className="home-screen-preset-name h-[1em] shrink-0 text-[6rem] text-white">
           {isTransport ? (
             <div className="flex h-full items-center justify-center">
               <PlayPauseIcon className="h-[0.7em] w-auto shrink-0" />
@@ -68,7 +68,7 @@ export function HomeScreenOverlay({
             </div>
           )}
         </div>
-        <div ref={presetListRef} className={`mt-3 ${listClass}`}>
+        <div ref={presetListRef} className={`home-screen-list mt-3 ${listClass}`}>
           {presets.map((item) => (
             <SequenceListRow
               key={`preset-${item.id}`}
@@ -83,12 +83,12 @@ export function HomeScreenOverlay({
       </div>
       <div className={boxClass}>
         <div className={boxLabelClass}>Song</div>
-        <div className="h-[1.25em] shrink-0 text-[3rem] text-white/70">
+        <div className="home-screen-song-name h-[1.25em] shrink-0 text-[3rem] text-white/70">
           <div className="h-full w-full truncate pb-[0.25em] text-center font-semibold leading-none tracking-tight">
             {songTitle}
           </div>
         </div>
-        <div ref={songListRef} className={`mt-3 ${listClass}`}>
+        <div ref={songListRef} className={`home-screen-list mt-3 ${listClass}`}>
           {songs.map((item) => (
             <SequenceListRow
               key={`song-${item.id}`}

@@ -19,7 +19,7 @@ export function SequenceListRow({
 }: SequenceListRowProps) {
   const showTransport = isTransport || name === PLAY_PAUSE_SEQUENCE_LABEL
   const rowClass = clsx(
-    'flex min-w-0 items-center gap-2 rounded-lg border px-2.5 py-1.5',
+    'home-screen-row flex min-w-0 items-center gap-2 rounded-lg border px-2.5 py-1.5',
     isActive ? 'border-amber-300/70 bg-amber-300/15' : 'border-white/10 bg-white/5',
     onSelect && 'w-full text-left',
   )
@@ -27,7 +27,7 @@ export function SequenceListRow({
     <>
       <span
         className={clsx(
-          'w-8 shrink-0 text-center text-[1.65rem] font-bold tabular-nums leading-none',
+          'home-screen-row-label w-8 shrink-0 text-center text-[1.65rem] font-bold tabular-nums leading-none',
           isActive ? 'text-amber-200' : 'text-white/40',
         )}
       >
@@ -36,7 +36,7 @@ export function SequenceListRow({
       {showTransport ? (
         <span
           className={clsx(
-            'flex min-w-0 items-center gap-2 text-[1.65rem]',
+            'home-screen-row-label flex min-w-0 items-center gap-2 text-[1.65rem]',
             isActive ? 'text-amber-100' : 'text-white/75',
           )}
         >
@@ -46,7 +46,7 @@ export function SequenceListRow({
       ) : (
         <span
           className={clsx(
-            'min-w-0 truncate text-[1.65rem] font-semibold leading-[1.2]',
+            'home-screen-row-label min-w-0 truncate text-[1.65rem] font-semibold leading-[1.2]',
             isActive ? 'text-white' : 'text-white/75',
           )}
         >

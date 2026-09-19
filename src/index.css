@@ -15,10 +15,39 @@
   text-size-adjust: 100%;
 }
 
-/* PWA phone only: shrink rem-based UI so the large title-bar clock fits. */
+/* PWA phone only: slightly compact rem UI so the large title-bar clock fits. */
 @media (max-width: 480px) {
   html:not(.ios-app) {
-    font-size: 14px;
+    font-size: 15px;
+  }
+
+  html:not(.ios-app) .home-screen-overlay {
+    gap: 0.5rem;
+  }
+
+  html:not(.ios-app) .home-screen-overlay .home-screen-box {
+    padding: 0.5rem 0.7rem;
+  }
+
+  html:not(.ios-app) .home-screen-overlay .home-screen-preset-name {
+    font-size: 5.1rem;
+  }
+
+  html:not(.ios-app) .home-screen-overlay .home-screen-song-name {
+    font-size: 2.5rem;
+  }
+
+  html:not(.ios-app) .home-screen-overlay .home-screen-list {
+    margin-top: 0.4rem;
+    gap: 0.2rem;
+  }
+
+  html:not(.ios-app) .home-screen-overlay .home-screen-row {
+    padding-block: 0.28rem;
+  }
+
+  html:not(.ios-app) .home-screen-overlay .home-screen-row-label {
+    font-size: 1.38rem;
   }
 }
 
