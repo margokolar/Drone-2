@@ -59,6 +59,27 @@
   html:not(.ios-app) .title-bar-end {
     display: contents;
   }
+
+  html:not(.ios-app) [data-app-bottom-nav] nav[aria-label="App sections"] {
+    overflow-x: hidden;
+  }
+
+  html:not(.ios-app) [data-app-bottom-nav] nav[aria-label="App sections"] > div,
+  html:not(.ios-app) [data-app-bottom-nav] nav[aria-label="App sections"] > div > div:first-child {
+    width: 100%;
+    max-width: 100%;
+    justify-content: stretch;
+    gap: 0.125rem;
+  }
+
+  html:not(.ios-app) [data-app-bottom-nav] [role="tab"] {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
 }
 
 body {
@@ -103,6 +124,11 @@ select {
   white-space: normal;
   overflow-wrap: anywhere;
   line-height: 1.2;
+}
+
+[data-app-bottom-nav] [role="tab"] {
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
 .text-safe {
