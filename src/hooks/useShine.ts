@@ -141,13 +141,14 @@ export function useShine(
       shineEngine.crossfadePresetApply(applyEngineConfig)
     } else if (!shineEngine.isPlaying() || shineAppearingOnPreset) {
       applyEngineConfig()
-      const fadeInSeconds =
-        shineAppearingOnPreset && playbackFadeEnabled
+      const fadeInSeconds = playbackFadeEnabled
+        ? shineAppearingOnPreset
           ? Math.max(
               playbackFadeInSeconds * SHINE_FADE_IN_MULTIPLIER,
               presetCrossfadeSeconds * SHINE_FADE_IN_MULTIPLIER,
             )
-          : undefined
+          : playbackFadeInSeconds * SHINE_FADE_IN_MULTIPLIER
+        : 0
       shineEngine.start({
         force: shineAppearingOnPreset && shineEngine.isRunning(),
         fadeInSeconds,

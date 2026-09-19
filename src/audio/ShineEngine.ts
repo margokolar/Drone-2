@@ -72,6 +72,8 @@ export class ShineEngine {
   private activeFadeOutSeconds = 0
   private activeFadeInSeconds = 0
   private shineStopAt = 0
+  private shineWriteChain: Promise<void> = Promise.resolve()
+  private pendingStartFadeIn: number | null = null
 
   private baseFrequency = 65.7
   private volume = 0.6
@@ -134,6 +136,29 @@ export class ShineEngine {
 
   private shouldDeferGainUpdates(now: number): boolean {
     return this.isAudibleStopping || (this.gainFadeInEndTime > 0 && now < this.gainFadeInEndTime)
+  }
+
+  private fadeScaleAt(now: number): number {
+    let fadeScale = 1
+    if (this.gainFadeInEndTime > 0 && now < this.gainFadeInEndTime) {
+      const duration =
+        this.activeFadeInSeconds > 0 ? this.activeFadeInSeconds : this.playbackFadeInSeconds
+      const elapsed = duration - (this.gainFadeInEndTime - now)
+      fadeScale = duration > 0 ? Math.min(1, Math.max(0, elapsed / duration)) : 1
+    }
+    if (this.isAudibleStopping) {
+      const fadeOut =
+        this.activeFadeOutSeconds > 0 ? this.activeFadeOutSeconds : this.playbackFadeOutSeconds
+      if (fadeOut > 0) {
+        const elapsed = now - this.shineStopAt
+        fadeScale *= Math.max(0, 1 - elapsed / fadeOut)
+      }
+    }
+    return fadeScale
+  }
+
+  private enqueueNativeShine(task: () => Promise<void>): void {
+    this.shineWriteChain = this.shineWriteChain.then(task).catch(() => {})
   }
 
   private initialHarmonicGain(index: number): number {
@@ -300,27 +325,24 @@ export class ShineEngine {
     }
     const fadeInOverride = options?.fadeInSeconds
     if (fadeInOverride !== undefined) {
-      const previousFadeIn = this.playbackFadeInSeconds
-      this.playbackFadeInSeconds = fadeInOverride
-      this.startInternal()
-      this.playbackFadeInSeconds = previousFadeIn
-      return
+      this.pendingStartFadeIn = fadeInOverride
     }
     this.startInternal()
   }
 
   private startInternal(): void {
+    this.stopScheduler()
     this.clearPendingStopTimer()
     this.clearPendingPresetCrossfadeTimer()
     this.isAudibleStopping = false
     this.activeFadeOutSeconds = 0
-    this.gainFadeInEndTime = 0
     if (this.running) {
       return
     }
     if (isNativeSynth()) {
       const now = this.nowSeconds()
-      const fadeInSeconds = this.playbackFadeInSeconds
+      const fadeInSeconds = this.pendingStartFadeIn ?? this.playbackFadeInSeconds
+      this.pendingStartFadeIn = null
       this.activeFadeInSeconds = fadeInSeconds
       this.gainFadeInEndTime = fadeInSeconds > 0 ? now + fadeInSeconds : 0
       for (let index = 0; index < SHINE_HARMONIC_COUNT; index += 1) {
@@ -333,6 +355,7 @@ export class ShineEngine {
       }
       this.running = true
       this.startScheduler()
+      this.enqueueNativeShine(() => DroneSynth.clearShine())
       this.pushNativeShine(now)
       return
     }
@@ -340,7 +363,25 @@ export class ShineEngine {
       this.hardStopVoices()
     }
     const context = this.ensureContext()
-    void context.resume().catch(() => {})
+    if (context.state !== 'running') {
+      void context
+        .resume()
+        .catch(() => {})
+        .then(() => {
+          if (this.running || this.isAudibleStopping) {
+            return
+          }
+          this.startWebVoices(this.ensureContext())
+        })
+      return
+    }
+    this.startWebVoices(context)
+  }
+
+  private startWebVoices(context: AudioContext): void {
+    if (this.running) {
+      return
+    }
 
     const fundamentalWave = context.createPeriodicWave(
       Float32Array.from([0, ...FUNDAMENTAL_PARTIALS.map(() => 0)]),
@@ -349,7 +390,8 @@ export class ShineEngine {
     )
 
     const now = context.currentTime
-    const fadeInSeconds = this.playbackFadeInSeconds
+    const fadeInSeconds = this.pendingStartFadeIn ?? this.playbackFadeInSeconds
+    this.pendingStartFadeIn = null
     this.activeFadeInSeconds = fadeInSeconds
     const targetMaster = this.effectiveMasterGain()
     if (this.masterGain) {
@@ -438,14 +480,14 @@ export class ShineEngine {
           this.running = false
           this.stopScheduler()
           this.displayLevel.fill(0)
-          void DroneSynth.clearShine().catch(() => {})
+          this.enqueueNativeShine(() => DroneSynth.clearShine())
         }, fadeOut * 1000 + 80)
         return
       }
       this.running = false
       this.stopScheduler()
       this.displayLevel.fill(0)
-      void DroneSynth.clearShine().catch(() => {})
+      this.enqueueNativeShine(() => DroneSynth.clearShine())
       return
     }
 
@@ -491,7 +533,7 @@ export class ShineEngine {
     this.gainFadeInEndTime = 0
     this.displayLevel.fill(0)
     if (isNativeSynth()) {
-      void DroneSynth.clearShine().catch(() => {})
+      this.enqueueNativeShine(() => DroneSynth.clearShine())
       return
     }
     const context = this.context
@@ -524,7 +566,7 @@ export class ShineEngine {
     this.clearPendingPresetCrossfadeTimer()
     this.stop()
     if (isNativeSynth()) {
-      void DroneSynth.clearShine().catch(() => {})
+      this.enqueueNativeShine(() => DroneSynth.clearShine())
       return
     }
     if (this.masterGain) {
@@ -701,7 +743,7 @@ export class ShineEngine {
         level = this.manualLevel[index]
       }
 
-      this.displayLevel[index] = Math.min(1, level)
+      this.displayLevel[index] = Math.min(1, level * this.fadeScaleAt(now))
       if (!this.shouldDeferGainUpdates(now)) {
         gainNode.gain.setTargetAtTime(Math.max(MIN_AUDIBLE_GAIN, level), now, GAIN_SMOOTH_SECONDS)
       }
@@ -714,28 +756,14 @@ export class ShineEngine {
   }
 
   private pushNativeShine(now: number): void {
-    let fadeScale = 1
-    if (this.gainFadeInEndTime > 0 && now < this.gainFadeInEndTime) {
-      const duration =
-        this.activeFadeInSeconds > 0 ? this.activeFadeInSeconds : this.playbackFadeInSeconds
-      const elapsed = duration - (this.gainFadeInEndTime - now)
-      fadeScale = duration > 0 ? Math.min(1, Math.max(0, elapsed / duration)) : 1
-    }
-    if (this.isAudibleStopping) {
-      const fadeOut =
-        this.activeFadeOutSeconds > 0 ? this.activeFadeOutSeconds : this.playbackFadeOutSeconds
-      if (fadeOut > 0) {
-        const elapsed = now - this.shineStopAt
-        fadeScale *= Math.max(0, 1 - elapsed / fadeOut)
-      }
-    }
+    const fadeScale = this.fadeScaleAt(now)
     const master = this.effectiveMasterGain() * fadeScale
-    const items = []
+    const items: { freq: number; gain: number; pan: number }[] = []
     for (let index = 0; index < SHINE_HARMONIC_COUNT; index += 1) {
       const level = this.auto[index]
         ? this.computeAutoLevel(index, now)
         : this.manualLevel[index]
-      this.displayLevel[index] = Math.min(1, level)
+      this.displayLevel[index] = Math.min(1, level * fadeScale)
       const sweep =
         (Math.sin(2 * Math.PI * (this.moveFrequency[index] * now + this.basePan[index])) + 1) / 2
       const panPosition = 0.5 + this.moveAmount * (sweep - 0.5)
@@ -745,11 +773,13 @@ export class ShineEngine {
         pan: panPosition * 2 - 1,
       })
     }
-    void DroneSynth.setShine({
-      packed: items
-        .map((item) => `${item.freq}\t${item.gain}\t${item.pan}`)
-        .join('\n'),
-    }).catch(() => {})
+    this.enqueueNativeShine(() =>
+      DroneSynth.setShine({
+        packed: items
+          .map((item) => `${item.freq}\t${item.gain}\t${item.pan}`)
+          .join('\n'),
+      }),
+    )
   }
 
   private computeAutoLevel(index: number, now: number): number {

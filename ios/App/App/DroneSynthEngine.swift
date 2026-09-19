@@ -526,6 +526,8 @@ final class DroneSynthEngine {
         lock.lock()
         for i in shine.indices {
             shine[i].gainTarget = 0
+            shine[i].gain = 0
+            shine[i].active = false
         }
         lock.unlock()
     }
