@@ -136,6 +136,20 @@ select {
   overflow-wrap: anywhere;
 }
 
+.ios-app .title-bar-menu-icon {
+  width: 20px;
+  height: 16px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+}
+.ios-app .title-bar-menu-icon span {
+  display: block;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
 @keyframes saveFlash {
   0% {
     background-color: rgba(251, 191, 36, 0.5);

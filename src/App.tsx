@@ -2252,7 +2252,12 @@ function App() {
                 setMenuOpen(true)
               }}
             >
-              <Menu size={20} />
+              <Menu size={20} className="ios-app:hidden" />
+              <span className="title-bar-menu-icon hidden ios-app:flex" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
             </button>
             <button
               type="button"
