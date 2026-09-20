@@ -534,7 +534,7 @@ final class DroneSynthEngine {
 
     func setMetronome(enabled: Bool, bpm: Double, volumeDb: Double, muted: Bool) {
         onScreen = true
-        let tempo = min(350, max(30, bpm))
+        let tempo = min(404, max(30, bpm))
         let peak = min(1, max(0.001, pow(10.0, volumeDb / 20.0) * 1.8))
         lock.lock()
         let wasOn = metroEnabled && !metroMuted
