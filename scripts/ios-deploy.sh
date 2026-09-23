@@ -30,13 +30,24 @@ UDID=$(python3 - "$DEVICE_JSON" <<'EOF'
 import json, sys
 data = json.load(open(sys.argv[1]))
 devices = data.get("result", {}).get("devices", [])
+candidates = []
 for d in devices:
-    props = d.get("deviceProperties", {})
     hw = d.get("hardwareProperties", {})
     conn = d.get("connectionProperties", {})
-    if hw.get("platform") == "iOS" and conn.get("tunnelState") != "unavailable":
-        print(d.get("identifier", ""))
-        break
+    if hw.get("reality") != "physical":
+        continue
+    if hw.get("platform") != "iOS":
+        continue
+    if conn.get("tunnelState") == "unavailable":
+        continue
+    identifier = d.get("identifier", "")
+    if not identifier:
+        continue
+    # Prefer an iPhone if several physical iOS devices are reachable.
+    candidates.append((0 if hw.get("deviceType") == "iPhone" else 1, identifier))
+candidates.sort()
+if candidates:
+    print(candidates[0][1])
 EOF
 )
 rm -f "$DEVICE_JSON"
