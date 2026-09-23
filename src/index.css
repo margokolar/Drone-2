@@ -150,6 +150,52 @@ select {
   background: currentColor;
 }
 
+/* Native iOS: enlarge range hit targets (PWA keeps the thin tracks). */
+.ios-app input[type='range']:not(.tone-mixer-fader-vertical-input) {
+  height: 2.75rem;
+  min-height: 2.75rem;
+}
+
+.ios-app .tone-mixer-channel {
+  width: 5.5rem;
+}
+
+.ios-app .tone-mixer-channel--expanded {
+  width: 7.25rem;
+}
+
+.ios-app .tone-mixer-fader-vertical {
+  width: 2.75rem;
+}
+
+.ios-app .tone-mixer-fader-vertical-input {
+  height: 2.75rem;
+}
+
+.ios-app .tone-mixer-fader-vertical--gain-compact,
+.ios-app .tone-mixer-fader-vertical--aux-compact {
+  width: 2.5rem;
+}
+
+.ios-app .tone-mixer-fader-vertical-input--aux-compact {
+  height: 2.5rem;
+}
+
+.ios-app .timbre-slider__range {
+  height: 2.75rem;
+}
+
+.ios-app .timbre-slider__range::-webkit-slider-thumb {
+  width: 24px;
+  height: 24px;
+  margin-top: -10px;
+}
+
+.ios-app .timbre-slider__range::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+}
+
 @keyframes saveFlash {
   0% {
     background-color: rgba(251, 191, 36, 0.5);
