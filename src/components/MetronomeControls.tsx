@@ -13,6 +13,7 @@ import { NumericValueField } from './NumericValueField'
 import { ResettableRangeInput } from './ResettableRangeInput'
 
 const TEMPO_PRESETS = Array.from({ length: 12 }, (_, index) => 40 + index * 10)
+const IOS_TEMPO_PRESET_ROW = [160, 170, 180, 190]
 const TAP_TEMPO_RESET_MS = 2000
 const TAP_TEMPO_MIN_BPM = MIN_METRONOME_BPM
 const TAP_TEMPO_MAX_BPM = MAX_METRONOME_BPM
@@ -174,10 +175,14 @@ export function MetronomeControls({
           />
           <div className="mt-3">
             <div className="grid grid-cols-4 gap-2">
-              {TEMPO_PRESETS.map((presetBpm) => {
+              {[...TEMPO_PRESETS, ...IOS_TEMPO_PRESET_ROW].map((presetBpm) => {
                 const isActive = Math.round(bpm) === presetBpm
+                const isIosOnly = IOS_TEMPO_PRESET_ROW.includes(presetBpm)
                 let presetClassName =
                   'min-h-[40px] rounded-md border px-2 py-2 text-sm tabular-nums transition'
+                if (isIosOnly) {
+                  presetClassName += ' hidden ios-app:block'
+                }
                 if (isActive) {
                   presetClassName +=
                     ' border-fuchsia-300/70 bg-fuchsia-300/25 text-fuchsia-50 shadow-[0_0_0_1px_rgba(245,158,255,0.25)]'
