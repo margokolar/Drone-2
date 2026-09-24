@@ -1,7 +1,11 @@
 import { droneEngine } from './DroneEngine'
-import { metronomeEngine } from './MetronomeEngine'
 import type { DroneRuntimeConfig } from './types'
-import { stepPresetNavigation, playNextPresetFromTransportMarker, syncTransportPaused } from './presetNavigationTransport'
+import {
+  playNextPresetFromTransportMarker,
+  stepPresetNavigation,
+  syncClickWithTransportPlayState,
+  syncTransportPaused,
+} from './presetNavigationTransport'
 import { isTransportMarkerKey } from '../presets/presetNavigation'
 import { useDroneStore } from '../store/useDroneStore'
 import { recordBleDebug } from '../utils/bleDebug'
@@ -26,12 +30,6 @@ export function transportSyncPlaybackState(): void {
   syncMediaSessionPlaybackState(useDroneStore.getState().playing)
 }
 
-function prepareMetronomeForTransportPlay(): void {
-  if (useDroneStore.getState().metronomeSyncEnabled) {
-    metronomeEngine.prepareContext()
-  }
-}
-
 function isOnTransportMarker(): boolean {
   const state = useDroneStore.getState()
   return isTransportMarkerKey(state.activeNavigationKey, state.presetNavigation)
@@ -49,8 +47,8 @@ export function transportPlay(config: DroneRuntimeConfig): void {
   } else {
     droneEngine.ensureRunning(config)
   }
-  prepareMetronomeForTransportPlay()
   useDroneStore.getState().setPlaying(true)
+  syncClickWithTransportPlayState(true)
   if (needsIosMediaRemoteIntegration()) {
     syncMediaSessionPlaybackState(true)
   }
@@ -74,8 +72,8 @@ export function transportPlayFromRemote(config: DroneRuntimeConfig): void {
   } else {
     droneEngine.ensureRunning(config)
   }
-  prepareMetronomeForTransportPlay()
   useDroneStore.getState().setPlaying(true)
+  syncClickWithTransportPlayState(true)
   if (needsIosMediaRemoteIntegration()) {
     syncMediaSessionPlaybackState(true)
   }
@@ -84,6 +82,7 @@ export function transportPlayFromRemote(config: DroneRuntimeConfig): void {
 
 export function transportPause(): void {
   syncTransportPaused()
+  syncClickWithTransportPlayState(false)
   recordBleDebug('note', `paused ctx=${droneEngine.contextDebugLabel()}`)
   window.setTimeout(() => {
     recordBleDebug(
@@ -100,6 +99,7 @@ export function transportPauseFromRemote(): void {
     return
   }
   syncTransportPaused()
+  syncClickWithTransportPlayState(false)
   recordBleDebug('note', `remote pause ctx=${droneEngine.contextDebugLabel()}`)
 }
 
@@ -116,8 +116,8 @@ export function transportTogglePlay(config: DroneRuntimeConfig): void {
 export function transportResume(config: DroneRuntimeConfig): void {
   droneEngine.setPlaybackIntent(true)
   droneEngine.fastResume(config)
-  prepareMetronomeForTransportPlay()
   useDroneStore.getState().setPlaying(true)
+  syncClickWithTransportPlayState(true)
   if (needsIosMediaRemoteIntegration()) {
     syncMediaSessionPlaybackState(true)
   }

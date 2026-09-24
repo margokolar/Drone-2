@@ -2307,12 +2307,12 @@ function App() {
             </button>
             <button
               type="button"
-              className={`relative z-50 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border p-2 transition max-[480px]:min-h-10 max-[480px]:min-w-10 max-[480px]:p-1.5 ios-app:min-h-[44px] ios-app:min-w-[44px] ios-app:p-2 ${
+              className={`relative z-50 flex min-h-[44px] shrink-0 items-center justify-center rounded-xl border transition max-[480px]:min-h-10 ios-app:min-h-[44px] ${
                 controlsLocked
-                  ? 'cursor-not-allowed border-white/10 bg-white/5 text-white/40 opacity-40'
+                  ? 'min-w-[44px] cursor-not-allowed border-white/10 bg-white/5 px-2.5 text-white/40 opacity-40 max-[480px]:min-w-10 max-[480px]:px-2 ios-app:min-w-[44px] ios-app:px-2.5'
                   : homeScreenOpen
-                    ? 'pointer-events-auto border-amber-300/50 bg-amber-300/15 text-amber-100'
-                    : 'pointer-events-auto border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
+                    ? 'pointer-events-auto min-w-[44px] border-amber-300/50 bg-amber-300/15 px-2.5 text-amber-100 max-[480px]:min-w-10 max-[480px]:px-2 ios-app:min-w-[44px] ios-app:px-2.5'
+                    : 'pointer-events-auto min-w-[44px] border-cyan-300/50 bg-cyan-300/15 p-2 text-cyan-100 hover:bg-cyan-300/25 max-[480px]:min-w-10 max-[480px]:p-1.5 ios-app:min-w-[44px] ios-app:p-2'
               }`}
               onClick={() => {
                 if (controlsLocked) {
@@ -2324,7 +2324,11 @@ function App() {
               aria-pressed={homeScreenOpen}
               aria-disabled={controlsLocked}
             >
-              <Home size={20} />
+              {homeScreenOpen ? (
+                <span className="text-sm font-semibold tracking-wide">EDIT</span>
+              ) : (
+                <Home size={20} />
+              )}
             </button>
             <div className="title-bar-end ml-auto flex shrink-0 items-center gap-3 ios-app:gap-3">
             <button

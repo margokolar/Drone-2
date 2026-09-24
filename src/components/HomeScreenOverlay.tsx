@@ -67,23 +67,15 @@ export function HomeScreenOverlay({
           {isTransport ? (
             <div className="flex h-full items-center justify-center gap-[0.18em]">
               <PlayPauseIcon className="h-[1em] w-auto shrink-0" />
-              {activeTransportId && onToggleTransportMetronomeSync ? (
+              {activeTransportId &&
+              onToggleTransportMetronomeSync &&
+              transportMetronomeSyncEnabled ? (
                 <button
                   type="button"
-                  onClick={() =>
-                    onToggleTransportMetronomeSync(activeTransportId, !transportMetronomeSyncEnabled)
-                  }
-                  className={`button-safe flex min-h-9 shrink-0 items-center self-center rounded-lg border px-3 text-xs font-semibold uppercase tracking-[0.12em] transition ${
-                    transportMetronomeSyncEnabled
-                      ? 'border-fuchsia-300/60 bg-fuchsia-300/20 text-fuchsia-100'
-                      : 'border-white/20 bg-white/10 text-white/70'
-                  }`}
-                  aria-pressed={transportMetronomeSyncEnabled}
-                  aria-label={
-                    transportMetronomeSyncEnabled
-                      ? 'Disable click sync for this play/pause marker'
-                      : 'Sync click start and stop with this play/pause marker'
-                  }
+                  onClick={() => onToggleTransportMetronomeSync(activeTransportId, false)}
+                  className="button-safe flex min-h-9 shrink-0 items-center self-center rounded-lg border border-fuchsia-300/60 bg-fuchsia-300/20 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-fuchsia-100 transition"
+                  aria-pressed="true"
+                  aria-label="Disable click sync for this play/pause marker"
                 >
                   SYNC
                 </button>
