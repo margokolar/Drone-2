@@ -54,6 +54,7 @@ import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from 
 import { AddFollowerControls, AddMicToolbarButton } from './components/AddFollowerControls'
 import { MicMenuSection } from './components/MicMenuSection'
 import { MetronomeControls } from './components/MetronomeControls'
+import { ClickSyncButton } from './components/ClickSyncButton'
 import { NoteSelector } from './components/NoteSelector'
 import { OvertoneBars } from './components/OvertoneBars'
 import { OvertoneAllSoloButton, OvertoneToneNavControls, HarmonicTimbreToggleButton, overtoneControlButtonSizeClass, overtoneIconButtonClass } from './components/OvertoneToneNavControls'
@@ -2807,23 +2808,16 @@ function App() {
               title="Click"
               className="[&>header]:mb-0"
               rightSlot={
-                <button
-                  type="button"
-                  className={`button-safe flex min-h-9 shrink-0 self-center items-center rounded-lg border px-3.5 text-xs font-semibold uppercase tracking-[0.14em] transition ${
-                    metronomeSyncEnabled
-                      ? 'border-fuchsia-300/60 bg-fuchsia-300/20 text-fuchsia-100 hover:bg-fuchsia-300/30'
-                      : 'border-white/15 bg-white/5 text-white/55 hover:bg-white/10'
-                  }`}
+                <ClickSyncButton
+                  enabled={metronomeSyncEnabled}
                   onClick={() => handleMetronomeSyncChange(!metronomeSyncEnabled)}
-                  aria-pressed={metronomeSyncEnabled}
-                  aria-label={
+                  inactiveClassName="border-white/15 bg-white/5 text-white/55 hover:bg-white/10"
+                  ariaLabel={
                     metronomeSyncEnabled
                       ? 'Disable click sync with drone transport play and pause'
                       : 'Sync click start and stop with drone transport play and pause'
                   }
-                >
-                  SYNC
-                </button>
+                />
               }
             >
               <MetronomeControls

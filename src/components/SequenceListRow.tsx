@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { ClickSyncButton } from './ClickSyncButton'
 import { PlayPauseIcon } from './PlayPauseIcon'
 import { PLAY_PAUSE_SEQUENCE_LABEL } from '../utils/nowPlayingLabels'
 
@@ -65,22 +66,19 @@ export function SequenceListRow({
   )
   const syncButton =
     onToggleMetronomeSync ? (
-      <button
-        type="button"
+      <ClickSyncButton
+        enabled={metronomeSyncEnabled}
         onClick={(event) => {
           event.stopPropagation()
           onToggleMetronomeSync()
         }}
-        className={clsx(
-          'button-safe ml-auto flex min-h-9 shrink-0 items-center rounded-lg border px-2.5 text-xs font-semibold uppercase tracking-[0.12em] transition',
-          metronomeSyncEnabled
-            ? 'border-fuchsia-300/60 bg-fuchsia-300/20 text-fuchsia-100'
-            : isActive
-              ? 'border-white/20 bg-white/10 text-white/70'
-              : 'border-white/10 bg-white/5 text-white/55',
-        )}
-        aria-pressed={metronomeSyncEnabled}
-        aria-label={
+        className="ml-auto"
+        inactiveClassName={
+          isActive
+            ? 'border-white/20 bg-white/10 text-white/70'
+            : 'border-white/10 bg-white/5 text-white/55'
+        }
+        ariaLabel={
           metronomeSyncEnabled
             ? showTransport
               ? 'Disable click sync for this play/pause marker'
@@ -89,9 +87,7 @@ export function SequenceListRow({
               ? 'Sync click start and stop with this play/pause marker'
               : 'Sync click start and stop with this preset'
         }
-      >
-        SYNC
-      </button>
+      />
     ) : null
 
   if (onSelect) {

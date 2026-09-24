@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { ClickSyncButton } from './ClickSyncButton'
 import { PlayPauseIcon } from './PlayPauseIcon'
 import { SequenceListRow } from './SequenceListRow'
 
@@ -71,15 +72,12 @@ export function HomeScreenOverlay({
               {activeTransportId &&
               onToggleTransportMetronomeSync &&
               transportMetronomeSyncEnabled ? (
-                <button
-                  type="button"
+                <ClickSyncButton
+                  enabled
                   onClick={() => onToggleTransportMetronomeSync(activeTransportId, false)}
-                  className="button-safe flex min-h-9 shrink-0 items-center self-center rounded-lg border border-fuchsia-300/60 bg-fuchsia-300/20 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-fuchsia-100 transition"
-                  aria-pressed="true"
-                  aria-label="Disable click sync for this play/pause marker"
-                >
-                  SYNC
-                </button>
+                  className="self-center"
+                  ariaLabel="Disable click sync for this play/pause marker"
+                />
               ) : null}
             </div>
           ) : (
