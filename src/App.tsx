@@ -2267,6 +2267,16 @@ function App() {
         setActiveTab('metronome')
         setHomeScreenOpen(false)
       }}
+      onOpenShineTab={(id) => {
+        suppressTrailingClickAfterLongPress()
+        const state = useDroneStore.getState()
+        if (state.activeNavigationKey !== id && state.activePresetId !== id) {
+          loadPreset(id)
+          applyClickSyncForPreset(id)
+        }
+        setActiveTab('shine')
+        setHomeScreenOpen(false)
+      }}
     />
   )
   const iosHomeOpen = isIosApp() && homeScreenOpen

@@ -28,6 +28,7 @@ type HomeScreenOverlayProps = {
   onSelectSong: (id: string) => void
   onToggleTransportMetronomeSync?: (id: string, enabled: boolean) => void
   onOpenClickTab?: () => void
+  onOpenShineTab?: (id: string) => void
 }
 
 const boxClass =
@@ -64,6 +65,7 @@ export function HomeScreenOverlay({
   onSelectSong,
   onToggleTransportMetronomeSync,
   onOpenClickTab,
+  onOpenShineTab,
 }: HomeScreenOverlayProps) {
   const presetListRef = useScrollActiveIntoView(presets)
   const songListRef = useScrollActiveIntoView(songs)
@@ -176,6 +178,11 @@ export function HomeScreenOverlay({
               onLongPressMetronome={
                 onOpenClickTab && (item.isTransport || item.showMetronomeSync)
                   ? onOpenClickTab
+                  : undefined
+              }
+              onOpenShine={
+                onOpenShineTab && !item.isTransport && item.shineEnabled
+                  ? () => onOpenShineTab(item.id)
                   : undefined
               }
             />

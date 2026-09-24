@@ -25,6 +25,7 @@ export type AudioSessionPlugin = {
     artist: string
     sequence?: string[]
     activeIndex?: number
+    playing?: boolean
   }): Promise<void>
   addListener(
     eventName: 'interruption',

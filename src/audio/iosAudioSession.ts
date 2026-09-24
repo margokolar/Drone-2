@@ -1,6 +1,7 @@
 /**
  * Web: `navigator.audioSession` playback so Safari ignores the silent switch.
- * Native iOS: exclusive playback for the on-screen app (Drone vs Just Keys).
+ * Native iOS: exclusive playback is claimed only while the app is actually
+ * sounding, so CarPlay radio keeps Now Playing until Play / click.
  */
 
 import { Capacitor } from '@capacitor/core'
@@ -24,9 +25,7 @@ export function setIosAudioSessionType(type: IosAudioSessionType): void {
   if (Capacitor.isNativePlatform()) {
     if (type === 'play-and-record') {
       void AudioSession.configurePlayAndRecord().catch(() => {})
-      return
     }
-    void AudioSession.configurePlayback().catch(() => {})
     return
   }
   const audioSession = (navigator as NavigatorWithAudioSession).audioSession
@@ -40,7 +39,20 @@ export function setIosAudioSessionType(type: IosAudioSessionType): void {
   }
 }
 
-/** Claim playback: exclusive on native iOS, Safari playback on PWA. */
+/** Safari playback on PWA. Native iOS waits until play so radio keeps focus. */
 export function claimMixableAudioSession(): void {
+  if (Capacitor.isNativePlatform()) {
+    return
+  }
   setIosAudioSessionType('playback')
+}
+
+let microphoneHoldsSession = false
+
+export function setMicrophoneSessionHold(on: boolean): void {
+  microphoneHoldsSession = on
+}
+
+export function microphoneHoldsSessionNow(): boolean {
+  return microphoneHoldsSession
 }

@@ -1,6 +1,6 @@
 import clsx from 'clsx'
-import { Sparkles } from 'lucide-react'
 import { ClickSyncButton } from './ClickSyncButton'
+import { ShineListButton } from './ShineListButton'
 import { PlayPauseIcon } from './PlayPauseIcon'
 import { PLAY_PAUSE_SEQUENCE_LABEL } from '../utils/nowPlayingLabels'
 
@@ -20,6 +20,7 @@ type SequenceListRowProps = {
   onSelect?: () => void
   onToggleMetronomeSync?: () => void
   onLongPressMetronome?: () => void
+  onOpenShine?: () => void
 }
 
 export function SequenceListRow({
@@ -35,6 +36,7 @@ export function SequenceListRow({
   onSelect,
   onToggleMetronomeSync,
   onLongPressMetronome,
+  onOpenShine,
 }: SequenceListRowProps) {
   const showTransport = isTransport || name === PLAY_PAUSE_SEQUENCE_LABEL
   const metroLit = metronomeLit ?? metronomeSyncEnabled
@@ -77,21 +79,24 @@ export function SequenceListRow({
       )}
     </>
   )
-  const shineMark =
-    shineEnabled && !showTransport ? (
-      <span
-        className={clsx(
-          'flex h-[22px] w-[22px] shrink-0 items-center justify-center',
-          isActive ? 'text-cyan-200' : 'text-cyan-200/75',
-        )}
-        title="Shine"
-        aria-label="Shine on"
-      >
-        <Sparkles size={22} strokeWidth={2} aria-hidden />
-      </span>
+  const shineButton =
+    onOpenShine && shineEnabled && !showTransport ? (
+      <ShineListButton
+        enabled={shineEnabled}
+        onClick={(event) => {
+          event.stopPropagation()
+          onOpenShine()
+        }}
+        inactiveClassName={
+          isActive
+            ? 'border-white/20 bg-white/10 text-white/70'
+            : 'border-white/10 bg-white/5 text-white/55'
+        }
+        ariaLabel={shineEnabled ? 'Open Shine. Shine is on.' : 'Open Shine.'}
+      />
     ) : null
   const bpmSlot =
-    !showTransport && (onToggleMetronomeSync || shineMark) ? (
+    !showTransport && (onToggleMetronomeSync || shineButton) ? (
       <span
         className={clsx(
           'relative flex h-[22px] shrink-0 items-center justify-end text-[22px] font-semibold tabular-nums leading-none',
@@ -113,9 +118,9 @@ export function SequenceListRow({
       </span>
     ) : null
   const trailingCluster =
-    shineMark || onToggleMetronomeSync ? (
+    shineButton || onToggleMetronomeSync ? (
       <div className="ml-auto flex h-9 shrink-0 items-center gap-1.5">
-        {shineMark}
+        {shineButton}
         {bpmSlot}
         {onToggleMetronomeSync ? (
           <ClickSyncButton
@@ -149,7 +154,7 @@ export function SequenceListRow({
     ) : null
 
   if (onSelect) {
-    if (onToggleMetronomeSync) {
+    if (onToggleMetronomeSync || shineButton) {
       return (
         <div className={rowClass}>
           <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={onSelect}>

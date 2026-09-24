@@ -12,6 +12,17 @@ export function useNowPlayingKeepAlive(mediaAnchorRef: RefObject<HTMLAudioElemen
     }
 
     const assertPlayingSession = () => {
+      const playing = useDroneStore.getState().playing
+      if (!playing) {
+        if ('mediaSession' in navigator) {
+          try {
+            navigator.mediaSession.playbackState = 'paused'
+          } catch {
+            // Ignore browsers that reject the write.
+          }
+        }
+        return
+      }
       if (!isCapacitorNative()) {
         const anchor = mediaAnchorRef.current
         if (anchor?.paused) {

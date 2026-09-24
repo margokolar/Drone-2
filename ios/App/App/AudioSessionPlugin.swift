@@ -4,10 +4,9 @@ import MediaPlayer
 import UIKit
 
 /**
- Exclusive playback session that ignores the silent switch.
- Lock screen / Home keep the drone running (background audio mode).
- Another app that takes the session (Just Keys, a call) interrupts us;
- we pause the engine and reclaim when this app is active again.
+ Exclusive playback only while the drone is sounding — never in the car.
+ A CarPlay / car-audio route yields the session immediately so the car
+ radio keeps playing. Phone, lock screen, and headphones are unchanged.
  */
 @objc(AudioSessionPlugin)
 public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -30,9 +29,11 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     override public func load() {
         isOnScreen = true
-        try? applyExclusivePlayback()
         startObserving()
         setupRemoteCommands()
+        DispatchQueue.main.async { [weak self] in
+            self?.yieldIfCarAudio()
+        }
     }
 
     deinit {
@@ -40,13 +41,14 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         clearRemoteCommands()
     }
 
-    private func applyExclusivePlayback() throws {
+    private func applyExclusivePlayback(claim: Bool = false) throws {
+        if DroneSynthEngine.isCarAudioRoute {
+            yieldIfCarAudio()
+            return
+        }
         guard isOnScreen else { return }
-        let session = AVAudioSession.sharedInstance()
-        let alreadyExclusive =
-            session.category == .playback && session.categoryOptions.isEmpty
-        if !alreadyExclusive {
-            try session.setCategory(.playback, mode: .default, options: [])
+        if !claim && !DroneSynthEngine.shared.wantsPlaybackSession {
+            return
         }
         try DroneSynthEngine.shared.applyPlaybackSession()
         try DroneSynthEngine.shared.reclaim()
@@ -63,7 +65,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func configurePlayback(_ call: CAPPluginCall) {
         do {
-            try applyExclusivePlayback()
+            try applyExclusivePlayback(claim: true)
             call.resolve([
                 "category": "playback",
                 "onScreen": isOnScreen,
@@ -96,7 +98,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func activate(_ call: CAPPluginCall) {
         do {
-            try applyExclusivePlayback()
+            try applyExclusivePlayback(claim: true)
             call.resolve(["active": isOnScreen])
         } catch {
             call.reject("Failed to activate audio session", nil, error)
@@ -104,7 +106,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func deactivate(_ call: CAPPluginCall) {
-        deactivate(notifyOthers: true)
+        DroneSynthEngine.shared.releasePlaybackSession()
         call.resolve(["active": false])
     }
 
@@ -136,6 +138,11 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         } else {
             activeIndex = -1
         }
+        if call.getBool("playing") == false {
+            DroneSynthEngine.shared.releasePlaybackSession()
+            call.resolve()
+            return
+        }
         DroneSynthEngine.shared.setNowPlayingLabels(
             title: title,
             artist: artist,
@@ -146,7 +153,6 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func setupRemoteCommands() {
-        UIApplication.shared.beginReceivingRemoteControlEvents()
         let center = MPRemoteCommandCenter.shared()
         bind(center.playCommand, "play")
         bind(center.pauseCommand, "pause")
@@ -177,7 +183,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func bind(_ command: MPRemoteCommand, _ action: String) {
-        command.isEnabled = true
+        command.isEnabled = false
         command.removeTarget(nil)
         command.addTarget { [weak self] _ in
             self?.handleRemote(action)
@@ -188,15 +194,15 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     private func handleRemote(_ action: String) {
         switch action {
         case "pause":
-            DroneSynthEngine.shared.mute()
+            DroneSynthEngine.shared.releasePlaybackSession()
         case "play":
-            try? applyExclusivePlayback()
+            try? applyExclusivePlayback(claim: true)
             DroneSynthEngine.shared.resumeAfterRemote()
         case "toggle":
             if DroneSynthEngine.shared.isAudible {
-                DroneSynthEngine.shared.mute()
+                DroneSynthEngine.shared.releasePlaybackSession()
             } else {
-                try? applyExclusivePlayback()
+                try? applyExclusivePlayback(claim: true)
                 DroneSynthEngine.shared.resumeAfterRemote()
             }
         default:
@@ -254,8 +260,19 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
                 forName: UIApplication.willResignActiveNotification,
                 object: nil,
                 queue: .main
-            ) { _ in
+            ) { [weak self] _ in
                 UIApplication.shared.isIdleTimerDisabled = false
+                self?.yieldIfSilent()
+            }
+        )
+
+        observers.append(
+            center.addObserver(
+                forName: UIApplication.didEnterBackgroundNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.yieldIfSilent()
             }
         )
     }
@@ -279,7 +296,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
         switch type {
         case .began:
-            DroneSynthEngine.shared.suspend()
+            DroneSynthEngine.shared.releasePlaybackSession()
             notifyListeners(
                 "interruption",
                 data: [
@@ -288,16 +305,9 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
                 ]
             )
         case .ended:
-            var shouldResume = true
+            var shouldResume = false
             if let value = info[AVAudioSessionInterruptionOptionKey] as? UInt {
                 shouldResume = AVAudioSession.InterruptionOptions(rawValue: value).contains(.shouldResume)
-            }
-            if shouldResume || UIApplication.shared.applicationState == .active {
-                do {
-                    try applyExclusivePlayback()
-                } catch {
-                    // JS may still restore the graph.
-                }
             }
             notifyListeners(
                 "interruption",
@@ -312,6 +322,10 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func handleRouteChange(_ notification: Notification) {
+        if DroneSynthEngine.isCarAudioRoute {
+            yieldIfCarAudio()
+            return
+        }
         var reason = "unknown"
         if
             let info = notification.userInfo,
@@ -319,19 +333,6 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             let routeReason = AVAudioSession.RouteChangeReason(rawValue: reasonValue)
         {
             reason = String(describing: routeReason)
-        }
-        if reclaimInFlight {
-            if isOnScreen {
-                try? applyExclusivePlayback()
-            }
-            return
-        }
-        if isOnScreen {
-            do {
-                try applyExclusivePlayback()
-            } catch {
-                // Ignore; JS recovery still runs.
-            }
         }
         notifyListeners(
             "routeChange",
@@ -341,8 +342,42 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         )
     }
 
+    private func yieldIfCarAudio() {
+        guard DroneSynthEngine.isCarAudioRoute else { return }
+        reclaimInFlight = false
+        DroneSynthEngine.shared.releasePlaybackSession()
+        notifyListeners(
+            "interruption",
+            data: [
+                "type": "began",
+                "shouldResume": false,
+                "source": "car",
+            ]
+        )
+    }
+
+    private func yieldIfSilent() {
+        if DroneSynthEngine.isCarAudioRoute {
+            yieldIfCarAudio()
+            return
+        }
+        guard !DroneSynthEngine.shared.wantsPlaybackSession else { return }
+        DroneSynthEngine.shared.releasePlaybackSession()
+    }
+
     private func reclaimAfterForeground() {
         isOnScreen = true
+        DroneSynthEngine.shared.appearOnScreen()
+        if DroneSynthEngine.isCarAudioRoute {
+            reclaimInFlight = false
+            yieldIfCarAudio()
+            return
+        }
+        guard DroneSynthEngine.shared.wantsPlaybackSession else {
+            reclaimInFlight = false
+            DroneSynthEngine.shared.releasePlaybackSession()
+            return
+        }
         if notifiedReclaim {
             try? applyExclusivePlayback()
             return
@@ -357,6 +392,11 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         do {
+            if DroneSynthEngine.isCarAudioRoute {
+                yieldIfCarAudio()
+                reclaimInFlight = false
+                return
+            }
             try applyExclusivePlayback()
             finishReclaim()
             return

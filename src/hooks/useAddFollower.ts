@@ -6,12 +6,14 @@ import { dbToGain } from '../audio/audioMath'
 import {
   claimMixableAudioSession,
   setIosAudioSessionType,
+  setMicrophoneSessionHold,
 } from '../audio/iosAudioSession'
 import {
   applyHarmonicMultiplier,
   DEFAULT_ADD_HARMONIC_RATIO,
 } from '../music/harmonicSeries'
 import { AudioSession } from '../native/audioSession'
+import { useDroneStore } from '../store/useDroneStore'
 
 /**
  * iOS Safari does not route Web Audio (`AudioContext`) output to Bluetooth
@@ -152,12 +154,16 @@ export function useAddFollower(): AddFollowerState {
     mediaStreamRef.current = null
     samplesRef.current = null
     releaseOutput()
+    setMicrophoneSessionHold(false)
     // Kick iOS out of play-and-record, then restore playback (+ native mix).
     setIosAudioSessionType('playback')
     setIosAudioSessionType('auto')
     claimMixableAudioSession()
     if (Capacitor.isNativePlatform()) {
-      void AudioSession.configurePlayback().catch(() => {})
+      const { playing, metronomeEnabled } = useDroneStore.getState()
+      if (playing || metronomeEnabled) {
+        void AudioSession.configurePlayback().catch(() => {})
+      }
     }
     setListening(false)
   }, [releaseOutput])
@@ -292,6 +298,7 @@ export function useAddFollower(): AddFollowerState {
       // supports the hands-free (HFP) profile.
       setIosAudioSessionType('play-and-record')
       if (Capacitor.isNativePlatform()) {
+        setMicrophoneSessionHold(true)
         void AudioSession.configurePlayAndRecord().catch(() => {})
       }
 

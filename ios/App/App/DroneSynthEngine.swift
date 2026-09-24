@@ -77,6 +77,7 @@ final class DroneSynthEngine {
     private var mixGain = 1.0
     private var storedFadeIn = 0.0
     private var storedFadeOut = 0.0
+    private(set) var wantsPlaybackSession = false
     private var nowPlayingTitle = "Drone"
     private var nowPlayingArtist = "Drone"
     private var nowPlayingSequence: [String] = []
@@ -211,13 +212,43 @@ final class DroneSynthEngine {
 
     private init() {}
 
+    static var isCarAudioRoute: Bool {
+        AVAudioSession.sharedInstance().currentRoute.outputs.contains { output in
+            if output.portType == .carAudio {
+                return true
+            }
+            let name = output.portName.lowercased()
+            return name.contains("carplay") || name.contains("car audio")
+        }
+    }
+
     func applyPlaybackSession() throws {
+        if Self.isCarAudioRoute {
+            releasePlaybackSession()
+            return
+        }
+        wantsPlaybackSession = true
         let session = AVAudioSession.sharedInstance()
         if session.category != .playback || !session.categoryOptions.isEmpty {
             try session.setCategory(.playback, mode: .default, options: [])
         }
         try session.setPreferredIOBufferDuration(Self.ioBufferDuration)
         try session.setActive(true, options: [])
+    }
+
+    func appearOnScreen() {
+        onScreen = true
+    }
+
+    func releasePlaybackSession() {
+        wantsPlaybackSession = false
+        suspend()
+        Self.publishNowPlaying(playing: false)
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            // Already inactive.
+        }
     }
 
     func park() {
@@ -270,6 +301,7 @@ final class DroneSynthEngine {
 
     func resumeAfterRemote() {
         onScreen = true
+        wantsPlaybackSession = true
         mixGain = 1
         try? startIfNeeded()
         lock.lock()
@@ -287,6 +319,7 @@ final class DroneSynthEngine {
 
     func reclaim() throws {
         onScreen = true
+        guard wantsPlaybackSession else { return }
         try startIfNeeded()
     }
 
@@ -552,6 +585,7 @@ final class DroneSynthEngine {
                 return
             }
             do {
+                self.wantsPlaybackSession = true
                 try self.startIfNeeded()
             } catch {
                 NSLog("DroneSynth metronome start failed: \(error.localizedDescription)")
@@ -572,6 +606,7 @@ final class DroneSynthEngine {
 
     func click(frequency: Double, peak: Double) {
         onScreen = true
+        wantsPlaybackSession = true
         try? startIfNeeded()
         let level = max(0, min(1, peak))
         guard level > 0.0001 else { return }
@@ -603,8 +638,13 @@ final class DroneSynthEngine {
     }
 
     private func startIfNeeded() throws {
-        guard onScreen else { return }
+        guard onScreen, wantsPlaybackSession else { return }
+        if Self.isCarAudioRoute {
+            releasePlaybackSession()
+            return
+        }
         try prepare()
+        try applyPlaybackSession()
         if !engine.isRunning {
             engine.prepare()
             try engine.start()
@@ -1185,6 +1225,18 @@ final class DroneSynthEngine {
         let sequence = shared.nowPlayingSequence
         let activeIndex = shared.nowPlayingActiveIndex
         DispatchQueue.main.async {
+            let center = MPRemoteCommandCenter.shared()
+            center.playCommand.isEnabled = playing
+            center.pauseCommand.isEnabled = playing
+            center.togglePlayPauseCommand.isEnabled = playing
+            center.nextTrackCommand.isEnabled = playing
+            center.previousTrackCommand.isEnabled = playing
+            if !playing {
+                MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+                UIApplication.shared.endReceivingRemoteControlEvents()
+                return
+            }
+            UIApplication.shared.beginReceivingRemoteControlEvents()
             MPNowPlayingInfoCenter.default().nowPlayingInfo = [
                 MPMediaItemPropertyTitle: "Drone",
                 MPMediaItemPropertyArtwork: nowPlayingArtwork(
@@ -1194,7 +1246,7 @@ final class DroneSynthEngine {
                     sequence: sequence,
                     activeIndex: activeIndex
                 ),
-                MPNowPlayingInfoPropertyPlaybackRate: playing ? 1.0 : 0.0,
+                MPNowPlayingInfoPropertyPlaybackRate: 1.0,
                 MPNowPlayingInfoPropertyIsLiveStream: true,
             ]
         }
