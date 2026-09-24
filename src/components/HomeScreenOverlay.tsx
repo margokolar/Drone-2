@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { Sparkles } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { METRONOME_LONG_PRESS_MS } from './ClickSyncButton'
 import { MetronomeIcon } from './MetronomeIcon'
@@ -137,6 +138,22 @@ export function HomeScreenOverlay({
         ) : null}
       </>
     ) : null
+  const showLargeShine =
+    Boolean(onOpenShineTab) &&
+    activeItem != null &&
+    !activeItem.isTransport &&
+    activeItem.shineEnabled === true
+  const largeShineButton =
+    showLargeShine && activeItem && onOpenShineTab ? (
+      <button
+        type="button"
+        onClick={() => onOpenShineTab(activeItem.id)}
+        className="button-safe flex h-[0.58em] w-[0.58em] shrink-0 items-center justify-center text-cyan-100"
+        aria-label="Open Shine. Shine is on."
+      >
+        <Sparkles className="h-full w-full" strokeWidth={2} aria-hidden />
+      </button>
+    ) : null
 
   return (
     <div className="home-screen-overlay flex h-full min-h-0 flex-col gap-3 overflow-hidden">
@@ -153,6 +170,7 @@ export function HomeScreenOverlay({
               <div className="min-w-0 truncate text-center font-bold leading-none tracking-tight">
                 {presetTitle}
               </div>
+              {largeShineButton}
               {largeMetronomeCluster}
             </div>
           )}
