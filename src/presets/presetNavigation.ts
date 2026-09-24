@@ -179,6 +179,31 @@ export function isPresetInClickSyncSegment(
   return false
 }
 
+/** True when a preset after this play/pause marker, before the next marker, has click SYNC on. */
+export function transportMarkerHasActiveFollowingClick(
+  navigation: PresetNavigationEntry[],
+  presets: Preset[],
+  markerId: string,
+): boolean {
+  const index = navigation.findIndex(
+    (entry) => entry.kind === 'transport' && entry.id === markerId,
+  )
+  if (index < 0) {
+    return false
+  }
+  for (let cursor = index + 1; cursor < navigation.length; cursor += 1) {
+    const entry = navigation[cursor]
+    if (entry.kind === 'transport') {
+      return false
+    }
+    const preset = presets.find((item) => item.id === entry.presetId)
+    if (preset?.metronomeSyncEnabled === true) {
+      return true
+    }
+  }
+  return false
+}
+
 export function resolveNavigationClickBpm(
   navigation: PresetNavigationEntry[],
   presets: Preset[],

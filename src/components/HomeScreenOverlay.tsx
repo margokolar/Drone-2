@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import { useEffect, useRef } from 'react'
 import { METRONOME_LONG_PRESS_MS } from './ClickSyncButton'
 import { MetronomeIcon } from './MetronomeIcon'
@@ -11,6 +12,7 @@ export type HomeScreenItem = {
   isActive: boolean
   isTransport?: boolean
   metronomeSyncEnabled?: boolean
+  metronomeLit?: boolean
   showMetronomeSync?: boolean
   metronomeBpm?: number
   shineEnabled?: boolean
@@ -38,7 +40,7 @@ const listClass =
   'flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain'
 
 const largeMetronomeButtonClass =
-  'button-safe flex h-[0.58em] w-[0.58em] shrink-0 items-center justify-center overflow-visible text-fuchsia-100'
+  'button-safe flex h-[0.58em] w-[0.58em] shrink-0 items-center justify-center overflow-visible'
 
 function useScrollActiveIntoView(items: HomeScreenItem[]) {
   const listRef = useRef<HTMLDivElement>(null)
@@ -74,6 +76,7 @@ export function HomeScreenOverlay({
     }
   }
   const activeItem = presets.find((item) => item.isActive)
+  const largeMetroLit = activeItem?.metronomeLit ?? activeItem?.metronomeSyncEnabled === true
   const showLargeMetronome =
     Boolean(onToggleTransportMetronomeSync) &&
     activeItem?.metronomeSyncEnabled === true &&
@@ -105,7 +108,10 @@ export function HomeScreenOverlay({
             }
             onToggleTransportMetronomeSync(activeItem.id, false)
           }}
-          className={largeMetronomeButtonClass}
+          className={clsx(
+            largeMetronomeButtonClass,
+            largeMetroLit ? 'text-fuchsia-100' : 'text-white/40',
+          )}
           aria-pressed="true"
           aria-label={
             `${
@@ -118,7 +124,12 @@ export function HomeScreenOverlay({
           <MetronomeIcon className="h-full w-full" />
         </button>
         {activeItem.metronomeBpm != null ? (
-          <span className="flex h-[0.58em] shrink-0 items-center text-[0.58em] font-bold tabular-nums leading-none text-fuchsia-100">
+          <span
+            className={clsx(
+              'flex h-[0.58em] shrink-0 items-center text-[0.58em] font-bold tabular-nums leading-none',
+              largeMetroLit ? 'text-fuchsia-100' : 'text-white/40',
+            )}
+          >
             {Math.round(activeItem.metronomeBpm)}
           </span>
         ) : null}
@@ -153,6 +164,7 @@ export function HomeScreenOverlay({
               isActive={item.isActive}
               isTransport={item.isTransport}
               metronomeSyncEnabled={item.metronomeSyncEnabled}
+              metronomeLit={item.metronomeLit}
               metronomeBpm={item.metronomeBpm}
               shineEnabled={item.shineEnabled}
               onSelect={() => onSelectPreset(item.id)}

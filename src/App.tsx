@@ -47,7 +47,7 @@ import {
 } from './audio/transportControls'
 import { buildRuntimeConfigFromStore } from './audio/runtimeConfigFromStore'
 import { activateTransportMarker, applyClickSyncForPreset, playNextPresetAfterTransportMarker } from './audio/presetNavigationTransport'
-import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isPresetInClickSyncSegment, isTransportMarkerKey, navigationEntryKey, resolveNavigationClickBpm } from './presets/presetNavigation'
+import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isPresetInClickSyncSegment, isTransportMarkerKey, navigationEntryKey, resolveNavigationClickBpm, transportMarkerHasActiveFollowingClick } from './presets/presetNavigation'
 import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL } from './utils/nowPlayingLabels'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
@@ -600,6 +600,11 @@ function App() {
         isTransport,
         metronomeSyncEnabled: isTransport
           ? entry.kind === 'transport' && entry.metronomeSyncEnabled === true
+          : preset?.metronomeSyncEnabled === true,
+        metronomeLit: isTransport
+          ? entry.kind === 'transport' &&
+            entry.metronomeSyncEnabled === true &&
+            transportMarkerHasActiveFollowingClick(enabledNav, presets, entry.id)
           : preset?.metronomeSyncEnabled === true,
         showMetronomeSync: isTransport
           ? true

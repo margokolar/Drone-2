@@ -13,6 +13,7 @@ type SequenceListRowProps = {
   isActive: boolean
   isTransport?: boolean
   metronomeSyncEnabled?: boolean
+  metronomeLit?: boolean
   metronomeBpm?: number
   shineEnabled?: boolean
   accent?: 'amber' | 'cyan'
@@ -27,6 +28,7 @@ export function SequenceListRow({
   isActive,
   isTransport = false,
   metronomeSyncEnabled = false,
+  metronomeLit,
   metronomeBpm,
   shineEnabled = false,
   accent = 'amber',
@@ -35,6 +37,7 @@ export function SequenceListRow({
   onLongPressMetronome,
 }: SequenceListRowProps) {
   const showTransport = isTransport || name === PLAY_PAUSE_SEQUENCE_LABEL
+  const metroLit = metronomeLit ?? metronomeSyncEnabled
   const rowClass = clsx(
     'home-screen-row flex min-w-0 items-center gap-2 rounded-lg border px-2.5 py-1.5',
     isActive
@@ -116,7 +119,7 @@ export function SequenceListRow({
         {bpmSlot}
         {onToggleMetronomeSync ? (
           <ClickSyncButton
-            enabled={metronomeSyncEnabled}
+            enabled={metroLit}
             onClick={(event) => {
               event.stopPropagation()
               onToggleMetronomeSync()
