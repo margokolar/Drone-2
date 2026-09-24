@@ -34,6 +34,7 @@ import {
   type ShineConfig,
 } from '../presets/defaultPresets'
 import {
+  applyDefaultPresetClickSync,
   buildDefaultPresetNavigation,
   createTransportMarkerId,
   getEnabledNavigationEntries,
@@ -174,6 +175,7 @@ type DroneState = {
   moveNavigationEntry: (entryKey: string, direction: 'up' | 'down') => void
   toggleTransportMarkerNavigationEnabled: (markerId: string) => void
   setTransportMarkerMetronomeSync: (markerId: string, enabled: boolean) => void
+  setPresetMetronomeSync: (presetId: string, enabled: boolean) => void
   setPresetNavigationEnabled: (presetId: string, enabled: boolean) => void
   togglePresetNavigationEnabled: (presetId: string) => void
   importSong: (songPresets: Preset[], activePresetId?: string, songName?: string) => void
@@ -1281,9 +1283,24 @@ export const useDroneStore = create<DroneState>()(
               ? { ...entry, metronomeSyncEnabled: enabled }
               : entry,
           )
+          const presets = applyDefaultPresetClickSync(presetNavigation, state.presets)
           return {
             presetNavigation,
-            ...syncPresetsToCurrentSong({ ...state, presetNavigation }),
+            presets,
+            ...syncPresetsToCurrentSong({ ...state, presetNavigation, presets }),
+          }
+        }),
+      setPresetMetronomeSync: (presetId, enabled) =>
+        set((state) => {
+          if (!state.presets.some((preset) => preset.id === presetId)) {
+            return state
+          }
+          const presets = state.presets.map((preset) =>
+            preset.id === presetId ? { ...preset, metronomeSyncEnabled: enabled } : preset,
+          )
+          return {
+            presets,
+            ...syncPresetsToCurrentSong({ ...state, presets }),
           }
         }),
       importSong: (songPresets, activePresetId, songName) =>

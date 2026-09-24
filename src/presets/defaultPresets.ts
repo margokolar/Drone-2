@@ -67,6 +67,8 @@ export type Preset = {
   name: string
   /** When false, prev/next preset navigation skips this preset. Defaults to true. */
   enabled?: boolean
+  /** When true, playing this preset starts the click and transport pause stops it. */
+  metronomeSyncEnabled?: boolean
   tuningSystemId: TuningSystemId
   tonalCenter: TonalCenter
   baseOctave: number

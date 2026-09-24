@@ -27,6 +27,7 @@ type PresetListProps = {
   onDeleteTransportMarker: (markerId: string) => void
   onToggleTransportNavigationEnabled: (markerId: string) => void
   onSetTransportMetronomeSync: (markerId: string, enabled: boolean) => void
+  onSetPresetMetronomeSync: (presetId: string, enabled: boolean) => void
   onActivateTransport: (markerId: string) => void
 }
 
@@ -45,11 +46,15 @@ export function PresetList({
   onDeleteTransportMarker,
   onToggleTransportNavigationEnabled,
   onSetTransportMetronomeSync,
+  onSetPresetMetronomeSync,
   onActivateTransport,
 }: PresetListProps) {
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
+  const showPresetClickSync = presetNavigation.some(
+    (entry) => entry.kind === 'transport' && entry.metronomeSyncEnabled === true,
+  )
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const renameBlurTimeoutRef = useRef<number | null>(null)
   const renameIgnoreBlurRef = useRef(false)
@@ -361,14 +366,41 @@ export function PresetList({
                   )}
                 </div>
                 {!isEditing && (
-                  <NavigationCheckbox
-                    checked={isNavigationEnabled}
-                    onToggle={() => onToggleNavigationEnabled(preset.id)}
-                    buttonClassName={navigationToggleButtonClass}
-                    accentColor="fuchsia"
-                    ariaLabelWhenChecked="Disable preset in prev/next navigation"
-                    ariaLabelWhenUnchecked="Enable preset in prev/next navigation"
-                  />
+                  <>
+                    {showPresetClickSync ? (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onSetPresetMetronomeSync(preset.id, preset.metronomeSyncEnabled !== true)
+                        }}
+                        className={clsx(
+                          'button-safe flex min-h-9 shrink-0 items-center rounded-lg border px-2 text-xs font-semibold uppercase tracking-[0.12em] transition',
+                          preset.metronomeSyncEnabled
+                            ? 'border-fuchsia-300/60 bg-fuchsia-300/20 text-fuchsia-100 hover:bg-fuchsia-300/30'
+                            : isActive
+                              ? 'border-white/20 bg-[#2a2238] text-white/70 hover:bg-[#352a48]'
+                              : 'border-white/10 bg-white/5 text-white/55 hover:bg-white/10',
+                        )}
+                        aria-pressed={preset.metronomeSyncEnabled === true}
+                        aria-label={
+                          preset.metronomeSyncEnabled
+                            ? 'Disable click sync for this preset'
+                            : 'Sync click start and stop with this preset'
+                        }
+                      >
+                        SYNC
+                      </button>
+                    ) : null}
+                    <NavigationCheckbox
+                      checked={isNavigationEnabled}
+                      onToggle={() => onToggleNavigationEnabled(preset.id)}
+                      buttonClassName={navigationToggleButtonClass}
+                      accentColor="fuchsia"
+                      ariaLabelWhenChecked="Disable preset in prev/next navigation"
+                      ariaLabelWhenUnchecked="Enable preset in prev/next navigation"
+                    />
+                  </>
                 )}
               </div>
               {!isCollapsed ? (

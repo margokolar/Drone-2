@@ -155,6 +155,46 @@ export function isTransportMarkerClickSyncEnabled(
   )
 }
 
+export function hasTransportClickSync(navigation: PresetNavigationEntry[]): boolean {
+  return navigation.some((entry) => entry.kind === 'transport' && entry.metronomeSyncEnabled === true)
+}
+
+/** Presets that start immediately after a play/pause marker with SYNC on. */
+export function applyDefaultPresetClickSync(
+  navigation: PresetNavigationEntry[],
+  presets: Preset[],
+): Preset[] {
+  const enabled = getEnabledNavigationEntries(navigation, presets)
+  const followingIds = new Set<string>()
+  for (let index = 0; index < enabled.length; index += 1) {
+    const entry = enabled[index]
+    if (entry.kind !== 'transport' || entry.metronomeSyncEnabled !== true) {
+      continue
+    }
+    for (let offset = 1; offset <= enabled.length; offset += 1) {
+      const next = enabled[(index + offset) % enabled.length]
+      if (next.kind === 'preset') {
+        followingIds.add(next.presetId)
+        break
+      }
+    }
+  }
+  let changed = false
+  const nextPresets = presets.map((preset) => {
+    const metronomeSyncEnabled = followingIds.has(preset.id)
+    if ((preset.metronomeSyncEnabled === true) === metronomeSyncEnabled) {
+      return preset
+    }
+    changed = true
+    return { ...preset, metronomeSyncEnabled }
+  })
+  return changed ? nextPresets : presets
+}
+
+export function isPresetClickSyncEnabled(presets: Preset[], presetId: string): boolean {
+  return presets.some((preset) => preset.id === presetId && preset.metronomeSyncEnabled === true)
+}
+
 /** Preset card highlight: falls back to activePresetId when nav key is a disabled/missing marker. */
 export function resolveActivePresetHighlightKey(
   activeNavigationKey: string,

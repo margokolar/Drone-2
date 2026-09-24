@@ -64,7 +64,7 @@ export function SequenceListRow({
     </>
   )
   const syncButton =
-    showTransport && onToggleMetronomeSync ? (
+    onToggleMetronomeSync ? (
       <button
         type="button"
         onClick={(event) => {
@@ -82,8 +82,12 @@ export function SequenceListRow({
         aria-pressed={metronomeSyncEnabled}
         aria-label={
           metronomeSyncEnabled
-            ? 'Disable click sync for this play/pause marker'
-            : 'Sync click start and stop with this play/pause marker'
+            ? showTransport
+              ? 'Disable click sync for this play/pause marker'
+              : 'Disable click sync for this preset'
+            : showTransport
+              ? 'Sync click start and stop with this play/pause marker'
+              : 'Sync click start and stop with this preset'
         }
       >
         SYNC

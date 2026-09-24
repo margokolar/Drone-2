@@ -1,5 +1,7 @@
 import {
   getEnabledNavigationEntries,
+  hasTransportClickSync,
+  isPresetClickSyncEnabled,
   isTransportMarkerClickSyncEnabled,
   isTransportMarkerKey,
   navigationEntryKey,
@@ -63,7 +65,17 @@ function applyClickSyncForTransport(playing: boolean, markerId?: string): void {
 }
 
 function shouldFollowClickWithTransport(): boolean {
-  return useDroneStore.getState().metronomeSyncEnabled || clickFollowsTransport
+  const state = useDroneStore.getState()
+  if (state.metronomeSyncEnabled || clickFollowsTransport) {
+    return true
+  }
+  if (
+    isTransportMarkerKey(state.activeNavigationKey, state.presetNavigation) ||
+    !hasTransportClickSync(state.presetNavigation)
+  ) {
+    return false
+  }
+  return isPresetClickSyncEnabled(state.presets, state.activePresetId)
 }
 
 /** Transport play/pause button and remotes: keep click in step when SYNC is on. */
@@ -73,6 +85,7 @@ export function syncClickWithTransportPlayState(playing: boolean): void {
   }
   const state = useDroneStore.getState()
   if (playing) {
+    clickFollowsTransport = true
     if (state.metronomeMuted) {
       state.setMetronomeMuted(false)
     }
@@ -80,6 +93,25 @@ export function syncClickWithTransportPlayState(playing: boolean): void {
     state.setMetronomeEnabled(true)
     return
   }
+  metronomeEngine.stopFromGesture()
+  state.setMetronomeEnabled(false)
+}
+
+export function applyClickSyncForPreset(presetId: string): void {
+  const state = useDroneStore.getState()
+  if (state.metronomeSyncEnabled || !hasTransportClickSync(state.presetNavigation)) {
+    return
+  }
+  if (isPresetClickSyncEnabled(state.presets, presetId) && state.playing) {
+    clickFollowsTransport = true
+    if (state.metronomeMuted) {
+      state.setMetronomeMuted(false)
+    }
+    metronomeEngine.prepareContext()
+    state.setMetronomeEnabled(true)
+    return
+  }
+  clickFollowsTransport = false
   metronomeEngine.stopFromGesture()
   state.setMetronomeEnabled(false)
 }
@@ -110,10 +142,12 @@ function applyPresetFromNavigation(
   shineEngine.markPresetTransition()
   useDroneStore.getState().loadPreset(presetId)
   if (!startPlayback) {
+    applyClickSyncForPreset(presetId)
     return
   }
   const freshConfig = buildRuntimeConfigFromStore(useDroneStore.getState())
   startPresetPlayback(freshConfig, clickSyncMarkerId)
+  applyClickSyncForPreset(presetId)
 }
 
 function advancePastTransportMarker(

@@ -46,7 +46,7 @@ import {
   transportTogglePlay,
 } from './audio/transportControls'
 import { buildRuntimeConfigFromStore } from './audio/runtimeConfigFromStore'
-import { activateTransportMarker, playNextPresetAfterTransportMarker } from './audio/presetNavigationTransport'
+import { activateTransportMarker, applyClickSyncForPreset, playNextPresetAfterTransportMarker } from './audio/presetNavigationTransport'
 import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isTransportMarkerKey, navigationEntryKey } from './presets/presetNavigation'
 import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL } from './utils/nowPlayingLabels'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
@@ -541,6 +541,7 @@ function App() {
   const setTransportMarkerMetronomeSync = useDroneStore(
     (state) => state.setTransportMarkerMetronomeSync,
   )
+  const setPresetMetronomeSync = useDroneStore((state) => state.setPresetMetronomeSync)
   const importSong = useDroneStore((state) => state.importSong)
   const importSongLibrary = useDroneStore((state) => state.importSongLibrary)
   const loadSongFromLibrary = useDroneStore((state) => state.loadSongFromLibrary)
@@ -579,7 +580,9 @@ function App() {
         number: index + 1,
         isActive: navigationEntryKey(entry) === activeNavigationKey,
         isTransport,
-        metronomeSyncEnabled: entry.kind === 'transport' && entry.metronomeSyncEnabled === true,
+        metronomeSyncEnabled: isTransport
+          ? entry.kind === 'transport' && entry.metronomeSyncEnabled === true
+          : preset?.metronomeSyncEnabled === true,
       }
     })
     const enabledSongs = songLibrary.filter((song) => song.enabled !== false)
@@ -1475,6 +1478,46 @@ function App() {
     [activeNavigationKey, setMetronomeEnabled, setTransportMarkerMetronomeSync],
   )
 
+  const handlePresetMetronomeSyncChange = useCallback(
+    (presetId: string, enabled: boolean) => {
+      setPresetMetronomeSync(presetId, enabled)
+      const onThisPreset =
+        activePresetId === presetId &&
+        !isTransportMarkerKey(activeNavigationKey, useDroneStore.getState().presetNavigation)
+      if (!onThisPreset) {
+        return
+      }
+      if (enabled) {
+        if (playing) {
+          applyClickSyncForPreset(presetId)
+        }
+        return
+      }
+      if (playing && !useDroneStore.getState().metronomeSyncEnabled) {
+        metronomeEngine.stopFromGesture()
+        setMetronomeEnabled(false)
+      }
+    },
+    [
+      activeNavigationKey,
+      activePresetId,
+      playing,
+      setMetronomeEnabled,
+      setPresetMetronomeSync,
+    ],
+  )
+
+  const handleHomeItemMetronomeSyncChange = useCallback(
+    (id: string, enabled: boolean) => {
+      if (isTransportMarkerKey(id, useDroneStore.getState().presetNavigation)) {
+        handleTransportMarkerMetronomeSyncChange(id, enabled)
+        return
+      }
+      handlePresetMetronomeSyncChange(id, enabled)
+    },
+    [handlePresetMetronomeSyncChange, handleTransportMarkerMetronomeSyncChange],
+  )
+
   const activeTones = useMemo(() => tonesInToneSet.filter((tone) => tone.enabled), [tonesInToneSet])
   const toneMixerTones = useMemo(() => {
     const toneById = new Map(tones.map((tone) => [tone.noteId, tone]))
@@ -1762,6 +1805,7 @@ function App() {
         return
       }
       loadPreset(id)
+      applyClickSyncForPreset(id)
     },
     [loadPreset, presetNavigation],
   )
@@ -2179,7 +2223,7 @@ function App() {
       songs={homeScreenLists.songs}
       onSelectPreset={handleHomePresetSelect}
       onSelectSong={handleHomeSongSelect}
-      onToggleTransportMetronomeSync={handleTransportMarkerMetronomeSyncChange}
+      onToggleTransportMetronomeSync={handleHomeItemMetronomeSyncChange}
     />
   )
   const iosHomeOpen = isIosApp() && homeScreenOpen
@@ -2846,6 +2890,7 @@ function App() {
                       activePresetId={activePresetId}
                       onLoadPreset={(presetId) => {
                         loadPreset(presetId)
+                        applyClickSyncForPreset(presetId)
                       }}
                       onRenamePreset={renamePreset}
                       onDuplicatePreset={duplicatePreset}
@@ -2856,6 +2901,7 @@ function App() {
                       onDeleteTransportMarker={deleteTransportMarker}
                       onToggleTransportNavigationEnabled={toggleTransportMarkerNavigationEnabled}
                       onSetTransportMetronomeSync={handleTransportMarkerMetronomeSyncChange}
+                      onSetPresetMetronomeSync={handlePresetMetronomeSyncChange}
                       onActivateTransport={activateTransportMarker}
                     />
                   </div>
