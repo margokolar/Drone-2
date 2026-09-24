@@ -69,6 +69,16 @@ export function SequenceListRow({
   const syncButton =
     onToggleMetronomeSync ? (
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
+        {metronomeSyncEnabled && !showTransport && metronomeBpm != null ? (
+          <span
+            className={clsx(
+              'flex h-[22px] shrink-0 items-center text-[22px] font-semibold tabular-nums leading-none',
+              isActive ? 'text-fuchsia-100' : 'text-fuchsia-100/75',
+            )}
+          >
+            {Math.round(metronomeBpm)}
+          </span>
+        ) : null}
         <ClickSyncButton
           enabled={metronomeSyncEnabled}
           onClick={(event) => {
@@ -90,16 +100,6 @@ export function SequenceListRow({
                 : 'Sync click start and stop with this preset'
           }
         />
-        {metronomeSyncEnabled && !showTransport && metronomeBpm != null ? (
-          <span
-            className={clsx(
-              'flex h-[22px] shrink-0 items-center text-[22px] font-semibold tabular-nums leading-none',
-              isActive ? 'text-fuchsia-100' : 'text-fuchsia-100/75',
-            )}
-          >
-            {Math.round(metronomeBpm)}
-          </span>
-        ) : null}
       </div>
     ) : null
 
