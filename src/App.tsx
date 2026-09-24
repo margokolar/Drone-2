@@ -538,6 +538,9 @@ function App() {
   const toggleTransportMarkerNavigationEnabled = useDroneStore(
     (state) => state.toggleTransportMarkerNavigationEnabled,
   )
+  const setTransportMarkerMetronomeSync = useDroneStore(
+    (state) => state.setTransportMarkerMetronomeSync,
+  )
   const importSong = useDroneStore((state) => state.importSong)
   const importSongLibrary = useDroneStore((state) => state.importSongLibrary)
   const loadSongFromLibrary = useDroneStore((state) => state.loadSongFromLibrary)
@@ -576,6 +579,7 @@ function App() {
         number: index + 1,
         isActive: navigationEntryKey(entry) === activeNavigationKey,
         isTransport,
+        metronomeSyncEnabled: entry.kind === 'transport' && entry.metronomeSyncEnabled === true,
       }
     })
     const enabledSongs = songLibrary.filter((song) => song.enabled !== false)
@@ -1459,6 +1463,18 @@ function App() {
     [playing, setMetronomeEnabled, setMetronomeMuted, setMetronomeSyncEnabled],
   )
 
+  const handleTransportMarkerMetronomeSyncChange = useCallback(
+    (markerId: string, enabled: boolean) => {
+      setTransportMarkerMetronomeSync(markerId, enabled)
+      if (!enabled || activeNavigationKey !== markerId) {
+        return
+      }
+      metronomeEngine.stopFromGesture()
+      setMetronomeEnabled(false)
+    },
+    [activeNavigationKey, setMetronomeEnabled, setTransportMarkerMetronomeSync],
+  )
+
   const activeTones = useMemo(() => tonesInToneSet.filter((tone) => tone.enabled), [tonesInToneSet])
   const toneMixerTones = useMemo(() => {
     const toneById = new Map(tones.map((tone) => [tone.noteId, tone]))
@@ -2155,11 +2171,15 @@ function App() {
     <HomeScreenOverlay
       presetTitle={lockScreenLabels.title}
       isTransport={isTransportMarkerKey(activeNavigationKey, presetNavigation)}
+      transportMetronomeSyncEnabled={
+        homeScreenLists.presets.find((item) => item.isActive)?.metronomeSyncEnabled === true
+      }
       songTitle={lockScreenLabels.artist}
       presets={homeScreenLists.presets}
       songs={homeScreenLists.songs}
       onSelectPreset={handleHomePresetSelect}
       onSelectSong={handleHomeSongSelect}
+      onToggleTransportMetronomeSync={handleTransportMarkerMetronomeSyncChange}
     />
   )
   const iosHomeOpen = isIosApp() && homeScreenOpen
@@ -2830,6 +2850,7 @@ function App() {
                       onInsertTransportAfter={insertTransportMarkerAfter}
                       onDeleteTransportMarker={deleteTransportMarker}
                       onToggleTransportNavigationEnabled={toggleTransportMarkerNavigationEnabled}
+                      onSetTransportMetronomeSync={handleTransportMarkerMetronomeSyncChange}
                       onActivateTransport={activateTransportMarker}
                     />
                   </div>

@@ -26,6 +26,7 @@ type PresetListProps = {
   onInsertTransportAfter: (presetId: string) => void
   onDeleteTransportMarker: (markerId: string) => void
   onToggleTransportNavigationEnabled: (markerId: string) => void
+  onSetTransportMetronomeSync: (markerId: string, enabled: boolean) => void
   onActivateTransport: (markerId: string) => void
 }
 
@@ -43,6 +44,7 @@ export function PresetList({
   onInsertTransportAfter,
   onDeleteTransportMarker,
   onToggleTransportNavigationEnabled,
+  onSetTransportMetronomeSync,
   onActivateTransport,
 }: PresetListProps) {
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
@@ -185,6 +187,29 @@ export function PresetList({
               >
                 <div className={clsx('flex min-h-10 items-center gap-2', !isCollapsed && 'mb-1.5')}>
                   <PlayPauseIcon size={28} className="shrink-0 text-amber-100/90" />
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onSetTransportMetronomeSync(entry.id, entry.metronomeSyncEnabled !== true)
+                    }}
+                    className={clsx(
+                      'button-safe flex min-h-9 shrink-0 items-center rounded-lg border px-2 text-xs font-semibold uppercase tracking-[0.12em] transition',
+                      entry.metronomeSyncEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-300/20 text-fuchsia-100 hover:bg-fuchsia-300/30'
+                        : isActive
+                          ? 'border-white/20 bg-[#2a2238] text-white/70 hover:bg-[#352a48]'
+                          : 'border-white/10 bg-white/5 text-white/55 hover:bg-white/10',
+                    )}
+                    aria-pressed={entry.metronomeSyncEnabled === true}
+                    aria-label={
+                      entry.metronomeSyncEnabled
+                        ? 'Disable click sync for this play/pause marker'
+                        : 'Sync click start and stop with this play/pause marker'
+                    }
+                  >
+                    SYNC
+                  </button>
                   <NavigationCheckbox
                     checked={isNavigationEnabled}
                     onToggle={() => onToggleTransportNavigationEnabled(entry.id)}

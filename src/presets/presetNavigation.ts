@@ -5,6 +5,8 @@ export type PresetTransportMarker = {
   id: string
   /** When false, prev/next navigation skips this marker. Defaults to true. */
   enabled?: boolean
+  /** When true, landing on this marker stops the click and leaving it starts the click. */
+  metronomeSyncEnabled?: boolean
 }
 
 export type PresetNavigationEntry =
@@ -139,6 +141,18 @@ export function isTransportMarkerKey(
   navigation: PresetNavigationEntry[],
 ): boolean {
   return navigation.some((entry) => entry.kind === 'transport' && entry.id === key)
+}
+
+export function isTransportMarkerClickSyncEnabled(
+  navigation: PresetNavigationEntry[],
+  markerId: string,
+): boolean {
+  return navigation.some(
+    (entry) =>
+      entry.kind === 'transport' &&
+      entry.id === markerId &&
+      entry.metronomeSyncEnabled === true,
+  )
 }
 
 /** Preset card highlight: falls back to activePresetId when nav key is a disabled/missing marker. */

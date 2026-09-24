@@ -5,6 +5,8 @@ type PlayPauseIconProps = {
   className?: string
   /** Height matches the current font's x-height (a lowercase letter). */
   matchEx?: boolean
+  /** Height matches the current font's capital letters (1em). */
+  matchCap?: boolean
 }
 
 const PAUSE_BAR = { y: 3, width: 5, height: 18, rx: 1 } as const
@@ -19,15 +21,25 @@ const VIEW_HEIGHT = 24
 const PLAY_X = PAUSE_BAR.width * 2 + BAR_GAP * 2
 
 /** Pause bars + play triangle using Lucide proportions. */
-export function PlayPauseIcon({ size = 28, className, matchEx = false }: PlayPauseIconProps) {
+export function PlayPauseIcon({
+  size = 28,
+  className,
+  matchEx = false,
+  matchCap = false,
+}: PlayPauseIconProps) {
+  const matchFont = matchEx || matchCap
   return (
     <svg
-      width={matchEx ? undefined : size}
-      height={matchEx ? undefined : size}
+      width={matchFont ? undefined : size}
+      height={matchFont ? undefined : size}
       viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
       fill="currentColor"
       xmlns="http://www.w3.org/2000/svg"
-      className={clsx(matchEx && 'h-[1ex] w-[calc(1ex*34/24)]', className)}
+      className={clsx(
+        matchEx && 'h-[1ex] w-[calc(1ex*34/24)]',
+        matchCap && 'h-[1em] w-[calc(1em*34/24)]',
+        className,
+      )}
       preserveAspectRatio="xMidYMid meet"
       aria-hidden
     >

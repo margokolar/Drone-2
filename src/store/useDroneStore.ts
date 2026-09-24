@@ -173,6 +173,7 @@ type DroneState = {
   deleteTransportMarker: (markerId: string) => void
   moveNavigationEntry: (entryKey: string, direction: 'up' | 'down') => void
   toggleTransportMarkerNavigationEnabled: (markerId: string) => void
+  setTransportMarkerMetronomeSync: (markerId: string, enabled: boolean) => void
   setPresetNavigationEnabled: (presetId: string, enabled: boolean) => void
   togglePresetNavigationEnabled: (presetId: string) => void
   importSong: (songPresets: Preset[], activePresetId?: string, songName?: string) => void
@@ -1265,6 +1266,24 @@ export const useDroneStore = create<DroneState>()(
             presetNavigation,
             activeNavigationKey,
             ...syncPresetsToCurrentSong({ ...state, presetNavigation, activeNavigationKey }),
+          }
+        }),
+      setTransportMarkerMetronomeSync: (markerId, enabled) =>
+        set((state) => {
+          const marker = state.presetNavigation.find(
+            (entry) => entry.kind === 'transport' && entry.id === markerId,
+          )
+          if (!marker || marker.kind !== 'transport') {
+            return state
+          }
+          const presetNavigation = state.presetNavigation.map((entry) =>
+            entry.kind === 'transport' && entry.id === markerId
+              ? { ...entry, metronomeSyncEnabled: enabled }
+              : entry,
+          )
+          return {
+            presetNavigation,
+            ...syncPresetsToCurrentSong({ ...state, presetNavigation }),
           }
         }),
       importSong: (songPresets, activePresetId, songName) =>

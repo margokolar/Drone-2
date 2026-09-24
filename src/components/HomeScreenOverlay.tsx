@@ -8,16 +8,19 @@ export type HomeScreenItem = {
   number: number
   isActive: boolean
   isTransport?: boolean
+  metronomeSyncEnabled?: boolean
 }
 
 type HomeScreenOverlayProps = {
   presetTitle: string
   isTransport: boolean
+  transportMetronomeSyncEnabled?: boolean
   songTitle: string
   presets: HomeScreenItem[]
   songs: HomeScreenItem[]
   onSelectPreset: (id: string) => void
   onSelectSong: (id: string) => void
+  onToggleTransportMetronomeSync?: (id: string, enabled: boolean) => void
 }
 
 const boxClass =
@@ -44,14 +47,17 @@ function useScrollActiveIntoView(items: HomeScreenItem[]) {
 export function HomeScreenOverlay({
   presetTitle,
   isTransport,
+  transportMetronomeSyncEnabled = false,
   songTitle,
   presets,
   songs,
   onSelectPreset,
   onSelectSong,
+  onToggleTransportMetronomeSync,
 }: HomeScreenOverlayProps) {
   const presetListRef = useScrollActiveIntoView(presets)
   const songListRef = useScrollActiveIntoView(songs)
+  const activeTransportId = presets.find((item) => item.isTransport && item.isActive)?.id
 
   return (
     <div className="home-screen-overlay flex h-full min-h-0 flex-col gap-3 overflow-hidden">
@@ -59,8 +65,29 @@ export function HomeScreenOverlay({
         <div className={boxLabelClass}>Preset</div>
         <div className="home-screen-preset-name h-[1em] shrink-0 text-[6rem] text-white">
           {isTransport ? (
-            <div className="flex h-full items-center justify-center">
-              <PlayPauseIcon className="h-[0.7em] w-auto shrink-0" />
+            <div className="flex h-full items-center justify-center gap-[0.18em]">
+              <PlayPauseIcon className="h-[1em] w-auto shrink-0" />
+              {activeTransportId && onToggleTransportMetronomeSync ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onToggleTransportMetronomeSync(activeTransportId, !transportMetronomeSyncEnabled)
+                  }
+                  className={`button-safe flex min-h-9 shrink-0 items-center self-center rounded-lg border px-3 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                    transportMetronomeSyncEnabled
+                      ? 'border-fuchsia-300/60 bg-fuchsia-300/20 text-fuchsia-100'
+                      : 'border-white/20 bg-white/10 text-white/70'
+                  }`}
+                  aria-pressed={transportMetronomeSyncEnabled}
+                  aria-label={
+                    transportMetronomeSyncEnabled
+                      ? 'Disable click sync for this play/pause marker'
+                      : 'Sync click start and stop with this play/pause marker'
+                  }
+                >
+                  SYNC
+                </button>
+              ) : null}
             </div>
           ) : (
             <div className="h-full w-full truncate text-center font-bold leading-none tracking-tight">
@@ -76,14 +103,20 @@ export function HomeScreenOverlay({
               name={item.name}
               isActive={item.isActive}
               isTransport={item.isTransport}
+              metronomeSyncEnabled={item.metronomeSyncEnabled}
               onSelect={() => onSelectPreset(item.id)}
+              onToggleMetronomeSync={
+                item.isTransport && onToggleTransportMetronomeSync
+                  ? () => onToggleTransportMetronomeSync(item.id, !item.metronomeSyncEnabled)
+                  : undefined
+              }
             />
           ))}
         </div>
       </div>
       <div className={boxClass}>
         <div className={boxLabelClass}>Song</div>
-        <div className="home-screen-song-name h-[1.25em] shrink-0 text-[3rem] text-white/70">
+        <div className="home-screen-song-name h-[1.25em] shrink-0 text-[3rem] text-cyan-100/90">
           <div className="h-full w-full truncate pb-[0.25em] text-center font-semibold leading-none tracking-tight">
             {songTitle}
           </div>
@@ -95,6 +128,7 @@ export function HomeScreenOverlay({
               number={item.number}
               name={item.name}
               isActive={item.isActive}
+              accent="cyan"
               onSelect={() => onSelectSong(item.id)}
             />
           ))}
