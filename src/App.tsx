@@ -2318,7 +2318,12 @@ function App() {
                 if (controlsLocked) {
                   return
                 }
-                setHomeScreenOpen((open) => !open)
+                if (homeScreenOpen) {
+                  setActiveTab('presets')
+                  setHomeScreenOpen(false)
+                  return
+                }
+                setHomeScreenOpen(true)
               }}
               aria-label={homeScreenOpen ? 'Edit drone' : 'Open home screen'}
               aria-pressed={homeScreenOpen}
