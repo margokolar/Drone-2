@@ -38,6 +38,7 @@ import {
   buildDefaultPresetNavigation,
   createTransportMarkerId,
   getEnabledNavigationEntries,
+  hasTransportClickSync,
   navigationEntryKey,
   isTransportMarkerKey,
   normalizePresetNavigation,
@@ -612,7 +613,9 @@ export const useDroneStore = create<DroneState>()(
       setPlaying: (playing) =>
         set((state) => ({
           playing,
-          ...(state.metronomeSyncEnabled ? { metronomeEnabled: playing } : {}),
+          ...(state.metronomeSyncEnabled && !hasTransportClickSync(state.presetNavigation)
+            ? { metronomeEnabled: playing }
+            : {}),
         })),
       togglePlaying: () => set((state) => ({ playing: !state.playing })),
       setReferenceA4Hz: (frequency) => set({ referenceA4Hz: clamp(frequency, 400, 480) }),

@@ -118,6 +118,22 @@ const TABS: { id: TabId; label: string }[] = [
 const APP_VERSION = '3.0'
 const DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS = 800
 const TOUCH_LOCK_LONG_PRESS_MS = 800
+
+function suppressTrailingClickAfterLongPress() {
+  const swallow = (event: Event) => {
+    event.preventDefault()
+    event.stopPropagation()
+  }
+  const options: AddEventListenerOptions = { capture: true }
+  window.addEventListener('click', swallow, options)
+  window.addEventListener('pointerup', swallow, options)
+  window.addEventListener('mouseup', swallow, options)
+  window.setTimeout(() => {
+    window.removeEventListener('click', swallow, options)
+    window.removeEventListener('pointerup', swallow, options)
+    window.removeEventListener('mouseup', swallow, options)
+  }, 500)
+}
 /** ~Safari viewport, loogilised CSS px (mitte dünaamiline Dynamic Island / toolbar). */
 const IPHONE_16_PRO_MAX_CSS_W = 440
 const IPHONE_16_PRO_MAX_CSS_H = 956
@@ -481,6 +497,7 @@ function App() {
   const metronomeVolumeDb = useDroneStore((state) => state.metronomeVolumeDb)
   const metronomeMuted = useDroneStore((state) => state.metronomeMuted)
   const metronomeSyncEnabled = useDroneStore((state) => state.metronomeSyncEnabled)
+  const liveShineEnabled = useDroneStore((state) => state.shine.enabled)
   const micFeaturesEnabled = useDroneStore((state) => state.micFeaturesEnabled)
   const controlsLocked = useDroneStore((state) => state.controlsLocked)
 
@@ -589,6 +606,11 @@ function App() {
           : isPresetInClickSyncSegment(presetNavigation, entry.presetId),
         metronomeBpm:
           resolveNavigationClickBpm(enabledNav, presets, index) ?? metronomeBpm,
+        shineEnabled: isTransport
+          ? false
+          : navigationEntryKey(entry) === activeNavigationKey
+            ? liveShineEnabled
+            : preset?.shine.enabled === true,
       }
     })
     const enabledSongs = songLibrary.filter((song) => song.enabled !== false)
@@ -599,7 +621,15 @@ function App() {
       isActive: song.name === songName,
     }))
     return { presets: presetsForHome, songs: songsForHome }
-  }, [activeNavigationKey, metronomeBpm, presetNavigation, presets, songLibrary, songName])
+  }, [
+    activeNavigationKey,
+    liveShineEnabled,
+    metronomeBpm,
+    presetNavigation,
+    presets,
+    songLibrary,
+    songName,
+  ])
   const visibleTabs = useMemo(
     () => (micFeaturesEnabled ? TABS : TABS.filter((tab) => tab.id !== 'add')),
     [micFeaturesEnabled],
@@ -2227,6 +2257,11 @@ function App() {
       onSelectPreset={handleHomePresetSelect}
       onSelectSong={handleHomeSongSelect}
       onToggleTransportMetronomeSync={handleHomeItemMetronomeSyncChange}
+      onOpenClickTab={() => {
+        suppressTrailingClickAfterLongPress()
+        setActiveTab('metronome')
+        setHomeScreenOpen(false)
+      }}
     />
   )
   const iosHomeOpen = isIosApp() && homeScreenOpen
@@ -2335,7 +2370,9 @@ function App() {
                 droneTitleLongPressTimerRef.current = window.setTimeout(() => {
                   droneTitleLongPressTimerRef.current = null
                   droneTitleLongPressFiredRef.current = true
+                  suppressTrailingClickAfterLongPress()
                   setActiveTab('overtones')
+                  setHomeScreenOpen(false)
                 }, DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS)
               }}
               onPointerUp={clearDroneTitleLongPressTimer}
@@ -2347,8 +2384,9 @@ function App() {
                   return
                 }
                 setActiveTab('tone')
+                setHomeScreenOpen(false)
               }}
-              aria-label="Open Tone home. Long-press to open Overtone balance."
+              aria-label="Open Tone. Long-press to open Timbre."
             >
               Drone
             </button>

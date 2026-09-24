@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { METRONOME_LONG_PRESS_MS } from './ClickSyncButton'
 import { MetronomeIcon } from './MetronomeIcon'
 import { PlayPauseIcon } from './PlayPauseIcon'
 import { SequenceListRow } from './SequenceListRow'
@@ -12,6 +13,7 @@ export type HomeScreenItem = {
   metronomeSyncEnabled?: boolean
   showMetronomeSync?: boolean
   metronomeBpm?: number
+  shineEnabled?: boolean
 }
 
 type HomeScreenOverlayProps = {
@@ -23,6 +25,7 @@ type HomeScreenOverlayProps = {
   onSelectPreset: (id: string) => void
   onSelectSong: (id: string) => void
   onToggleTransportMetronomeSync?: (id: string, enabled: boolean) => void
+  onOpenClickTab?: () => void
 }
 
 const boxClass =
@@ -58,9 +61,18 @@ export function HomeScreenOverlay({
   onSelectPreset,
   onSelectSong,
   onToggleTransportMetronomeSync,
+  onOpenClickTab,
 }: HomeScreenOverlayProps) {
   const presetListRef = useScrollActiveIntoView(presets)
   const songListRef = useScrollActiveIntoView(songs)
+  const metroLongPressTimerRef = useRef<number | null>(null)
+  const metroLongPressFiredRef = useRef(false)
+  const clearMetroLongPressTimer = () => {
+    if (metroLongPressTimerRef.current !== null) {
+      window.clearTimeout(metroLongPressTimerRef.current)
+      metroLongPressTimerRef.current = null
+    }
+  }
   const activeItem = presets.find((item) => item.isActive)
   const showLargeMetronome =
     Boolean(onToggleTransportMetronomeSync) &&
@@ -71,13 +83,36 @@ export function HomeScreenOverlay({
       <>
         <button
           type="button"
-          onClick={() => onToggleTransportMetronomeSync(activeItem.id, false)}
+          onPointerDown={() => {
+            if (!onOpenClickTab) {
+              return
+            }
+            metroLongPressFiredRef.current = false
+            clearMetroLongPressTimer()
+            metroLongPressTimerRef.current = window.setTimeout(() => {
+              metroLongPressTimerRef.current = null
+              metroLongPressFiredRef.current = true
+              onOpenClickTab()
+            }, METRONOME_LONG_PRESS_MS)
+          }}
+          onPointerUp={clearMetroLongPressTimer}
+          onPointerLeave={clearMetroLongPressTimer}
+          onPointerCancel={clearMetroLongPressTimer}
+          onClick={() => {
+            if (metroLongPressFiredRef.current) {
+              metroLongPressFiredRef.current = false
+              return
+            }
+            onToggleTransportMetronomeSync(activeItem.id, false)
+          }}
           className={largeMetronomeButtonClass}
           aria-pressed="true"
           aria-label={
-            activeItem.isTransport
-              ? 'Disable click sync for this play/pause marker'
-              : 'Disable click sync for this preset'
+            `${
+              activeItem.isTransport
+                ? 'Disable click sync for this play/pause marker'
+                : 'Disable click sync for this preset'
+            }${onOpenClickTab ? '. Long-press to open Click.' : ''}`
           }
         >
           <MetronomeIcon className="h-full w-full" />
@@ -119,10 +154,16 @@ export function HomeScreenOverlay({
               isTransport={item.isTransport}
               metronomeSyncEnabled={item.metronomeSyncEnabled}
               metronomeBpm={item.metronomeBpm}
+              shineEnabled={item.shineEnabled}
               onSelect={() => onSelectPreset(item.id)}
               onToggleMetronomeSync={
                 onToggleTransportMetronomeSync && (item.isTransport || item.showMetronomeSync)
                   ? () => onToggleTransportMetronomeSync(item.id, !item.metronomeSyncEnabled)
+                  : undefined
+              }
+              onLongPressMetronome={
+                onOpenClickTab && (item.isTransport || item.showMetronomeSync)
+                  ? onOpenClickTab
                   : undefined
               }
             />

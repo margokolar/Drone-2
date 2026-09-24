@@ -37,86 +37,86 @@ let clickFollowsTransport = false
 
 function shouldSyncClickWithMarker(markerId?: string): boolean {
   const state = useDroneStore.getState()
-  if (state.metronomeSyncEnabled) {
-    return true
+  if (markerId) {
+    return isTransportMarkerClickSyncEnabled(state.presetNavigation, markerId)
   }
-  if (!markerId) {
+  if (hasTransportClickSync(state.presetNavigation)) {
     return false
   }
-  return isTransportMarkerClickSyncEnabled(state.presetNavigation, markerId)
+  return state.metronomeSyncEnabled
+}
+
+function shouldStartClickWithCurrentItem(): boolean {
+  const state = useDroneStore.getState()
+  if (isTransportMarkerKey(state.activeNavigationKey, state.presetNavigation)) {
+    return isTransportMarkerClickSyncEnabled(state.presetNavigation, state.activeNavigationKey)
+  }
+  if (hasTransportClickSync(state.presetNavigation)) {
+    return isPresetClickSyncEnabled(state.presets, state.activePresetId, state.presetNavigation)
+  }
+  return state.metronomeSyncEnabled
+}
+
+function startSyncedClick(): void {
+  const state = useDroneStore.getState()
+  clickFollowsTransport = true
+  if (state.metronomeMuted) {
+    state.setMetronomeMuted(false)
+  }
+  metronomeEngine.prepareContext()
+  state.setMetronomeEnabled(true)
+}
+
+function stopSyncedClick(): void {
+  clickFollowsTransport = false
+  metronomeEngine.stopFromGesture()
+  useDroneStore.getState().setMetronomeEnabled(false)
 }
 
 function applyClickSyncForTransport(playing: boolean, markerId?: string): void {
-  if (!shouldSyncClickWithMarker(markerId)) {
-    return
-  }
-  const state = useDroneStore.getState()
   if (playing) {
-    clickFollowsTransport = true
-    if (state.metronomeMuted) {
-      state.setMetronomeMuted(false)
+    if (!shouldSyncClickWithMarker(markerId)) {
+      return
     }
-    metronomeEngine.prepareContext()
-    state.setMetronomeEnabled(true)
+    startSyncedClick()
     return
   }
-  metronomeEngine.stopFromGesture()
-  state.setMetronomeEnabled(false)
-}
-
-function shouldFollowClickWithTransport(): boolean {
-  const state = useDroneStore.getState()
-  if (state.metronomeSyncEnabled || clickFollowsTransport) {
-    return true
+  if (!shouldSyncClickWithMarker(markerId) && !clickFollowsTransport) {
+    return
   }
-  if (
-    isTransportMarkerKey(state.activeNavigationKey, state.presetNavigation) ||
-    !hasTransportClickSync(state.presetNavigation)
-  ) {
-    return false
-  }
-  return isPresetClickSyncEnabled(state.presets, state.activePresetId, state.presetNavigation)
+  stopSyncedClick()
 }
 
 /** Transport play/pause button and remotes: keep click in step when SYNC is on. */
 export function syncClickWithTransportPlayState(playing: boolean): void {
-  if (!shouldFollowClickWithTransport()) {
-    return
-  }
-  const state = useDroneStore.getState()
   if (playing) {
-    clickFollowsTransport = true
-    if (state.metronomeMuted) {
-      state.setMetronomeMuted(false)
+    if (!shouldStartClickWithCurrentItem()) {
+      return
     }
-    metronomeEngine.prepareContext()
-    state.setMetronomeEnabled(true)
+    startSyncedClick()
     return
   }
-  metronomeEngine.stopFromGesture()
-  state.setMetronomeEnabled(false)
+  if (!shouldStartClickWithCurrentItem() && !clickFollowsTransport) {
+    return
+  }
+  stopSyncedClick()
 }
 
 export function applyClickSyncForPreset(presetId: string): void {
   const state = useDroneStore.getState()
-  if (state.metronomeSyncEnabled || !hasTransportClickSync(state.presetNavigation)) {
+  if (!hasTransportClickSync(state.presetNavigation)) {
     return
   }
   if (isPresetClickSyncEnabled(state.presets, presetId, state.presetNavigation) && state.playing) {
-    clickFollowsTransport = true
-    if (state.metronomeMuted) {
-      state.setMetronomeMuted(false)
-    }
-    metronomeEngine.prepareContext()
-    state.setMetronomeEnabled(true)
+    startSyncedClick()
     return
   }
-  clickFollowsTransport = false
-  metronomeEngine.stopFromGesture()
-  state.setMetronomeEnabled(false)
+  if (state.playing || clickFollowsTransport) {
+    stopSyncedClick()
+  }
 }
 
-function startPresetPlayback(config: DroneRuntimeConfig, clickSyncMarkerId?: string): void {
+function startPresetPlayback(config: DroneRuntimeConfig): void {
   droneEngine.setPlaybackIntent(true)
   droneEngine.markGesturePlaybackStarted()
   droneEngine.prepareContextForGesture()
@@ -126,14 +126,9 @@ function startPresetPlayback(config: DroneRuntimeConfig, clickSyncMarkerId?: str
     droneEngine.ensureRunning(config)
   }
   useDroneStore.getState().setPlaying(true)
-  applyClickSyncForTransport(true, clickSyncMarkerId)
 }
 
-function applyPresetFromNavigation(
-  presetId: string,
-  startPlayback = false,
-  clickSyncMarkerId?: string,
-): void {
+function applyPresetFromNavigation(presetId: string, startPlayback = false): void {
   const preset = useDroneStore.getState().presets.find((item) => item.id === presetId)
   if (!preset) {
     return
@@ -146,7 +141,7 @@ function applyPresetFromNavigation(
     return
   }
   const freshConfig = buildRuntimeConfigFromStore(useDroneStore.getState())
-  startPresetPlayback(freshConfig, clickSyncMarkerId)
+  startPresetPlayback(freshConfig)
   applyClickSyncForPreset(presetId)
 }
 
@@ -160,7 +155,7 @@ function advancePastTransportMarker(
       ? selectNextInRing(enabledEntries, activeKey, navigationEntryKey)
       : selectPreviousInRing(enabledEntries, activeKey, navigationEntryKey)
   if (afterMarker?.kind === 'preset') {
-    applyPresetFromNavigation(afterMarker.presetId, true, activeKey)
+    applyPresetFromNavigation(afterMarker.presetId, true)
   }
 }
 
@@ -266,9 +261,5 @@ export function stepPresetNavigation(
   }
 
   const leavingTransportMarker = isTransportMarkerKey(activeKey, state.presetNavigation)
-  applyPresetFromNavigation(
-    nextEntry.presetId,
-    leavingTransportMarker,
-    leavingTransportMarker ? activeKey : undefined,
-  )
+  applyPresetFromNavigation(nextEntry.presetId, leavingTransportMarker)
 }
