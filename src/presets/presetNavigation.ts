@@ -159,6 +159,26 @@ export function hasTransportClickSync(navigation: PresetNavigationEntry[]): bool
   return navigation.some((entry) => entry.kind === 'transport' && entry.metronomeSyncEnabled === true)
 }
 
+/** True when this preset sits after a play/pause marker that has SYNC on, before the next marker. */
+export function isPresetInClickSyncSegment(
+  navigation: PresetNavigationEntry[],
+  presetId: string,
+): boolean {
+  const index = navigation.findIndex(
+    (entry) => entry.kind === 'preset' && entry.presetId === presetId,
+  )
+  if (index < 0) {
+    return false
+  }
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    const entry = navigation[cursor]
+    if (entry.kind === 'transport') {
+      return entry.metronomeSyncEnabled === true
+    }
+  }
+  return false
+}
+
 /** Presets that start immediately after a play/pause marker with SYNC on. */
 export function applyDefaultPresetClickSync(
   navigation: PresetNavigationEntry[],
@@ -191,7 +211,14 @@ export function applyDefaultPresetClickSync(
   return changed ? nextPresets : presets
 }
 
-export function isPresetClickSyncEnabled(presets: Preset[], presetId: string): boolean {
+export function isPresetClickSyncEnabled(
+  presets: Preset[],
+  presetId: string,
+  navigation: PresetNavigationEntry[],
+): boolean {
+  if (!isPresetInClickSyncSegment(navigation, presetId)) {
+    return false
+  }
   return presets.some((preset) => preset.id === presetId && preset.metronomeSyncEnabled === true)
 }
 

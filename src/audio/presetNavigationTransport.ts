@@ -75,7 +75,7 @@ function shouldFollowClickWithTransport(): boolean {
   ) {
     return false
   }
-  return isPresetClickSyncEnabled(state.presets, state.activePresetId)
+  return isPresetClickSyncEnabled(state.presets, state.activePresetId, state.presetNavigation)
 }
 
 /** Transport play/pause button and remotes: keep click in step when SYNC is on. */
@@ -102,7 +102,7 @@ export function applyClickSyncForPreset(presetId: string): void {
   if (state.metronomeSyncEnabled || !hasTransportClickSync(state.presetNavigation)) {
     return
   }
-  if (isPresetClickSyncEnabled(state.presets, presetId) && state.playing) {
+  if (isPresetClickSyncEnabled(state.presets, presetId, state.presetNavigation) && state.playing) {
     clickFollowsTransport = true
     if (state.metronomeMuted) {
       state.setMetronomeMuted(false)

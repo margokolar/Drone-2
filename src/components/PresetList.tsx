@@ -3,7 +3,11 @@ import { ArrowDown, ArrowUp, Check, Copy, Pencil, Plus, Trash2 } from 'lucide-re
 import { useRef, useState, useMemo } from 'react'
 import { flushSync } from 'react-dom'
 import type { Preset } from '../presets/defaultPresets'
-import { resolveActivePresetHighlightKey, type PresetNavigationEntry } from '../presets/presetNavigation'
+import {
+  isPresetInClickSyncSegment,
+  resolveActivePresetHighlightKey,
+  type PresetNavigationEntry,
+} from '../presets/presetNavigation'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ClickSyncButton } from './ClickSyncButton'
 import { PlayPauseIcon } from './PlayPauseIcon'
@@ -53,9 +57,6 @@ export function PresetList({
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
-  const showPresetClickSync = presetNavigation.some(
-    (entry) => entry.kind === 'transport' && entry.metronomeSyncEnabled === true,
-  )
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const renameBlurTimeoutRef = useRef<number | null>(null)
   const renameIgnoreBlurRef = useRef(false)
@@ -174,7 +175,7 @@ export function PresetList({
                 ? 'border-red-300/55 bg-[#2a2238] text-red-200 hover:bg-red-300/20'
                 : 'border-red-300/40 bg-red-300/10 text-red-100 hover:bg-red-300/20',
             )
-            const navigationToggleButtonClass = clsx(toolButtonClass, 'ml-auto shrink-0')
+            const navigationToggleButtonClass = clsx(toolButtonClass, 'shrink-0')
             const isCollapsed = !isNavigationEnabled
             return (
               <article
@@ -199,6 +200,7 @@ export function PresetList({
                       event.stopPropagation()
                       onSetTransportMetronomeSync(entry.id, entry.metronomeSyncEnabled !== true)
                     }}
+                    className="ml-auto"
                     inactiveClassName={
                       isActive
                         ? 'border-white/20 bg-[#2a2238] text-white/70 hover:bg-[#352a48]'
@@ -362,7 +364,7 @@ export function PresetList({
                 </div>
                 {!isEditing && (
                   <>
-                    {showPresetClickSync ? (
+                    {isPresetInClickSyncSegment(presetNavigation, preset.id) ? (
                       <ClickSyncButton
                         enabled={preset.metronomeSyncEnabled === true}
                         onClick={(event) => {

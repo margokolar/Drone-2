@@ -47,7 +47,7 @@ import {
 } from './audio/transportControls'
 import { buildRuntimeConfigFromStore } from './audio/runtimeConfigFromStore'
 import { activateTransportMarker, applyClickSyncForPreset, playNextPresetAfterTransportMarker } from './audio/presetNavigationTransport'
-import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isTransportMarkerKey, navigationEntryKey } from './presets/presetNavigation'
+import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isPresetInClickSyncSegment, isTransportMarkerKey, navigationEntryKey } from './presets/presetNavigation'
 import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL } from './utils/nowPlayingLabels'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
@@ -584,6 +584,9 @@ function App() {
         metronomeSyncEnabled: isTransport
           ? entry.kind === 'transport' && entry.metronomeSyncEnabled === true
           : preset?.metronomeSyncEnabled === true,
+        showMetronomeSync: isTransport
+          ? true
+          : isPresetInClickSyncSegment(presetNavigation, entry.presetId),
       }
     })
     const enabledSongs = songLibrary.filter((song) => song.enabled !== false)

@@ -10,6 +10,7 @@ export type HomeScreenItem = {
   isActive: boolean
   isTransport?: boolean
   metronomeSyncEnabled?: boolean
+  showMetronomeSync?: boolean
 }
 
 type HomeScreenOverlayProps = {
@@ -59,7 +60,6 @@ export function HomeScreenOverlay({
   const presetListRef = useScrollActiveIntoView(presets)
   const songListRef = useScrollActiveIntoView(songs)
   const activeTransportId = presets.find((item) => item.isTransport && item.isActive)?.id
-  const playPauseSyncOn = presets.some((item) => item.isTransport && item.metronomeSyncEnabled)
 
   return (
     <div className="home-screen-overlay flex h-full min-h-0 flex-col gap-3 overflow-hidden">
@@ -97,7 +97,7 @@ export function HomeScreenOverlay({
               metronomeSyncEnabled={item.metronomeSyncEnabled}
               onSelect={() => onSelectPreset(item.id)}
               onToggleMetronomeSync={
-                onToggleTransportMetronomeSync && (item.isTransport || playPauseSyncOn)
+                onToggleTransportMetronomeSync && (item.isTransport || item.showMetronomeSync)
                   ? () => onToggleTransportMetronomeSync(item.id, !item.metronomeSyncEnabled)
                   : undefined
               }
