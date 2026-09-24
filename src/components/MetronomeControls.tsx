@@ -1,5 +1,5 @@
 import { Pause, Play, Volume2, VolumeX } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 import { metronomeEngine } from '../audio/MetronomeEngine'
 import {
   DEFAULT_METRONOME_BPM,
@@ -18,6 +18,10 @@ const TAP_TEMPO_RESET_MS = 2000
 const TAP_TEMPO_MIN_BPM = MIN_METRONOME_BPM
 const TAP_TEMPO_MAX_BPM = MAX_METRONOME_BPM
 const TAP_TEMPO_HISTORY_LIMIT = 8
+const TEMPO_HOLD_INITIAL_DELAY_MS = 420
+const TEMPO_HOLD_REPEAT_START_MS = 130
+const TEMPO_HOLD_REPEAT_MIN_MS = 28
+const TEMPO_HOLD_REPEAT_ACCEL = 0.82
 
 type MetronomeControlsProps = {
   enabled: boolean
@@ -43,6 +47,71 @@ export function MetronomeControls({
   const [beatFlash, setBeatFlash] = useState(false)
   const beatFlashTimeoutRef = useRef<number | null>(null)
   const tapTimesRef = useRef<number[]>([])
+  const bpmRef = useRef(bpm)
+  const tempoHoldTimerRef = useRef<number | null>(null)
+  const tempoHoldIgnoreClickRef = useRef(false)
+  bpmRef.current = bpm
+
+  const stopTempoHold = useCallback(() => {
+    if (tempoHoldTimerRef.current !== null) {
+      window.clearTimeout(tempoHoldTimerRef.current)
+      tempoHoldTimerRef.current = null
+    }
+  }, [])
+
+  const stepTempo = useCallback(
+    (delta: number) => {
+      const current = Math.round(bpmRef.current)
+      const next = Math.min(MAX_METRONOME_BPM, Math.max(MIN_METRONOME_BPM, current + delta))
+      if (next !== current) {
+        onBpmChange(next)
+      }
+    },
+    [onBpmChange],
+  )
+
+  const startTempoHold = useCallback(
+    (delta: number) => {
+      stopTempoHold()
+      stepTempo(delta)
+      let interval = TEMPO_HOLD_REPEAT_START_MS
+      const scheduleNext = (delay: number) => {
+        tempoHoldTimerRef.current = window.setTimeout(() => {
+          stepTempo(delta)
+          interval = Math.max(TEMPO_HOLD_REPEAT_MIN_MS, interval * TEMPO_HOLD_REPEAT_ACCEL)
+          scheduleNext(interval)
+        }, delay)
+      }
+      scheduleNext(TEMPO_HOLD_INITIAL_DELAY_MS)
+    },
+    [stepTempo, stopTempoHold],
+  )
+
+  const bindTempoHold = (delta: number) => ({
+    onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return
+      }
+      tempoHoldIgnoreClickRef.current = true
+      event.currentTarget.setPointerCapture(event.pointerId)
+      startTempoHold(delta)
+    },
+    onPointerUp: stopTempoHold,
+    onPointerCancel: stopTempoHold,
+    onLostPointerCapture: stopTempoHold,
+    onContextMenu: (event: MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault()
+    },
+    onClick: () => {
+      if (tempoHoldIgnoreClickRef.current) {
+        tempoHoldIgnoreClickRef.current = false
+        return
+      }
+      stepTempo(delta)
+    },
+  })
+
+  useEffect(() => stopTempoHold, [stopTempoHold])
 
   const handleTapTempo = () => {
     const now = performance.now()
@@ -128,9 +197,9 @@ export function MetronomeControls({
               <div className="col-span-3 flex min-w-0 flex-wrap items-center gap-2 text-white/85">
                 <button
                   type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/10 text-sm text-white/90 transition hover:bg-white/15"
-                  onClick={() => onBpmChange(Math.round(bpm) - 1)}
+                  className="flex h-8 w-8 select-none items-center justify-center rounded-md border border-white/15 bg-white/10 text-sm text-white/90 transition hover:bg-white/15 touch-none"
                   aria-label="Decrease tempo by 1 BPM"
+                  {...bindTempoHold(-1)}
                 >
                   -
                 </button>
@@ -145,9 +214,9 @@ export function MetronomeControls({
                 />
                 <button
                   type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/10 text-sm text-white/90 transition hover:bg-white/15"
-                  onClick={() => onBpmChange(Math.round(bpm) + 1)}
+                  className="flex h-8 w-8 select-none items-center justify-center rounded-md border border-white/15 bg-white/10 text-sm text-white/90 transition hover:bg-white/15 touch-none"
                   aria-label="Increase tempo by 1 BPM"
+                  {...bindTempoHold(1)}
                 >
                   +
                 </button>
