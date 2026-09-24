@@ -69,6 +69,9 @@ export type Preset = {
   enabled?: boolean
   /** When true, playing this preset starts the click and transport pause stops it. */
   metronomeSyncEnabled?: boolean
+  metronomeBpm?: number
+  metronomeVolumeDb?: number
+  metronomeMuted?: boolean
   tuningSystemId: TuningSystemId
   tonalCenter: TonalCenter
   baseOctave: number

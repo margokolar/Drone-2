@@ -300,7 +300,8 @@ function applyPresetState(preset: Preset): Pick<
   | 'tones'
   | 'partials'
   | 'shine'
-> {
+> &
+  Partial<Pick<DroneState, 'metronomeBpm' | 'metronomeVolumeDb' | 'metronomeMuted'>> {
   return {
     activePresetId: preset.id,
     activeNavigationKey: preset.id,
@@ -316,20 +317,41 @@ function applyPresetState(preset: Preset): Pick<
     partials: normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial }))),
     timbreBlend: normalizeTimbreBlend(preset.timbreBlend ?? DEFAULT_TIMBRE_BLEND),
     shine: normalizeShine(preset.shine),
+    ...(typeof preset.metronomeBpm === 'number'
+      ? { metronomeBpm: clamp(preset.metronomeBpm, MIN_METRONOME_BPM, MAX_METRONOME_BPM) }
+      : {}),
+    ...(typeof preset.metronomeVolumeDb === 'number'
+      ? {
+          metronomeVolumeDb: clamp(
+            preset.metronomeVolumeDb,
+            MIN_METRONOME_VOLUME_DB,
+            MAX_METRONOME_VOLUME_DB,
+          ),
+        }
+      : {}),
+    ...(typeof preset.metronomeMuted === 'boolean' ? { metronomeMuted: preset.metronomeMuted } : {}),
   }
 }
 
 function snapshotPresetFromState(
   state: Pick<
     DroneState,
-    'tuningSystemId' | 'tonalCenter' | 'baseOctave' | 'masterGainDb' | 'timbreBlend' | 'tones' | 'partials' | 'shine'
+    | 'tuningSystemId'
+    | 'tonalCenter'
+    | 'baseOctave'
+    | 'masterGainDb'
+    | 'timbreBlend'
+    | 'tones'
+    | 'partials'
+    | 'shine'
+    | 'metronomeBpm'
+    | 'metronomeVolumeDb'
+    | 'metronomeMuted'
   >,
-  presetId: string,
-  name: string,
+  existing: Preset,
 ): Preset {
   return {
-    id: presetId,
-    name,
+    ...existing,
     tuningSystemId: state.tuningSystemId,
     tonalCenter: state.tonalCenter,
     baseOctave: state.baseOctave,
@@ -338,6 +360,9 @@ function snapshotPresetFromState(
     tones: state.tones.map((tone) => normalizeTone(tone, state.partials, state.timbreBlend)),
     partials: normalizePartials(state.partials.map((partial) => ({ ...partial }))),
     shine: normalizeShine(state.shine),
+    metronomeBpm: state.metronomeBpm,
+    metronomeVolumeDb: state.metronomeVolumeDb,
+    metronomeMuted: state.metronomeMuted,
   }
 }
 
@@ -516,7 +541,7 @@ function applyDroneStateSave(
   if (!target) {
     return null
   }
-  const updatedPreset = snapshotPresetFromState(state, state.activePresetId, target.name)
+  const updatedPreset = snapshotPresetFromState(state, target)
   const presets = state.presets.map((preset) =>
     preset.id === state.activePresetId ? updatedPreset : preset,
   )
@@ -1020,7 +1045,7 @@ export const useDroneStore = create<DroneState>()(
           if (!target) {
             return state
           }
-          const updatedPreset = snapshotPresetFromState(state, presetId, target.name)
+          const updatedPreset = snapshotPresetFromState(state, target)
           const presets = state.presets.map((preset) => (preset.id === presetId ? updatedPreset : preset))
           if (presetId === state.activePresetId) {
             return {
@@ -1044,6 +1069,9 @@ export const useDroneStore = create<DroneState>()(
             tones: state.tones.map((tone) => normalizeTone(tone, state.partials, state.timbreBlend)),
             partials: normalizePartials(state.partials.map((partial) => ({ ...partial }))),
             shine: normalizeShine(state.shine),
+            metronomeBpm: state.metronomeBpm,
+            metronomeVolumeDb: state.metronomeVolumeDb,
+            metronomeMuted: state.metronomeMuted,
           }
           const presetNavigation = [
             ...state.presetNavigation,

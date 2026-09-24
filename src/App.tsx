@@ -47,7 +47,7 @@ import {
 } from './audio/transportControls'
 import { buildRuntimeConfigFromStore } from './audio/runtimeConfigFromStore'
 import { activateTransportMarker, applyClickSyncForPreset, playNextPresetAfterTransportMarker } from './audio/presetNavigationTransport'
-import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isPresetInClickSyncSegment, isTransportMarkerKey, navigationEntryKey } from './presets/presetNavigation'
+import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isPresetInClickSyncSegment, isTransportMarkerKey, navigationEntryKey, resolveNavigationClickBpm } from './presets/presetNavigation'
 import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL } from './utils/nowPlayingLabels'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
@@ -587,6 +587,8 @@ function App() {
         showMetronomeSync: isTransport
           ? true
           : isPresetInClickSyncSegment(presetNavigation, entry.presetId),
+        metronomeBpm:
+          resolveNavigationClickBpm(enabledNav, presets, index) ?? metronomeBpm,
       }
     })
     const enabledSongs = songLibrary.filter((song) => song.enabled !== false)
@@ -597,7 +599,7 @@ function App() {
       isActive: song.name === songName,
     }))
     return { presets: presetsForHome, songs: songsForHome }
-  }, [activeNavigationKey, presetNavigation, presets, songLibrary, songName])
+  }, [activeNavigationKey, metronomeBpm, presetNavigation, presets, songLibrary, songName])
   const visibleTabs = useMemo(
     () => (micFeaturesEnabled ? TABS : TABS.filter((tab) => tab.id !== 'add')),
     [micFeaturesEnabled],
@@ -2219,9 +2221,6 @@ function App() {
     <HomeScreenOverlay
       presetTitle={lockScreenLabels.title}
       isTransport={isTransportMarkerKey(activeNavigationKey, presetNavigation)}
-      transportMetronomeSyncEnabled={
-        homeScreenLists.presets.find((item) => item.isActive)?.metronomeSyncEnabled === true
-      }
       songTitle={lockScreenLabels.artist}
       presets={homeScreenLists.presets}
       songs={homeScreenLists.songs}
@@ -2811,16 +2810,29 @@ function App() {
               title="Click"
               className="[&>header]:mb-0"
               rightSlot={
-                <ClickSyncButton
-                  enabled={metronomeSyncEnabled}
-                  onClick={() => handleMetronomeSyncChange(!metronomeSyncEnabled)}
-                  inactiveClassName="border-white/15 bg-white/5 text-white/55 hover:bg-white/10"
-                  ariaLabel={
-                    metronomeSyncEnabled
-                      ? 'Disable click sync with drone transport play and pause'
-                      : 'Sync click start and stop with drone transport play and pause'
-                  }
-                />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="button-safe flex size-9 shrink-0 items-center justify-center rounded-lg border border-fuchsia-300/50 bg-fuchsia-300/20 text-fuchsia-100 transition hover:bg-fuchsia-300/30"
+                    onClick={(event) => {
+                      triggerSaveFlash(event.currentTarget)
+                      saveDroneState()
+                    }}
+                    aria-label="Save click settings to the current preset"
+                  >
+                    <Save size={15} />
+                  </button>
+                  <ClickSyncButton
+                    enabled={metronomeSyncEnabled}
+                    onClick={() => handleMetronomeSyncChange(!metronomeSyncEnabled)}
+                    inactiveClassName="border-white/15 bg-white/5 text-white/55 hover:bg-white/10"
+                    ariaLabel={
+                      metronomeSyncEnabled
+                        ? 'Disable click sync with drone transport play and pause'
+                        : 'Sync click start and stop with drone transport play and pause'
+                    }
+                  />
+                </div>
               }
             >
               <MetronomeControls

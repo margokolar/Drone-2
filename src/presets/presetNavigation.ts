@@ -179,6 +179,31 @@ export function isPresetInClickSyncSegment(
   return false
 }
 
+export function resolveNavigationClickBpm(
+  navigation: PresetNavigationEntry[],
+  presets: Preset[],
+  index: number,
+): number | undefined {
+  const entry = navigation[index]
+  if (!entry) {
+    return undefined
+  }
+  const bpmForPreset = (presetId: string) => {
+    const preset = presets.find((item) => item.id === presetId)
+    return typeof preset?.metronomeBpm === 'number' ? preset.metronomeBpm : undefined
+  }
+  if (entry.kind === 'preset') {
+    return bpmForPreset(entry.presetId)
+  }
+  for (let offset = 1; offset < navigation.length; offset += 1) {
+    const next = navigation[(index + offset) % navigation.length]
+    if (next.kind === 'preset') {
+      return bpmForPreset(next.presetId)
+    }
+  }
+  return undefined
+}
+
 /** Presets that start immediately after a play/pause marker with SYNC on. */
 export function applyDefaultPresetClickSync(
   navigation: PresetNavigationEntry[],

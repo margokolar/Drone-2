@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { ClickSyncButton } from './ClickSyncButton'
+import { MetronomeIcon } from './MetronomeIcon'
 import { PlayPauseIcon } from './PlayPauseIcon'
 import { SequenceListRow } from './SequenceListRow'
 
@@ -11,12 +11,12 @@ export type HomeScreenItem = {
   isTransport?: boolean
   metronomeSyncEnabled?: boolean
   showMetronomeSync?: boolean
+  metronomeBpm?: number
 }
 
 type HomeScreenOverlayProps = {
   presetTitle: string
   isTransport: boolean
-  transportMetronomeSyncEnabled?: boolean
   songTitle: string
   presets: HomeScreenItem[]
   songs: HomeScreenItem[]
@@ -34,6 +34,9 @@ const boxLabelClass =
 const listClass =
   'flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain'
 
+const largeMetronomeButtonClass =
+  'button-safe flex h-[0.58em] w-[0.58em] shrink-0 items-center justify-center overflow-visible text-fuchsia-100'
+
 function useScrollActiveIntoView(items: HomeScreenItem[]) {
   const listRef = useRef<HTMLDivElement>(null)
   const activeIndex = items.findIndex((item) => item.isActive)
@@ -49,7 +52,6 @@ function useScrollActiveIntoView(items: HomeScreenItem[]) {
 export function HomeScreenOverlay({
   presetTitle,
   isTransport,
-  transportMetronomeSyncEnabled = false,
   songTitle,
   presets,
   songs,
@@ -59,7 +61,34 @@ export function HomeScreenOverlay({
 }: HomeScreenOverlayProps) {
   const presetListRef = useScrollActiveIntoView(presets)
   const songListRef = useScrollActiveIntoView(songs)
-  const activeTransportId = presets.find((item) => item.isTransport && item.isActive)?.id
+  const activeItem = presets.find((item) => item.isActive)
+  const showLargeMetronome =
+    Boolean(onToggleTransportMetronomeSync) &&
+    activeItem?.metronomeSyncEnabled === true &&
+    (activeItem.isTransport || activeItem.showMetronomeSync)
+  const largeMetronomeCluster =
+    showLargeMetronome && activeItem && onToggleTransportMetronomeSync ? (
+      <>
+        <button
+          type="button"
+          onClick={() => onToggleTransportMetronomeSync(activeItem.id, false)}
+          className={largeMetronomeButtonClass}
+          aria-pressed="true"
+          aria-label={
+            activeItem.isTransport
+              ? 'Disable click sync for this play/pause marker'
+              : 'Disable click sync for this preset'
+          }
+        >
+          <MetronomeIcon className="h-full w-full" />
+        </button>
+        {activeItem.metronomeBpm != null ? (
+          <span className="flex h-[0.58em] shrink-0 items-center text-[0.58em] font-bold tabular-nums leading-none text-fuchsia-100">
+            {Math.round(activeItem.metronomeBpm)}
+          </span>
+        ) : null}
+      </>
+    ) : null
 
   return (
     <div className="home-screen-overlay flex h-full min-h-0 flex-col gap-3 overflow-hidden">
@@ -69,20 +98,14 @@ export function HomeScreenOverlay({
           {isTransport ? (
             <div className="flex h-full items-center justify-center gap-[0.18em]">
               <PlayPauseIcon className="h-[1em] w-auto shrink-0" />
-              {activeTransportId &&
-              onToggleTransportMetronomeSync &&
-              transportMetronomeSyncEnabled ? (
-                <ClickSyncButton
-                  enabled
-                  onClick={() => onToggleTransportMetronomeSync(activeTransportId, false)}
-                  className="self-center"
-                  ariaLabel="Disable click sync for this play/pause marker"
-                />
-              ) : null}
+              {largeMetronomeCluster}
             </div>
           ) : (
-            <div className="h-full w-full truncate text-center font-bold leading-none tracking-tight">
-              {presetTitle}
+            <div className="flex h-full min-w-0 items-center justify-center gap-[0.18em]">
+              <div className="min-w-0 truncate text-center font-bold leading-none tracking-tight">
+                {presetTitle}
+              </div>
+              {largeMetronomeCluster}
             </div>
           )}
         </div>
@@ -95,6 +118,7 @@ export function HomeScreenOverlay({
               isActive={item.isActive}
               isTransport={item.isTransport}
               metronomeSyncEnabled={item.metronomeSyncEnabled}
+              metronomeBpm={item.metronomeBpm}
               onSelect={() => onSelectPreset(item.id)}
               onToggleMetronomeSync={
                 onToggleTransportMetronomeSync && (item.isTransport || item.showMetronomeSync)
