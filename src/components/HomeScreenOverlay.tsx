@@ -30,6 +30,9 @@ type HomeScreenOverlayProps = {
   onToggleTransportMetronomeSync?: (id: string, enabled: boolean) => void
   onOpenClickTab?: () => void
   onOpenShineTab?: (id: string) => void
+  liveClickPlaying?: boolean
+  liveClickBpm?: number
+  onStopLiveClick?: () => void
 }
 
 const boxClass =
@@ -67,6 +70,9 @@ export function HomeScreenOverlay({
   onToggleTransportMetronomeSync,
   onOpenClickTab,
   onOpenShineTab,
+  liveClickPlaying = false,
+  liveClickBpm,
+  onStopLiveClick,
 }: HomeScreenOverlayProps) {
   const presetListRef = useScrollActiveIntoView(presets)
   const songListRef = useScrollActiveIntoView(songs)
@@ -79,13 +85,18 @@ export function HomeScreenOverlay({
     }
   }
   const activeItem = presets.find((item) => item.isActive)
-  const largeMetroLit = activeItem?.metronomeLit ?? activeItem?.metronomeSyncEnabled === true
-  const showLargeMetronome =
+  const syncLargeMetronome =
     Boolean(onToggleTransportMetronomeSync) &&
     activeItem?.metronomeSyncEnabled === true &&
     (activeItem.isTransport || activeItem.showMetronomeSync)
+  const unsyncedLiveClick = liveClickPlaying && !syncLargeMetronome
+  const showLargeMetronome = Boolean(activeItem) && (syncLargeMetronome || unsyncedLiveClick)
+  const largeMetroLit = unsyncedLiveClick
+    ? true
+    : (activeItem?.metronomeLit ?? activeItem?.metronomeSyncEnabled === true)
+  const largeMetroBpm = unsyncedLiveClick ? liveClickBpm : activeItem?.metronomeBpm
   const largeMetronomeCluster =
-    showLargeMetronome && activeItem && onToggleTransportMetronomeSync ? (
+    showLargeMetronome && activeItem ? (
       <>
         <button
           type="button"
@@ -109,31 +120,37 @@ export function HomeScreenOverlay({
               metroLongPressFiredRef.current = false
               return
             }
-            onToggleTransportMetronomeSync(activeItem.id, false)
+            if (unsyncedLiveClick) {
+              onStopLiveClick?.()
+              return
+            }
+            onToggleTransportMetronomeSync?.(activeItem.id, false)
           }}
           className={clsx(
             largeMetronomeButtonClass,
             largeMetroLit ? 'text-fuchsia-100' : 'text-white/40',
           )}
-          aria-pressed="true"
+          aria-pressed={unsyncedLiveClick || syncLargeMetronome}
           aria-label={
-            `${
-              activeItem.isTransport
-                ? 'Disable click sync for this play/pause marker'
-                : 'Disable click sync for this preset'
-            }${onOpenClickTab ? '. Long-press to open Click.' : ''}`
+            unsyncedLiveClick
+              ? `Stop click${onOpenClickTab ? '. Long-press to open Click.' : ''}`
+              : `${
+                  activeItem.isTransport
+                    ? 'Disable click sync for this play/pause marker'
+                    : 'Disable click sync for this preset'
+                }${onOpenClickTab ? '. Long-press to open Click.' : ''}`
           }
         >
           <MetronomeIcon className="h-full w-full" />
         </button>
-        {activeItem.metronomeBpm != null ? (
+        {largeMetroBpm != null ? (
           <span
             className={clsx(
               'flex h-[0.58em] shrink-0 items-center text-[0.58em] font-bold tabular-nums leading-none',
               largeMetroLit ? 'text-fuchsia-100' : 'text-white/40',
             )}
           >
-            {Math.round(activeItem.metronomeBpm)}
+            {Math.round(largeMetroBpm)}
           </span>
         ) : null}
       </>

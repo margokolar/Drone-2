@@ -2277,6 +2277,9 @@ function App() {
         setActiveTab('shine')
         setHomeScreenOpen(false)
       }}
+      liveClickPlaying={metronomeEnabled}
+      liveClickBpm={metronomeBpm}
+      onStopLiveClick={() => handleMetronomeEnabledChange(false)}
     />
   )
   const iosHomeOpen = isIosApp() && homeScreenOpen
