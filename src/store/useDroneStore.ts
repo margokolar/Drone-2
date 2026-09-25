@@ -39,6 +39,7 @@ import {
   createTransportMarkerId,
   getEnabledNavigationEntries,
   hasTransportClickSync,
+  shouldApplyPresetClickTempo,
   navigationEntryKey,
   isTransportMarkerKey,
   normalizePresetNavigation,
@@ -289,7 +290,16 @@ function duplicatePresetData(preset: Preset): Preset {
   })
 }
 
-function applyPresetState(preset: Preset): Pick<
+type ApplyPresetClickTempoContext = {
+  navigation: PresetNavigationEntry[]
+  presets: Preset[]
+  globalSyncEnabled: boolean
+}
+
+function applyPresetState(
+  preset: Preset,
+  clickTempo?: ApplyPresetClickTempoContext,
+): Pick<
   DroneState,
   | 'activePresetId'
   | 'activeNavigationKey'
@@ -303,6 +313,14 @@ function applyPresetState(preset: Preset): Pick<
   | 'shine'
 > &
   Partial<Pick<DroneState, 'metronomeBpm' | 'metronomeVolumeDb' | 'metronomeMuted'>> {
+  const applyClickTempo =
+    clickTempo == null ||
+    shouldApplyPresetClickTempo(
+      clickTempo.navigation,
+      clickTempo.presets,
+      preset.id,
+      clickTempo.globalSyncEnabled,
+    )
   return {
     activePresetId: preset.id,
     activeNavigationKey: preset.id,
@@ -318,7 +336,7 @@ function applyPresetState(preset: Preset): Pick<
     partials: normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial }))),
     timbreBlend: normalizeTimbreBlend(preset.timbreBlend ?? DEFAULT_TIMBRE_BLEND),
     shine: normalizeShine(preset.shine),
-    ...(typeof preset.metronomeBpm === 'number'
+    ...(applyClickTempo && typeof preset.metronomeBpm === 'number'
       ? { metronomeBpm: clamp(preset.metronomeBpm, MIN_METRONOME_BPM, MAX_METRONOME_BPM) }
       : {}),
     ...(typeof preset.metronomeVolumeDb === 'number'
@@ -331,6 +349,18 @@ function applyPresetState(preset: Preset): Pick<
         }
       : {}),
     ...(typeof preset.metronomeMuted === 'boolean' ? { metronomeMuted: preset.metronomeMuted } : {}),
+  }
+}
+
+function clickTempoFromState(state: {
+  presetNavigation: PresetNavigationEntry[]
+  presets: Preset[]
+  metronomeSyncEnabled: boolean
+}): ApplyPresetClickTempoContext {
+  return {
+    navigation: state.presetNavigation,
+    presets: state.presets,
+    globalSyncEnabled: state.metronomeSyncEnabled,
   }
 }
 
@@ -1121,12 +1151,13 @@ export const useDroneStore = create<DroneState>()(
           }
         }),
       loadPreset: (presetId) => {
-        const preset = get().presets.find((item) => item.id === presetId)
+        const state = get()
+        const preset = state.presets.find((item) => item.id === presetId)
         if (!preset) {
           return
         }
         set({
-          ...applyPresetState(preset),
+          ...applyPresetState(preset, clickTempoFromState(state)),
         })
       },
       renamePreset: (presetId, name) =>
@@ -1162,7 +1193,11 @@ export const useDroneStore = create<DroneState>()(
           return {
             presets: [...state.presets, duplicate],
             presetNavigation: nextNavigation,
-            ...applyPresetState(duplicate),
+            ...applyPresetState(duplicate, {
+              navigation: nextNavigation,
+              presets: [...state.presets, duplicate],
+              globalSyncEnabled: state.metronomeSyncEnabled,
+            }),
             ...syncPresetsToCurrentSong({
               ...state,
               presets: [...state.presets, duplicate],
@@ -1203,7 +1238,11 @@ export const useDroneStore = create<DroneState>()(
           return {
             presets: filtered,
             presetNavigation: nextNavigation,
-            ...applyPresetState(nextActive),
+            ...applyPresetState(nextActive, {
+              navigation: nextNavigation,
+              presets: filtered,
+              globalSyncEnabled: state.metronomeSyncEnabled,
+            }),
             ...syncPresetsToCurrentSong({
               ...state,
               presets: filtered,
@@ -1374,7 +1413,11 @@ export const useDroneStore = create<DroneState>()(
             songLibrary: [...state.songLibrary, importedSong],
             presets: imported,
             presetNavigation: buildDefaultPresetNavigation(imported),
-            ...applyPresetState(active),
+            ...applyPresetState(active, {
+              navigation: buildDefaultPresetNavigation(imported),
+              presets: imported,
+              globalSyncEnabled: state.metronomeSyncEnabled,
+            }),
           }
         }),
       importSongLibrary: (songs) =>
@@ -1449,13 +1492,18 @@ export const useDroneStore = create<DroneState>()(
           const copiedPresets = activeSong.presets.map((preset) => duplicatePresetData(preset))
           const activePreset =
             copiedPresets.find((preset) => preset.id === activeSong.activePresetId) ?? copiedPresets[0]
+          const importedNavigation = normalizePresetNavigation(activeSong.presetNavigation, copiedPresets)
 
           return {
             songName: activeSong.name,
             songLibrary: importedSongs,
             presets: copiedPresets,
-            presetNavigation: normalizePresetNavigation(activeSong.presetNavigation, copiedPresets),
-            ...applyPresetState(activePreset),
+            presetNavigation: importedNavigation,
+            ...applyPresetState(activePreset, {
+              navigation: importedNavigation,
+              presets: copiedPresets,
+              globalSyncEnabled: state.metronomeSyncEnabled,
+            }),
           }
         }),
       loadSongFromLibrary: (songId) =>
@@ -1481,14 +1529,18 @@ export const useDroneStore = create<DroneState>()(
                 firstActive.navigationKey,
               )
             : null
+          const landingPreset = presetBeforeMarker ?? firstActive.preset
+          const songClickTempo = {
+            navigation: presetNavigation,
+            presets: copiedPresets,
+            globalSyncEnabled: state.metronomeSyncEnabled,
+          }
           return {
             songName: song.name,
             songLibrary: state.songLibrary,
             presets: copiedPresets,
             presetNavigation,
-            ...(presetBeforeMarker
-              ? applyPresetState(presetBeforeMarker)
-              : applyPresetState(firstActive.preset)),
+            ...applyPresetState(landingPreset, songClickTempo),
             activeNavigationKey: firstActive.navigationKey,
             ...(landingOnTransport
               ? {
@@ -1520,11 +1572,19 @@ export const useDroneStore = create<DroneState>()(
           const fallbackSong = filtered[0]
           const copiedPresets = fallbackSong.presets.map((preset) => duplicatePresetData(preset))
           const active = copiedPresets.find((preset) => preset.id === fallbackSong.activePresetId) ?? copiedPresets[0]
+          const fallbackNavigation = normalizePresetNavigation(
+            fallbackSong.presetNavigation,
+            copiedPresets,
+          )
           return {
             songName: fallbackSong.name,
             songLibrary: filtered,
             presets: copiedPresets,
-            ...applyPresetState(active),
+            ...applyPresetState(active, {
+              navigation: fallbackNavigation,
+              presets: copiedPresets,
+              globalSyncEnabled: state.metronomeSyncEnabled,
+            }),
           }
         }),
       moveSongInLibrary: (songId, direction) =>

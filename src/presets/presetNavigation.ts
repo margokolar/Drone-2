@@ -159,6 +159,19 @@ export function hasTransportClickSync(navigation: PresetNavigationEntry[]): bool
   return navigation.some((entry) => entry.kind === 'transport' && entry.metronomeSyncEnabled === true)
 }
 
+/** Live tempo follows a preset only when that preset is in an active click-sync. */
+export function shouldApplyPresetClickTempo(
+  navigation: PresetNavigationEntry[],
+  presets: Preset[],
+  presetId: string,
+  globalSyncEnabled: boolean,
+): boolean {
+  if (hasTransportClickSync(navigation)) {
+    return isPresetClickSyncEnabled(presets, presetId, navigation)
+  }
+  return globalSyncEnabled
+}
+
 /** True when this preset sits after a play/pause marker that has SYNC on, before the next marker. */
 export function isPresetInClickSyncSegment(
   navigation: PresetNavigationEntry[],
