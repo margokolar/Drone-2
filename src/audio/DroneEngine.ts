@@ -3,8 +3,6 @@ import {
   morphFromBlend,
   normalizedBlend,
   partialBrightnessGain,
-  partialTimbreWeights,
-  waveformGainCompensation,
 } from './audioMath'
 import type { DroneRuntimeConfig, EntryGlideParams, PartialConfig, ToneConfig } from './types'
 import { getFrequency } from '../music/tuning'
@@ -19,7 +17,8 @@ import {
   shouldAvoidValueCurves,
 } from './fadeCurves'
 import { isNativeSynth } from './isNativeSynth'
-import { nativeOscillatorsFromConfig } from './nativeDroneGraph'
+import { nativeOscillatorsFromConfig, packNativeWavetables } from './nativeDroneGraph'
+import { scaleWavetableByPartials, wavetableToPeriodicWave } from './wavetable'
 
 type OscBundle = {
   oscillator: OscillatorNode
@@ -33,6 +32,7 @@ type ToneVoice = {
   outputGain: GainNode
   panner: StereoPannerNode
   oscillators: OscBundle[]
+  usesWavetable: boolean
   /** AudioContext time after which entry pitch glide may be overridden by updates. */
   entryGlideEndTime: number | null
 }
@@ -123,6 +123,7 @@ export class DroneEngine {
   private nativeGraphPushed = false
   private nativeGlideNotes = new Set<string>()
   private lastNativePacked = ''
+  private lastNativeTables = ''
   private lastNativeMaster = -1
 
   setPlaybackIntent(shouldPlay: boolean): void {
@@ -201,18 +202,21 @@ export class DroneEngine {
     const rows = audible
       ? oscillators.map(
           (osc) =>
-            `${osc.id}\t${osc.wave}\t${osc.freq}\t${osc.gain}\t${osc.pan}\t${osc.glideFrom ?? 0}\t${osc.glideSeconds ?? 0}`,
+            `${osc.id}\t${osc.wave}\t${osc.freq}\t${osc.gain}\t${osc.pan}\t${osc.glideFrom ?? 0}\t${osc.glideSeconds ?? 0}\t${osc.tableId ?? ''}`,
         )
       : []
     const packed = rows.join('\n')
+    const tables = audible ? packNativeWavetables(config) : ''
     if (
       packed === this.lastNativePacked &&
+      tables === this.lastNativeTables &&
       Math.abs(masterTarget - this.lastNativeMaster) < 1e-6 &&
       audible
     ) {
       return
     }
     this.lastNativePacked = packed
+    this.lastNativeTables = tables
     this.lastNativeMaster = masterTarget
     void DroneSynth.setGraph({
       master: audible ? masterTarget : MIN_AUDIBLE_GAIN,
@@ -220,6 +224,7 @@ export class DroneEngine {
       fadeInSeconds: this.playbackFadeInSeconds,
       fadeOutSeconds: this.playbackFadeOutSeconds,
       packed,
+      tables,
     }).catch(() => {})
   }
 
@@ -261,19 +266,14 @@ export class DroneEngine {
     }
     const context = new AudioContext({ latencyHint: 'interactive' })
     const masterGain = context.createGain()
-    const lowPass = context.createBiquadFilter()
     const limiter = context.createDynamicsCompressor()
-    lowPass.type = 'lowpass'
-    lowPass.frequency.value = 6500
-    lowPass.Q.value = 0.7
     limiter.threshold.value = LIMITER_THRESHOLD_DB
     limiter.knee.value = 0
     limiter.ratio.value = 20
     limiter.attack.value = 0.002
     limiter.release.value = 0.05
     masterGain.gain.value = 0.0001
-    masterGain.connect(lowPass)
-    lowPass.connect(limiter)
+    masterGain.connect(limiter)
     limiter.connect(context.destination)
     this.context = context
     this.masterGain = masterGain
@@ -424,36 +424,30 @@ export class DroneEngine {
       voice.outputGain.gain.cancelScheduledValues(now)
       voice.outputGain.gain.setValueAtTime(toneGain, now)
 
+      if (voice.usesWavetable) {
+        const bundle = voice.oscillators[0]
+        if (bundle) {
+          bundle.gainNode.gain.cancelScheduledValues(now)
+          bundle.gainNode.gain.setValueAtTime(1, now)
+        }
+        continue
+      }
+
       const blend = normalizedBlend(toneConfig.timbreBlend ?? config.timbreBlend)
       const morph = morphFromBlend(blend.sine, blend.saw, blend.square)
       const activePartials = (toneConfig.partials ?? config.partials).filter((partial) => partial.enabled)
-      let index = 0
       for (let partialIndex = 0; partialIndex < activePartials.length; partialIndex += 1) {
         const partial = activePartials[partialIndex]
-        const partialLinear = dbToGain(partial.gainDb)
-        const harmonicIndex = partialIndex + 1
-        const brightness = partialBrightnessGain(harmonicIndex, morph)
-        const timbreWeights = partialTimbreWeights(harmonicIndex, blend, config.harmonicTimbreEnabled)
-        const waveTypes = ['sine', 'sawtooth', 'square'] as const
-        const waveTarget = [timbreWeights.sine, timbreWeights.saw, timbreWeights.square]
-        for (let waveIndex = 0; waveIndex < 3; waveIndex += 1) {
-          const bundle = voice.oscillators[index]
-          if (!bundle) {
-            continue
-          }
-          const weightedAmount = waveTarget[waveIndex] ?? 0
-          const waveType = waveTypes[waveIndex]
-          const nextWaveGain =
-            weightedAmount > 0
-              ? Math.max(
-                  0.0001,
-                  partialLinear * weightedAmount * waveformGainCompensation(waveType) * brightness,
-                )
-              : 0.0001
-          bundle.gainNode.gain.cancelScheduledValues(now)
-          bundle.gainNode.gain.setValueAtTime(nextWaveGain, now)
-          index += 1
+        const bundle = voice.oscillators[partialIndex]
+        if (!bundle) {
+          continue
         }
+        const nextWaveGain = Math.max(
+          0.0001,
+          dbToGain(partial.gainDb) * partialBrightnessGain(partialIndex + 1, morph),
+        )
+        bundle.gainNode.gain.cancelScheduledValues(now)
+        bundle.gainNode.gain.setValueAtTime(nextWaveGain, now)
       }
     }
   }
@@ -760,6 +754,7 @@ export class DroneEngine {
     this.nativeGraphPushed = false
     this.nativeGlideNotes.clear()
     this.lastNativePacked = ''
+    this.lastNativeTables = ''
     this.lastNativeMaster = -1
     if (isNativeSynth()) {
       this.resumeFromSilence = true
@@ -792,6 +787,7 @@ export class DroneEngine {
       this.resumeFromSilence = true
       this.nativeGraphPushed = false
       this.lastNativePacked = ''
+      this.lastNativeTables = ''
       this.lastNativeMaster = -1
       void DroneSynth.setGraph({
         master: MIN_AUDIBLE_GAIN,
@@ -935,7 +931,7 @@ export class DroneEngine {
   ): void {
     const existing = this.voiceMap.get(toneConfig.noteId)
     const tonePartials = toneConfig.partials ?? config.partials
-    const needsRebuild = forceRebuild || this.voiceNeedsRebuild(existing, tonePartials)
+    const needsRebuild = forceRebuild || this.voiceNeedsRebuild(existing, toneConfig, tonePartials)
 
     if (needsRebuild && existing) {
       // Keep rebuild crossfades short unless a preset transition requests longer overlap.
@@ -952,13 +948,38 @@ export class DroneEngine {
     this.updateVoice(config, liveVoice, toneConfig, now, transition.updateSeconds)
   }
 
-  private voiceNeedsRebuild(voice: ToneVoice | undefined, partials: PartialConfig[]): boolean {
+  private voiceNeedsRebuild(
+    voice: ToneVoice | undefined,
+    toneConfig: ToneConfig,
+    partials: PartialConfig[],
+  ): boolean {
     if (!voice) {
       return true
     }
+    const wantsWavetable = Boolean(toneConfig.wavetable)
+    if (voice.usesWavetable !== wantsWavetable) {
+      return true
+    }
+    if (wantsWavetable) {
+      const wavetableOscCount = partials.some((partial) => partial.enabled) ? 1 : 0
+      return wavetableOscCount !== voice.oscillators.length
+    }
     const activePartials = partials.filter((partial) => partial.enabled)
-    const activeOscCount = activePartials.length * 3
-    return activeOscCount !== voice.oscillators.length
+    return activePartials.length !== voice.oscillators.length
+  }
+
+  private applyWavetableWave(
+    oscillator: OscillatorNode,
+    config: DroneRuntimeConfig,
+    toneConfig: ToneConfig,
+    frequencyHz: number,
+  ): void {
+    if (!this.context || !toneConfig.wavetable) {
+      return
+    }
+    const partials = toneConfig.partials ?? config.partials
+    const scaled = scaleWavetableByPartials(toneConfig.wavetable, partials)
+    oscillator.setPeriodicWave(wavetableToPeriodicWave(this.context, scaled, frequencyHz))
   }
 
   private getEntryGlideSpec(
@@ -1028,23 +1049,34 @@ export class DroneEngine {
     )
     const entryGlide = this.getEntryGlideSpec(config, toneConfig)
     const oscillators: OscBundle[] = []
+    const usesWavetable = Boolean(toneConfig.wavetable)
     const activePartials = (toneConfig.partials ?? config.partials).filter((partial) => partial.enabled)
-    for (let partialIndex = 0; partialIndex < activePartials.length; partialIndex += 1) {
-      const partial = activePartials[partialIndex]
-      const ratio = Math.max(0.0625, partial.ratio)
-      const fundamentalPartialGain = dbToGain(partial.gainDb)
-      const harmonicIndex = partialIndex + 1
-      const brightness = partialBrightnessGain(harmonicIndex, morph)
-      const timbreWeights = partialTimbreWeights(harmonicIndex, blend, config.harmonicTimbreEnabled)
-      const waveGains = [
-        { type: 'sine' as const, amount: timbreWeights.sine },
-        { type: 'sawtooth' as const, amount: timbreWeights.saw },
-        { type: 'square' as const, amount: timbreWeights.square },
-      ]
-      for (const waveGain of waveGains) {
+    if (usesWavetable && activePartials.length > 0) {
+      const oscillator = this.context.createOscillator()
+      const gainNode = this.context.createGain()
+      const targetFrequency = toneFrequency
+      this.applyWavetableWave(oscillator, config, toneConfig, targetFrequency)
+      oscillator.frequency.value = targetFrequency
+      oscillator.detune.value = toneConfig.detuneCents
+      gainNode.gain.value = 0.0001
+      oscillator.connect(gainNode)
+      gainNode.connect(outputGain)
+      oscillator.start()
+      this.scheduleEntryGlideFrequency(oscillator, targetFrequency, config, toneConfig, now)
+      oscillators.push({
+        oscillator,
+        gainNode,
+        waveGain: 1,
+        ratio: 1,
+      })
+    } else {
+      for (let partialIndex = 0; partialIndex < activePartials.length; partialIndex += 1) {
+        const partial = activePartials[partialIndex]
+        const ratio = Math.max(0.0625, partial.ratio)
+        const brightness = partialBrightnessGain(partialIndex + 1, morph)
         const oscillator = this.context.createOscillator()
         const gainNode = this.context.createGain()
-        oscillator.type = waveGain.type
+        oscillator.type = 'sine'
         const targetFrequency = toneFrequency * ratio
         oscillator.frequency.value = targetFrequency
         oscillator.detune.value = toneConfig.detuneCents
@@ -1056,11 +1088,7 @@ export class DroneEngine {
         oscillators.push({
           oscillator,
           gainNode,
-          waveGain:
-            waveGain.amount *
-            fundamentalPartialGain *
-            waveformGainCompensation(waveGain.type) *
-            brightness,
+          waveGain: dbToGain(partial.gainDb) * brightness,
           ratio,
         })
       }
@@ -1099,6 +1127,7 @@ export class DroneEngine {
       outputGain,
       panner,
       oscillators,
+      usesWavetable,
       entryGlideEndTime:
         entryGlide && entryGlide.cents !== 0 && entryGlide.seconds > 0 ? now + entryGlide.seconds : null,
     }
@@ -1151,64 +1180,66 @@ export class DroneEngine {
       }
     }
 
-    const blend = normalizedBlend(toneConfig.timbreBlend ?? config.timbreBlend)
-    const morph = morphFromBlend(blend.sine, blend.saw, blend.square)
-    const activePartials = (toneConfig.partials ?? config.partials).filter((partial) => partial.enabled)
-    let index = 0
-    for (let partialIndex = 0; partialIndex < activePartials.length; partialIndex += 1) {
-      const partial = activePartials[partialIndex]
-      const ratio = Math.max(0.0625, partial.ratio)
-      const partialLinear = dbToGain(partial.gainDb)
-      const harmonicIndex = partialIndex + 1
-      const brightness = partialBrightnessGain(harmonicIndex, morph)
-      const timbreWeights = partialTimbreWeights(harmonicIndex, blend, config.harmonicTimbreEnabled)
-      const waveTypes = ['sine', 'sawtooth', 'square'] as const
-      const waveTarget = [timbreWeights.sine, timbreWeights.saw, timbreWeights.square]
-      for (let waveIndex = 0; waveIndex < 3; waveIndex += 1) {
-        const bundle = voice.oscillators[index]
-        if (!bundle) {
-          continue
-        }
-        const weightedAmount = waveTarget[waveIndex] ?? 0
-        const waveType = waveTypes[waveIndex]
-        const nextWaveGain =
-          weightedAmount > 0
-            ? Math.max(
-                0.0001,
-                partialLinear * weightedAmount * waveformGainCompensation(waveType) * brightness,
-              )
-            : 0.0001
-        bundle.ratio = ratio
-        bundle.waveGain = nextWaveGain
+    if (voice.usesWavetable) {
+      const bundle = voice.oscillators[0]
+      if (bundle) {
+        bundle.ratio = 1
+        bundle.waveGain = 1
+        this.applyWavetableWave(bundle.oscillator, config, toneConfig, frequency)
         if (!entryGlideActive) {
           bundle.oscillator.frequency.cancelScheduledValues(now)
           bundle.oscillator.frequency.setValueAtTime(bundle.oscillator.frequency.value, now)
           bundle.oscillator.frequency.exponentialRampToValueAtTime(
-            Math.max(1, frequency * ratio),
+            Math.max(1, frequency),
             now + updateSeconds,
           )
         }
-        if (usesSmoothCrossfade(updateSeconds)) {
-          const waveStart =
-            bundle.gainNode.gain.value > 0.002
-              ? bundle.gainNode.gain.value
-              : Math.max(MIN_AUDIBLE_GAIN, bundle.waveGain, nextWaveGain)
-          scheduleSmoothGainCrossfade(
-            bundle.gainNode.gain,
-            nextWaveGain,
-            now,
-            updateSeconds,
-            waveStart,
-          )
-        } else {
-          bundle.gainNode.gain.cancelScheduledValues(now)
-          bundle.gainNode.gain.setValueAtTime(bundle.gainNode.gain.value, now)
-          bundle.gainNode.gain.exponentialRampToValueAtTime(
-            nextWaveGain,
-            now + updateSeconds,
-          )
-        }
-        index += 1
+        bundle.gainNode.gain.cancelScheduledValues(now)
+        bundle.gainNode.gain.setValueAtTime(1, now)
+      }
+      return
+    }
+
+    const blend = normalizedBlend(toneConfig.timbreBlend ?? config.timbreBlend)
+    const morph = morphFromBlend(blend.sine, blend.saw, blend.square)
+    const activePartials = (toneConfig.partials ?? config.partials).filter((partial) => partial.enabled)
+    for (let partialIndex = 0; partialIndex < activePartials.length; partialIndex += 1) {
+      const partial = activePartials[partialIndex]
+      const bundle = voice.oscillators[partialIndex]
+      if (!bundle) {
+        continue
+      }
+      const ratio = Math.max(0.0625, partial.ratio)
+      const nextWaveGain = Math.max(
+        0.0001,
+        dbToGain(partial.gainDb) * partialBrightnessGain(partialIndex + 1, morph),
+      )
+      bundle.ratio = ratio
+      bundle.waveGain = nextWaveGain
+      if (!entryGlideActive) {
+        bundle.oscillator.frequency.cancelScheduledValues(now)
+        bundle.oscillator.frequency.setValueAtTime(bundle.oscillator.frequency.value, now)
+        bundle.oscillator.frequency.exponentialRampToValueAtTime(
+          Math.max(1, frequency * ratio),
+          now + updateSeconds,
+        )
+      }
+      if (usesSmoothCrossfade(updateSeconds)) {
+        const waveStart =
+          bundle.gainNode.gain.value > 0.002
+            ? bundle.gainNode.gain.value
+            : Math.max(MIN_AUDIBLE_GAIN, bundle.waveGain, nextWaveGain)
+        scheduleSmoothGainCrossfade(
+          bundle.gainNode.gain,
+          nextWaveGain,
+          now,
+          updateSeconds,
+          waveStart,
+        )
+      } else {
+        bundle.gainNode.gain.cancelScheduledValues(now)
+        bundle.gainNode.gain.setValueAtTime(bundle.gainNode.gain.value, now)
+        bundle.gainNode.gain.exponentialRampToValueAtTime(nextWaveGain, now + updateSeconds)
       }
     }
   }

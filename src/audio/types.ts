@@ -14,6 +14,12 @@ export type PartialConfig = {
   enabled: boolean
 }
 
+/** Cosine/sine terms for one drone cycle. Index 0 is DC; 1 is the fundamental. */
+export type WavetableCoeffs = {
+  real: number[]
+  imag: number[]
+}
+
 export type ToneConfig = {
   noteId: NoteId
   enabled: boolean
@@ -22,6 +28,7 @@ export type ToneConfig = {
   detuneCents: number
   partials?: PartialConfig[]
   timbreBlend?: TimbreBlend
+  wavetable?: WavetableCoeffs
 }
 
 export type EntryGlideParams = {

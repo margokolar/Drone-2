@@ -5,7 +5,8 @@ export type NativeDroneOsc = {
   freq: number
   gain: number
   pan: number
-  wave: 0 | 1 | 2
+  wave: 0 | 1 | 2 | 3
+  tableId?: string
   glideFrom?: number
   glideSeconds?: number
 }
@@ -25,6 +26,7 @@ export type NativeDroneSynthPlugin = {
     fadeInSeconds?: number
     fadeOutSeconds?: number
     packed: string
+    tables?: string
   }): Promise<void>
   fadeMaster(options: { target: number; seconds: number }): Promise<void>
   mute(): Promise<void>

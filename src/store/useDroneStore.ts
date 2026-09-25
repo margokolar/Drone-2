@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { PartialConfig, TimbreBlend, ToneConfig } from '../audio/types'
+import type { PartialConfig, TimbreBlend, ToneConfig, WavetableCoeffs } from '../audio/types'
+import { cloneWavetable } from '../audio/wavetable'
 import type { BtControlMode } from '../bluetooth/types'
 import { TONAL_CENTERS, migrateLegacyNoteId, NOTE_IDS, type NoteId, type TonalCenter } from '../music/notes'
 import {
@@ -146,6 +147,8 @@ type DroneState = {
   setPartials: (partials: PartialConfig[]) => void
   addPartial: () => void
   removePartial: (partialId: string) => void
+  setToneWavetable: (noteId: NoteId, wavetable: WavetableCoeffs | null) => void
+  applyWavetableGlobally: (wavetable: WavetableCoeffs | null) => void
   setTonePartials: (noteId: NoteId, partials: PartialConfig[]) => void
   setTonePartialGain: (noteId: NoteId, partialId: string, gainDb: number) => void
   setTonePartialRatio: (noteId: NoteId, partialId: string, ratio: number) => void
@@ -421,6 +424,19 @@ function normalizeTimbreBlend(timbreBlend: TimbreBlend): TimbreBlend {
   }
 }
 
+function withNormalizedWavetable(tone: ToneConfig): ToneConfig {
+  const wavetable = cloneWavetable(tone.wavetable)
+  if (!wavetable) {
+    if (!tone.wavetable) {
+      return tone
+    }
+    const next = { ...tone }
+    delete next.wavetable
+    return next
+  }
+  return { ...tone, wavetable }
+}
+
 function normalizeTonePartials(tone: ToneConfig, fallbackPartials: PartialConfig[]): ToneConfig {
   return {
     ...tone,
@@ -441,7 +457,27 @@ function normalizeTone(
   fallbackPartials: PartialConfig[],
   fallbackTimbre: TimbreBlend,
 ): ToneConfig {
-  return normalizeToneTimbre(normalizeTonePartials(tone, fallbackPartials), fallbackTimbre)
+  return withNormalizedWavetable(
+    normalizeToneTimbre(normalizeTonePartials(tone, fallbackPartials), fallbackTimbre),
+  )
+}
+
+function syncAllTonesWithWavetable(
+  tones: ToneConfig[],
+  wavetable: WavetableCoeffs | null | undefined,
+): ToneConfig[] {
+  const cloned = cloneWavetable(wavetable)
+  return tones.map((tone) => {
+    if (!cloned) {
+      if (!tone.wavetable) {
+        return tone
+      }
+      const copy = { ...tone }
+      delete copy.wavetable
+      return copy
+    }
+    return { ...tone, wavetable: { real: cloned.real.slice(), imag: cloned.imag.slice() } }
+  })
 }
 
 function syncAllTonesWithPartials(
@@ -738,13 +774,15 @@ export const useDroneStore = create<DroneState>()(
           const partialSource = tone?.partials ?? state.partials
           const timbreSource = tone?.timbreBlend ?? state.timbreBlend
           const partialSync = syncAllTonesWithPartials(state, partialSource)
+          const timbreSync = syncAllTonesWithTimbre(
+            { tones: partialSync.tones, timbreBlend: state.timbreBlend },
+            timbreSource,
+          )
           return {
             globalOvertoneEditEnabled: true,
-            ...partialSync,
-            ...syncAllTonesWithTimbre(
-              { tones: partialSync.tones, timbreBlend: state.timbreBlend },
-              timbreSource,
-            ),
+            partials: partialSync.partials,
+            timbreBlend: timbreSync.timbreBlend,
+            tones: syncAllTonesWithWavetable(timbreSync.tones, tone?.wavetable),
           }
         }),
       applyPartialsGlobally: (partials) =>
@@ -939,6 +977,28 @@ export const useDroneStore = create<DroneState>()(
             partials: state.partials.filter((partial) => partial.id !== partialId),
           }
         }),
+      setToneWavetable: (noteId, wavetable) =>
+        set((state) => ({
+          tones: state.tones.map((tone) => {
+            if (tone.noteId !== noteId) {
+              return tone
+            }
+            const next = cloneWavetable(wavetable)
+            if (!next) {
+              if (!tone.wavetable) {
+                return tone
+              }
+              const copy = { ...tone }
+              delete copy.wavetable
+              return copy
+            }
+            return { ...tone, wavetable: next }
+          }),
+        })),
+      applyWavetableGlobally: (wavetable) =>
+        set((state) => ({
+          tones: syncAllTonesWithWavetable(state.tones, wavetable),
+        })),
       setTonePartials: (noteId, partials) =>
         set((state) => ({
           tones: state.tones.map((tone) =>

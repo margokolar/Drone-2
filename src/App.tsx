@@ -50,7 +50,8 @@ import { activateTransportMarker, applyClickSyncForPreset, playNextPresetAfterTr
 import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isPresetInClickSyncSegment, isTransportMarkerKey, navigationEntryKey, resolveNavigationClickBpm, transportMarkerHasActiveFollowingClick } from './presets/presetNavigation'
 import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL } from './utils/nowPlayingLabels'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
-import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig } from './audio/types'
+import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig, WavetableCoeffs } from './audio/types'
+import { cloneWavetable, sameWavetable } from './audio/wavetable'
 import { AddFollowerControls, AddMicToolbarButton } from './components/AddFollowerControls'
 import { MicMenuSection } from './components/MicMenuSection'
 import { MetronomeControls } from './components/MetronomeControls'
@@ -144,6 +145,7 @@ const TONE_SET_COLLECTION_STORAGE_KEY = 'drone-tone-sets-v1'
 type OvertoneSnapshot = {
   partials: PartialConfig[]
   timbreBlend: TimbreBlend
+  wavetable?: WavetableCoeffs
 }
 
 type PendingOvertoneAnalysis = {
@@ -511,6 +513,8 @@ function App() {
   const setTonePan = useDroneStore((state) => state.setTonePan)
   const setToneDetune = useDroneStore((state) => state.setToneDetune)
   const setTonePartials = useDroneStore((state) => state.setTonePartials)
+  const setToneWavetable = useDroneStore((state) => state.setToneWavetable)
+  const applyWavetableGlobally = useDroneStore((state) => state.applyWavetableGlobally)
   const setTonePartialEnabled = useDroneStore((state) => state.setTonePartialEnabled)
   const setTonePartialRatio = useDroneStore((state) => state.setTonePartialRatio)
   const setTonePartialGain = useDroneStore((state) => state.setTonePartialGain)
@@ -790,7 +794,9 @@ function App() {
 
   const sameOvertoneSnapshot = useCallback(
     (a: OvertoneSnapshot, b: OvertoneSnapshot) =>
-      samePartials(a.partials, b.partials) && sameTimbreBlend(a.timbreBlend, b.timbreBlend),
+      samePartials(a.partials, b.partials) &&
+      sameTimbreBlend(a.timbreBlend, b.timbreBlend) &&
+      sameWavetable(a.wavetable, b.wavetable),
     [samePartials, sameTimbreBlend],
   )
 
@@ -806,6 +812,7 @@ function App() {
     return {
       partials: clonePartials(sourcePartials),
       timbreBlend: cloneTimbreBlend(sourceTimbre),
+      wavetable: cloneWavetable(selectedTone?.wavetable),
     }
   }, [
     clonePartials,
@@ -820,8 +827,13 @@ function App() {
     (snapshot: OvertoneSnapshot) => {
       setSelectedOvertonePartials(clonePartials(snapshot.partials))
       setSelectedOvertoneTimbreBlend(cloneTimbreBlend(snapshot.timbreBlend))
+      if (globalOvertoneEditEnabled) {
+        applyWavetableGlobally(snapshot.wavetable ?? null)
+      } else {
+        setToneWavetable(selectedOvertoneNoteId, snapshot.wavetable ?? null)
+      }
     },
-    [clonePartials, cloneTimbreBlend, setSelectedOvertonePartials, setSelectedOvertoneTimbreBlend],
+    [clonePartials, cloneTimbreBlend, setSelectedOvertonePartials, setSelectedOvertoneTimbreBlend, applyWavetableGlobally, globalOvertoneEditEnabled, selectedOvertoneNoteId, setToneWavetable],
   )
 
   const getOvertoneHistoryStack = useCallback(
@@ -1189,17 +1201,36 @@ function App() {
   const resetOvertoneBalance = useCallback(() => {
     const current = selectedOvertonePartials
     const resetTarget = buildResetOvertoneBalance(current)
-    if (samePartials(current, resetTarget)) {
+    const hasWavetable = Boolean(selectedOvertoneTone?.wavetable)
+    if (samePartials(current, resetTarget) && !hasWavetable) {
       return
     }
     rememberOvertoneState()
     setSelectedOvertonePartials(resetTarget)
-  }, [buildResetOvertoneBalance, rememberOvertoneState, samePartials, selectedOvertonePartials, setSelectedOvertonePartials])
+    if (globalOvertoneEditEnabled) {
+      applyWavetableGlobally(null)
+    } else {
+      setToneWavetable(selectedOvertoneNoteId, null)
+    }
+  }, [
+    applyWavetableGlobally,
+    buildResetOvertoneBalance,
+    globalOvertoneEditEnabled,
+    rememberOvertoneState,
+    samePartials,
+    selectedOvertoneNoteId,
+    selectedOvertonePartials,
+    selectedOvertoneTone?.wavetable,
+    setSelectedOvertonePartials,
+    setToneWavetable,
+  ])
 
   const canResetOvertones = useMemo(() => {
     const resetTarget = buildResetOvertoneBalance(selectedOvertonePartials)
-    return !samePartials(selectedOvertonePartials, resetTarget)
-  }, [buildResetOvertoneBalance, selectedOvertonePartials, samePartials])
+    return (
+      !samePartials(selectedOvertonePartials, resetTarget) || Boolean(selectedOvertoneTone?.wavetable)
+    )
+  }, [buildResetOvertoneBalance, selectedOvertonePartials, selectedOvertoneTone?.wavetable, samePartials])
 
   const analyzeOvertoneBalanceFromFile = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
@@ -1248,13 +1279,33 @@ function App() {
           ...partial,
           ratio,
           gainDb,
+          enabled: gainDb > -42,
         }
       })
+      rememberOvertoneState()
       setSelectedOvertonePartials(analyzed)
+      const wavetable = analysis.wavetable ?? null
+      if (globalOvertoneEditEnabled) {
+        applyWavetableGlobally(wavetable)
+      } else {
+        setToneWavetable(selectedOvertoneNoteId, wavetable)
+      }
+      setSelectedOvertoneTimbreBlend({ sine: 1, saw: 0, square: 0 })
       saveDroneState()
       setPendingOvertoneAnalysis(null)
     },
-    [pendingOvertoneAnalysis, saveDroneState, selectedOvertonePartials, setSelectedOvertonePartials],
+    [
+      applyWavetableGlobally,
+      globalOvertoneEditEnabled,
+      pendingOvertoneAnalysis,
+      rememberOvertoneState,
+      saveDroneState,
+      selectedOvertoneNoteId,
+      selectedOvertonePartials,
+      setSelectedOvertonePartials,
+      setSelectedOvertoneTimbreBlend,
+      setToneWavetable,
+    ],
   )
 
   const openJblPortableApp = useCallback(() => {
@@ -3698,7 +3749,7 @@ function App() {
                   Apply analysis
                 </h2>
                 <p className="mt-1 text-sm text-white/70">
-                  Choose how to apply overtone ratios.
+                  Sample waveform is applied as a wavetable. Choose how overtone bars get ratios.
                 </p>
               </div>
               <button

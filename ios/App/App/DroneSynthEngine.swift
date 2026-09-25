@@ -22,11 +22,13 @@ final class DroneSynthEngine {
         var pan: Double
         var glideFrom: Double
         var glideSeconds: Double
+        var tableId: String = ""
     }
 
     private struct Osc {
         var id = ""
         var wave = 0
+        var tableId = ""
         var phase = 0.0
         var freq = 440.0
         var freqTarget = 440.0
@@ -69,9 +71,8 @@ final class DroneSynthEngine {
     private var master = 0.0001
     private var masterTarget = 0.0001
     private var masterInc = 0.0
-    private var lpL = Biquad()
-    private var lpR = Biquad()
     private var waves = BandLimitedWaves()
+    private var customWaves: [String: CustomWave] = [:]
     private var limiterEnv = 0.0
     private var heldMaster = 0.3
     private var mixGain = 1.0
@@ -94,7 +95,6 @@ final class DroneSynthEngine {
 
     /// Prefer ~23 ms I/O. Never bounce the session while playing.
     private static let ioBufferDuration: TimeInterval = 0.023
-    private static let lowpassHz = 6500.0
     private static let limiterThreshold = pow(10.0, -1.0 / 20.0)
 
     /// Web Audio OscillatorNode saw/square: Fourier sine series, peak-normalized,
@@ -169,44 +169,50 @@ final class DroneSynthEngine {
         }
     }
 
-    private struct Biquad {
-        var b0 = 1.0
-        var b1 = 0.0
-        var b2 = 0.0
-        var a1 = 0.0
-        var a2 = 0.0
-        var z1 = 0.0
-        var z2 = 0.0
+    private struct CustomWave {
+        private let size = 4096
+        private let mask = 4095
+        private let counts = [256, 128, 64, 32, 16, 8, 4, 2]
+        private var tables: [[Double]] = []
 
-        mutating func setLowpass(freq: Double, q: Double, sampleRate: Double) {
-            let nyquist = sampleRate * 0.45
-            let cutoff = min(max(10, freq), nyquist)
-            let w0 = 2.0 * Double.pi * cutoff / sampleRate
-            let cosw = cos(w0)
-            let alpha = sin(w0) / (2 * max(0.1, q))
-            let b0t = (1 - cosw) / 2
-            let b1t = 1 - cosw
-            let b2t = (1 - cosw) / 2
-            let a0 = 1 + alpha
-            b0 = b0t / a0
-            b1 = b1t / a0
-            b2 = b2t / a0
-            a1 = (-2 * cosw) / a0
-            a2 = (1 - alpha) / a0
-            z1 = 0
-            z2 = 0
+        init(real: [Double], imag: [Double]) {
+            let harmonicLimit = max(1, min(real.count, imag.count) - 1)
+            tables = counts.map { count in
+                Self.makeTable(harmonics: min(count, harmonicLimit), real: real, imag: imag, size: size)
+            }
         }
 
-        mutating func process(_ x: Double) -> Double {
-            let y = b0 * x + z1
-            z1 = b1 * x - a1 * y + z2
-            z2 = b2 * x - a2 * y
-            return y
+        func sample(phase: Double, freq: Double, sampleRate: Double) -> Double {
+            guard !tables.isEmpty else { return 0 }
+            let allowed = max(1, Int(sampleRate * 0.49 / max(freq, 1)))
+            var index = counts.count - 1
+            for i in counts.indices where counts[i] <= allowed {
+                index = i
+                break
+            }
+            let table = tables[index]
+            let pos = phase * Double(size)
+            let i0 = Int(pos) & mask
+            let frac = pos - floor(pos)
+            let i1 = (i0 + 1) & mask
+            return table[i0] + (table[i1] - table[i0]) * frac
         }
 
-        mutating func reset() {
-            z1 = 0
-            z2 = 0
+        private static func makeTable(harmonics: Int, real: [Double], imag: [Double], size: Int) -> [Double] {
+            var table = Array(repeating: 0.0, count: size)
+            let stepBase = 2.0 * Double.pi / Double(size)
+            for harmonic in 1...harmonics {
+                let a = harmonic < real.count ? real[harmonic] : 0
+                let b = harmonic < imag.count ? imag[harmonic] : 0
+                if a == 0 && b == 0 { continue }
+                let step = stepBase * Double(harmonic)
+                var phase = 0.0
+                for i in 0..<size {
+                    table[i] += a * cos(phase) + b * sin(phase)
+                    phase += step
+                }
+            }
+            return table
         }
     }
 
@@ -267,8 +273,6 @@ final class DroneSynthEngine {
         mixGain = 0
         metroEnabled = false
         limiterEnv = 0
-        lpL.reset()
-        lpR.reset()
         lock.unlock()
         clickPlayer?.stop()
         Self.publishNowPlaying(playing: false)
@@ -352,10 +356,21 @@ final class DroneSynthEngine {
         Self.publishNowPlaying(playing: dest > 0.01)
     }
 
-    func setGraph(master: Double, fadeSeconds: Double, fadeInSeconds: Double, fadeOutSeconds: Double, oscillators: [OscSpec]) {
+    func setGraph(
+        master: Double,
+        fadeSeconds: Double,
+        fadeInSeconds: Double,
+        fadeOutSeconds: Double,
+        oscillators: [OscSpec],
+        wavetables: [String: (real: [Double], imag: [Double])] = [:]
+    ) {
         onScreen = true
         storedFadeIn = max(0, fadeInSeconds)
         storedFadeOut = max(0, fadeOutSeconds)
+        var nextWaves: [String: CustomWave] = [:]
+        for (id, coeffs) in wavetables {
+            nextWaves[id] = CustomWave(real: coeffs.real, imag: coeffs.imag)
+        }
         do {
             try startIfNeeded()
         } catch {
@@ -363,6 +378,7 @@ final class DroneSynthEngine {
         }
         let sr = sampleRate
         lock.lock()
+        customWaves = nextWaves
         let snapshot = Array(oscs.prefix(liveOsc))
         let currentMaster = self.master
         lock.unlock()
@@ -436,6 +452,7 @@ final class DroneSynthEngine {
             var osc = Osc()
             osc.id = spec.id
             osc.wave = spec.wave
+            osc.tableId = spec.tableId
             osc.freqTarget = max(1, spec.freq)
             osc.gainTarget = max(0, spec.gain)
             osc.panTarget = max(-1, min(1, spec.pan))
@@ -654,8 +671,6 @@ final class DroneSynthEngine {
             }
             if runningRate >= 1000, abs(runningRate - sampleRate) > 0.5 {
                 sampleRate = runningRate
-                lpL.setLowpass(freq: Self.lowpassHz, q: 0.7, sampleRate: runningRate)
-                lpR.setLowpass(freq: Self.lowpassHz, q: 0.7, sampleRate: runningRate)
             }
             waves.prepare()
         }
@@ -671,8 +686,6 @@ final class DroneSynthEngine {
         }
         sampleRate = hwRate
         waves.prepare()
-        lpL.setLowpass(freq: Self.lowpassHz, q: 0.7, sampleRate: hwRate)
-        lpR.setLowpass(freq: Self.lowpassHz, q: 0.7, sampleRate: hwRate)
         limiterEnv = 0
         guard let format = AVAudioFormat(standardFormatWithSampleRate: hwRate, channels: 2) else {
             throw NSError(domain: "DroneSynthEngine", code: 1)
@@ -817,7 +830,7 @@ final class DroneSynthEngine {
                 if oscs[i].freq >= nyquist { continue }
                 let dt = oscs[i].freq * invSr
                 oscs[i].phase = wrap01(oscs[i].phase + dt)
-                let sample = waveform(oscs[i].wave, phase: oscs[i].phase, freq: oscs[i].freq) * oscs[i].gain
+                let sample = waveform(oscs[i].wave, phase: oscs[i].phase, freq: oscs[i].freq, tableId: oscs[i].tableId) * oscs[i].gain
                 let pan = oscs[i].pan
                 mixL += sample * sqrt((1 - pan) * 0.5)
                 mixR += sample * sqrt((1 + pan) * 0.5)
@@ -859,8 +872,8 @@ final class DroneSynthEngine {
                 }
             }
 
-            var leftSample = lpL.process(mixL * master + shineL) * mixGain
-            var rightSample = lpR.process(mixR * master + shineR) * mixGain
+            var leftSample = (mixL * master + shineL) * mixGain
+            var rightSample = (mixR * master + shineR) * mixGain
             let peak = max(abs(leftSample), abs(rightSample))
             if peak > limiterEnv {
                 limiterEnv += (peak - limiterEnv) * attackCoeff
@@ -895,13 +908,16 @@ final class DroneSynthEngine {
         return phase
     }
 
-    /// 0 = sine, 1 = saw, 2 = square — same Fourier series as Web Audio OscillatorNode.
-    private func waveform(_ wave: Int, phase: Double, freq: Double) -> Double {
+    /// 0 = sine, 1 = saw, 2 = square, 3 = sample wavetable.
+    private func waveform(_ wave: Int, phase: Double, freq: Double, tableId: String) -> Double {
         switch wave {
         case 1:
             return waves.sample(isSquare: false, phase: phase, freq: freq, sampleRate: sampleRate)
         case 2:
             return waves.sample(isSquare: true, phase: phase, freq: freq, sampleRate: sampleRate)
+        case 3:
+            return customWaves[tableId]?.sample(phase: phase, freq: freq, sampleRate: sampleRate)
+                ?? sin(phase * twoPi)
         default:
             return sin(phase * twoPi)
         }

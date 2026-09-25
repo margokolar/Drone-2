@@ -1,25 +1,13 @@
-import {
-  dbToGain,
-  morphFromBlend,
-  normalizedBlend,
-  partialBrightnessGain,
-  partialTimbreWeights,
-  waveformGainCompensation,
-} from './audioMath'
+import { dbToGain, morphFromBlend, normalizedBlend, partialBrightnessGain } from './audioMath'
 import { getFrequency } from '../music/tuning'
 import type { NativeDroneOsc } from '../native/droneSynth'
-import type { DroneRuntimeConfig, EntryGlideParams, ToneConfig } from './types'
+import type { DroneRuntimeConfig, EntryGlideParams, ToneConfig, WavetableCoeffs } from './types'
+import { cloneWavetable, packWavetables, scaleWavetableByPartials } from './wavetable'
 
 const DEFAULT_ENTRY_GLIDE: EntryGlideParams = {
   cents: 0,
   seconds: 2,
 }
-
-const WAVES: { id: 'sine' | 'saw' | 'square'; wave: 0 | 1 | 2; type: OscillatorType }[] = [
-  { id: 'sine', wave: 0, type: 'sine' },
-  { id: 'saw', wave: 1, type: 'sawtooth' },
-  { id: 'square', wave: 2, type: 'square' },
-]
 
 function entryGlide(config: DroneRuntimeConfig, tone: ToneConfig): EntryGlideParams | null {
   if (config.lowestToneGlideNoteId && config.lowestToneGlideNoteId === tone.noteId) {
@@ -29,6 +17,35 @@ function entryGlide(config: DroneRuntimeConfig, tone: ToneConfig): EntryGlidePar
     return config.highestToneGlide ?? DEFAULT_ENTRY_GLIDE
   }
   return null
+}
+
+function attachGlide(
+  osc: NativeDroneOsc,
+  glide: EntryGlideParams | null,
+  freq: number,
+): NativeDroneOsc {
+  if (glide && glide.cents !== 0 && glide.seconds > 0) {
+    const centRatio = 2 ** (Math.abs(glide.cents) / 1200)
+    osc.glideFrom = Math.max(1, glide.cents > 0 ? freq * centRatio : freq / centRatio)
+    osc.glideSeconds = glide.seconds
+  }
+  return osc
+}
+
+export function nativeWavetablesFromConfig(config: DroneRuntimeConfig): Record<string, WavetableCoeffs> {
+  const tables: Record<string, WavetableCoeffs> = {}
+  for (const tone of config.tones) {
+    if (!tone.enabled || !tone.wavetable) continue
+    const partials = tone.partials ?? config.partials
+    if (!partials.some((partial) => partial.enabled)) continue
+    const scaled = scaleWavetableByPartials(tone.wavetable, partials)
+    tables[tone.noteId] = scaled
+  }
+  return tables
+}
+
+export function packNativeWavetables(config: DroneRuntimeConfig): string {
+  return packWavetables(nativeWavetablesFromConfig(config))
 }
 
 export function nativeOscillatorsFromConfig(config: DroneRuntimeConfig): NativeDroneOsc[] {
@@ -47,35 +64,47 @@ export function nativeOscillatorsFromConfig(config: DroneRuntimeConfig): NativeD
         config.baseOctave,
       ) * 2 ** (tone.detuneCents / 1200)
     const glide = entryGlide(config, tone)
-    const activePartials = (tone.partials ?? config.partials).filter((partial) => partial.enabled)
+    const partials = tone.partials ?? config.partials
+    const wavetable = cloneWavetable(tone.wavetable)
+    if (wavetable) {
+      if (!partials.some((partial) => partial.enabled)) continue
+      const freq = Math.max(1, toneFrequency)
+      const osc = attachGlide(
+        {
+          id: `${tone.noteId}:wavetable`,
+          freq,
+          gain: toneGain,
+          pan: tone.pan,
+          wave: 3,
+          tableId: tone.noteId,
+        },
+        glide,
+        freq,
+      )
+      out.push(osc)
+      continue
+    }
+    const activePartials = partials.filter((partial) => partial.enabled)
     for (let partialIndex = 0; partialIndex < activePartials.length; partialIndex += 1) {
       const partial = activePartials[partialIndex]
       const ratio = Math.max(0.0625, partial.ratio)
-      const partialLinear = dbToGain(partial.gainDb)
-      const harmonicIndex = partialIndex + 1
-      const timbreWeights = partialTimbreWeights(harmonicIndex, blend, config.harmonicTimbreEnabled)
-      const brightness = partialBrightnessGain(harmonicIndex, morph)
+      const brightness = partialBrightnessGain(partialIndex + 1, morph)
       const freq = Math.max(1, toneFrequency * ratio)
-      for (const spec of WAVES) {
-        const amount = timbreWeights[spec.id]
-        if (amount <= 0) continue
-        const gain =
-          toneGain * partialLinear * brightness * amount * waveformGainCompensation(spec.type)
-        if (gain < 0.0002) continue
-        const osc: NativeDroneOsc = {
-          id: `${tone.noteId}:${partial.id}:${spec.id}`,
+      const gain = toneGain * dbToGain(partial.gainDb) * brightness
+      if (gain < 0.0002) continue
+      out.push(
+        attachGlide(
+          {
+            id: `${tone.noteId}:${partial.id}:sine`,
+            freq,
+            gain,
+            pan: tone.pan,
+            wave: 0,
+          },
+          glide,
           freq,
-          gain,
-          pan: tone.pan,
-          wave: spec.wave,
-        }
-        if (glide && glide.cents !== 0 && glide.seconds > 0) {
-          const centRatio = 2 ** (Math.abs(glide.cents) / 1200)
-          osc.glideFrom = Math.max(1, glide.cents > 0 ? freq * centRatio : freq / centRatio)
-          osc.glideSeconds = glide.seconds
-        }
-        out.push(osc)
-      }
+        ),
+      )
     }
   }
   return out

@@ -40,7 +40,8 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
             fadeSeconds: Self.number(call, "fadeSeconds", 0),
             fadeInSeconds: Self.number(call, "fadeInSeconds", 0),
             fadeOutSeconds: Self.number(call, "fadeOutSeconds", 0),
-            oscillators: Self.parsePacked(packed)
+            oscillators: Self.parsePacked(packed),
+            wavetables: Self.parseTables(call.getString("tables") ?? "")
         )
         call.resolve()
     }
@@ -120,7 +121,7 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
         return fallback
     }
 
-    /// `id \t wave \t freq \t gain \t pan \t glideFrom \t glideSeconds`, lines split by `\n`.
+    /// `id \t wave \t freq \t gain \t pan \t glideFrom \t glideSeconds \t tableId`, lines split by `\n`.
     private static func parsePacked(_ packed: String) -> [DroneSynthEngine.OscSpec] {
         guard !packed.isEmpty else { return [] }
         var out: [DroneSynthEngine.OscSpec] = []
@@ -135,9 +136,25 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
                     gain: Double(parts[3]) ?? 0,
                     pan: Double(parts[4]) ?? 0,
                     glideFrom: parts.count > 5 ? (Double(parts[5]) ?? 0) : 0,
-                    glideSeconds: parts.count > 6 ? (Double(parts[6]) ?? 0) : 0
+                    glideSeconds: parts.count > 6 ? (Double(parts[6]) ?? 0) : 0,
+                    tableId: parts.count > 7 ? String(parts[7]) : ""
                 )
             )
+        }
+        return out
+    }
+
+    /// `id \t real0,real1,... \t imag0,imag1,...`
+    private static func parseTables(_ packed: String) -> [String: (real: [Double], imag: [Double])] {
+        guard !packed.isEmpty else { return [:] }
+        var out: [String: (real: [Double], imag: [Double])] = [:]
+        packed.split(separator: "\n", omittingEmptySubsequences: true).forEach { line in
+            let parts = line.split(separator: "\t", omittingEmptySubsequences: false)
+            guard parts.count >= 3 else { return }
+            let real = parts[1].split(separator: ",").compactMap { Double($0) }
+            let imag = parts[2].split(separator: ",").compactMap { Double($0) }
+            guard !real.isEmpty, real.count == imag.count else { return }
+            out[String(parts[0])] = (real, imag)
         }
         return out
     }

@@ -1,7 +1,11 @@
+import { extractWavetableFromSamples, harmonicMagnitudesDb } from './wavetable'
+import type { WavetableCoeffs } from './types'
+
 type OvertoneAnalysisResult = {
   fundamentalHz: number
   gainsDb: number[]
   ratios: number[]
+  wavetable?: WavetableCoeffs
 }
 
 export type { OvertoneAnalysisResult }
@@ -139,6 +143,8 @@ export async function analyzeWavOvertones(
       1e-9,
     )
 
+    const wavetable = extractWavetableFromSamples(channelData, decoded.sampleRate, fundamentalHz)
+    const wavetableGains = wavetable ? harmonicMagnitudesDb(wavetable, partialCount) : null
     const claimedPeakHz: number[] = []
 
     for (let index = 0; index < partialCount; index += 1) {
@@ -171,9 +177,11 @@ export async function analyzeWavOvertones(
       }
       claimedPeakHz.push(bestHz)
 
-      const magnitude = goertzelMagnitude(analysisSamples, decoded.sampleRate, harmonicHz)
+      const magnitude = goertzelMagnitude(analysisSamples, decoded.sampleRate, bestHz)
       const relative = Math.max(magnitude / fundamentalMagnitude, 1e-9)
-      gainsDb[index] = clamp(20 * Math.log10(relative), -48, 0)
+      gainsDb[index] = wavetableGains
+        ? (wavetableGains[index] ?? -48)
+        : clamp(20 * Math.log10(relative), -48, 0)
       ratios[index] = clamp(bestHz / fundamentalHz, 0.125, 16)
     }
 
@@ -181,5 +189,6 @@ export async function analyzeWavOvertones(
       fundamentalHz,
       gainsDb,
       ratios,
+      ...(wavetable ? { wavetable } : {}),
     }
 }
