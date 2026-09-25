@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react'
 import type { PartialConfig, TimbreBlend } from '../audio/types'
-import { clamp, dbToGain, partialTimbreWeights, normalizedBlend } from '../audio/audioMath'
+import { clamp, dbToGain, morphFromBlend, normalizedBlend, partialBrightnessGain } from '../audio/audioMath'
 
 type OvertoneBarsProps = {
   partials: PartialConfig[]
   timbreBlend: TimbreBlend
-  harmonicTimbreEnabled: boolean
+  harmonicTimbreEnabled?: boolean
   onGainChange: (partialId: string, gainDb: number) => void
   onToggleEnabled: (partialId: string, enabled: boolean) => void
   onGainDragStart?: () => void
@@ -30,109 +30,9 @@ function gainToDb(gain: number): number {
   return 20 * Math.log10(gain)
 }
 
-type ComponentGains = {
-  sine: number
-  saw: number
-  square: number
-  total: number
-}
-
-/** Harmonics implied by timbre on the fundamental only (Fourier series). */
-function seriesSpreadWeights(harmonicIndex: number, blend: TimbreBlend): Omit<ComponentGains, 'total'> {
-  if (harmonicIndex < 1) {
-    return { sine: 0, saw: 0, square: 0 }
-  }
-  return {
-    sine: harmonicIndex === 1 ? blend.sine : 0,
-    saw: blend.saw / harmonicIndex,
-    square: harmonicIndex % 2 === 1 ? blend.square / harmonicIndex : 0,
-  }
-}
-
-/** Per-partial timbre: sine on every enabled partial; saw/square follow harmonic rolloff. */
-function explicitPartialWeights(
-  harmonicIndex: number,
-  blend: TimbreBlend,
-  harmonicTimbreEnabled: boolean,
-): Omit<ComponentGains, 'total'> {
-  return partialTimbreWeights(harmonicIndex, blend, harmonicTimbreEnabled)
-}
-
-function ratiosMatch(a: number, b: number): boolean {
-  return Math.abs(a - b) < 0.01
-}
-
-function effectiveHarmonicComponents(
-  harmonicNumber: number,
-  targetRatio: number,
-  sourcePartials: PartialConfig[],
-  activePartialId: string | null,
-  dragGainDb: number | null,
-  blend: TimbreBlend,
-  harmonicTimbreEnabled: boolean,
-): ComponentGains {
-  const seriesIndex = Math.max(1, harmonicNumber)
-  const hasExplicitAtTarget = sourcePartials.some(
-    (partial) => partial.enabled && ratiosMatch(partial.ratio, targetRatio),
-  )
-
-  const gains = sourcePartials.reduce<ComponentGains>((sum, source) => {
-    if (!source.enabled) {
-      return sum
-    }
-
-    const sourceGainDb = activePartialId === source.id && dragGainDb !== null ? dragGainDb : source.gainDb
-    const sourceGain = dbToGain(sourceGainDb)
-
-    if (ratiosMatch(source.ratio, targetRatio)) {
-      const weights = explicitPartialWeights(seriesIndex, blend, harmonicTimbreEnabled)
-      sum.sine += sourceGain * weights.sine
-      sum.saw += sourceGain * weights.saw
-      sum.square += sourceGain * weights.square
-    } else if (
-      !hasExplicitAtTarget &&
-      ratiosMatch(source.ratio, 1) &&
-      !ratiosMatch(targetRatio, 1)
-    ) {
-      const weights = seriesSpreadWeights(seriesIndex, blend)
-      sum.sine += sourceGain * weights.sine
-      sum.saw += sourceGain * weights.saw
-      sum.square += sourceGain * weights.square
-    }
-
-    sum.total = sum.sine + sum.saw + sum.square
-    return sum
-  }, { sine: 0, saw: 0, square: 0, total: 0 })
-
-  if (harmonicTimbreEnabled && harmonicNumber % 2 === 0) {
-    gains.square = 0
-    gains.total = gains.sine + gains.saw
-  }
-
-  return gains
-}
-
-function logLayerPercents(components: ComponentGains): Omit<ComponentGains, 'total'> {
-  const sine = toPercentFromDb(gainToDb(components.sine))
-  const saw = toPercentFromDb(gainToDb(components.saw))
-  const square = toPercentFromDb(gainToDb(components.square))
-  const total = sine + saw + square
-
-  if (total <= 0) {
-    return { sine: 0, saw: 0, square: 0 }
-  }
-
-  return {
-    sine: (sine / total) * 100,
-    saw: (saw / total) * 100,
-    square: (square / total) * 100,
-  }
-}
-
 export function OvertoneBars({
   partials,
   timbreBlend,
-  harmonicTimbreEnabled,
   onGainChange,
   onToggleEnabled,
   onGainDragStart,
@@ -146,6 +46,7 @@ export function OvertoneBars({
   const soloPressTimerRef = useRef<number | null>(null)
   const soloPressTriggeredRef = useRef(false)
   const blend = normalizedBlend(timbreBlend)
+  const morph = morphFromBlend(blend.sine, blend.saw, blend.square)
 
   const flushPending = () => {
     if (rafIdRef.current !== null) {
@@ -227,20 +128,9 @@ export function OvertoneBars({
             const gainDbForHeight =
               activePartialId === partial.id && dragGainDb !== null ? dragGainDb : partial.gainDb
             const harmonicNumber = index + 1
-            const componentGains = effectiveHarmonicComponents(
-              harmonicNumber,
-              partial.ratio,
-              partials,
-              activePartialId,
-              dragGainDb,
-              blend,
-              harmonicTimbreEnabled,
-            )
             const heightPercent = toPercentFromDb(gainDbForHeight)
-            const totalEffectPercent = toPercentFromDb(gainToDb(componentGains.total))
-            const layerPercents = logLayerPercents(componentGains)
-            const squareLayerPercent =
-              !harmonicTimbreEnabled || harmonicNumber % 2 === 1 ? layerPercents.square : 0
+            const heardGain = dbToGain(gainDbForHeight) * partialBrightnessGain(harmonicNumber, morph)
+            const totalEffectPercent = toPercentFromDb(gainToDb(heardGain))
             const isSoloMode = soloPartialId !== null
             const isSoloTarget = soloPartialId === partial.id
             const barClass = partial.enabled
@@ -297,16 +187,7 @@ export function OvertoneBars({
                     style={{ height: `${heightPercent}%` }}
                   >
                     <div
-                      className={partial.enabled ? 'bg-cyan-300/85' : 'bg-cyan-900/70'}
-                      style={{ height: `${squareLayerPercent}%` }}
-                    />
-                    <div
-                      className={partial.enabled ? 'bg-fuchsia-400/90' : 'bg-fuchsia-950/75'}
-                      style={{ height: `${layerPercents.saw}%` }}
-                    />
-                    <div
-                      className={partial.enabled ? 'bg-amber-200/90' : 'bg-amber-950/75'}
-                      style={{ height: `${layerPercents.sine}%` }}
+                      className={partial.enabled ? 'h-full bg-amber-200/90' : 'h-full bg-amber-950/75'}
                     />
                   </div>
                   <div

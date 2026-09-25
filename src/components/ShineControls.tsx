@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Play, Save, Square } from 'lucide-react'
 import { SectionCard } from './SectionCard'
 import { ResettableRangeInput } from './ResettableRangeInput'
+import { ShineMotionSlider } from './ShineMotionSlider'
 import { triggerSaveFlash } from '../utils/saveFlash'
 import { DEFAULT_SHINE_VOLUME, SHINE_OCTAVE_LABELS, type ShineState } from '../hooks/useShine'
 import { TONAL_CENTERS, type TonalCenter } from '../music/notes'
@@ -16,20 +17,16 @@ type HarmonicBarProps = {
   harmonicNumber: number
   level: number
   auto: boolean
-  bumps: boolean
   onLevelChange: (level: number) => void
   onToggleAuto: () => void
-  onToggleBumps: () => void
 }
 
 function HarmonicBar({
   harmonicNumber,
   level,
   auto,
-  bumps,
   onLevelChange,
   onToggleAuto,
-  onToggleBumps,
 }: HarmonicBarProps) {
   const trackRef = useRef<HTMLDivElement | null>(null)
 
@@ -88,22 +85,6 @@ function HarmonicBar({
       >
         A
       </button>
-      <button
-        type="button"
-        disabled={!auto}
-        className={`shrink-0 text-[11px] font-bold leading-none transition ${
-          !auto
-            ? 'text-white/20'
-            : bumps
-              ? 'text-cyan-300'
-              : 'text-white/50 hover:text-white/80'
-        }`}
-        onClick={onToggleBumps}
-        aria-pressed={bumps}
-        aria-label={`Harmonic ${harmonicNumber} bumps`}
-      >
-        B
-      </button>
     </div>
   )
 }
@@ -112,32 +93,27 @@ export function ShineControls({
   enabled,
   levels,
   autos,
-  bumps,
   displayLevels,
   volume,
+  motion,
   octaveIndex,
   toggleRunning,
   setLevel,
   setAuto,
-  setBumps,
   allOn,
   allOff,
-  setAllAuto,
-  setAllBumps,
   setVolume,
+  setMotion,
   setOctaveIndex,
   tonalCenter,
   onTonalCenterChange,
   onSaveDroneState,
 }: ShineControlsProps) {
-  const allAuto = autos.every(Boolean)
-  const allBumps = autos.some(Boolean) && autos.every((autoOn, index) => (autoOn ? bumps[index] : true))
-
   const shineActionButtonClass =
     'button-safe flex min-h-[44px] shrink-0 items-center justify-center rounded-xl border px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.12em] transition landscape:min-h-10 landscape:px-4 landscape:py-2 landscape:text-xs max-h-[500px]:min-h-10 max-h-[500px]:px-4 max-h-[500px]:py-2 max-h-[500px]:text-xs'
 
   const allControlsRow = (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
       <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.14em] text-white/50 landscape:tracking-[0.12em] max-h-[500px]:tracking-[0.12em]">
         All
       </span>
@@ -155,30 +131,7 @@ export function ShineControls({
       >
         Off
       </button>
-      <button
-        type="button"
-        className={`${shineActionButtonClass} ${
-          allAuto
-            ? 'border-cyan-300/60 bg-cyan-300/20 text-cyan-50'
-            : 'border-white/15 bg-white/5 text-white/80 hover:bg-white/10'
-        }`}
-        onClick={() => setAllAuto(!allAuto)}
-        aria-pressed={allAuto}
-      >
-        Auto
-      </button>
-      <button
-        type="button"
-        className={`${shineActionButtonClass} ${
-          allBumps
-            ? 'border-cyan-300/60 bg-cyan-300/20 text-cyan-50'
-            : 'border-white/15 bg-white/5 text-white/80 hover:bg-white/10'
-        }`}
-        onClick={() => setAllBumps(!allBumps)}
-        aria-pressed={allBumps}
-      >
-        Bumps
-      </button>
+      <ShineMotionSlider value={motion} onChange={setMotion} className="min-w-[10rem]" />
       <button
         type="button"
         className={`${shineActionButtonClass} border-white/15 bg-[#2a2238] px-4 text-white/80 hover:bg-[#352a48] landscape:px-3 max-h-[500px]:px-3`}
@@ -237,10 +190,8 @@ export function ShineControls({
                 harmonicNumber={index + 1}
                 level={autos[index] ? displayLevels[index] : level}
                 auto={autos[index]}
-                bumps={bumps[index]}
                 onLevelChange={(value) => setLevel(index, value)}
                 onToggleAuto={() => setAuto(index, !autos[index])}
-                onToggleBumps={() => setBumps(index, !bumps[index])}
               />
             ))}
           </div>

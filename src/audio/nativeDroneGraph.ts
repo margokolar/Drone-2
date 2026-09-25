@@ -38,7 +38,9 @@ export function nativeWavetablesFromConfig(config: DroneRuntimeConfig): Record<s
     if (!tone.enabled || !tone.wavetable) continue
     const partials = tone.partials ?? config.partials
     if (!partials.some((partial) => partial.enabled)) continue
-    const scaled = scaleWavetableByPartials(tone.wavetable, partials)
+    const blend = normalizedBlend(tone.timbreBlend ?? config.timbreBlend)
+    const morph = morphFromBlend(blend.sine, blend.saw, blend.square)
+    const scaled = scaleWavetableByPartials(tone.wavetable, partials, morph)
     tables[tone.noteId] = scaled
   }
   return tables

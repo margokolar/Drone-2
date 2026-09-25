@@ -83,7 +83,8 @@ export class ShineEngine {
 
   private manualLevel = new Array<number>(SHINE_HARMONIC_COUNT).fill(0)
   private auto = new Array<boolean>(SHINE_HARMONIC_COUNT).fill(true)
-  private bumps = new Array<boolean>(SHINE_HARMONIC_COUNT).fill(false)
+  /** 0 = auto only, 1 = full bump height. */
+  private bumpAmount = 0
   private displayLevel = new Array<number>(SHINE_HARMONIC_COUNT).fill(0)
 
   private jitterPrev = new Array<number>(SHINE_HARMONIC_COUNT).fill(0)
@@ -662,7 +663,6 @@ export class ShineEngine {
     }
     this.auto[index] = on
     if (!on) {
-      this.bumps[index] = false
       this.bumpActive[index] = false
     } else {
       const now = this.nowSeconds()
@@ -671,11 +671,8 @@ export class ShineEngine {
     }
   }
 
-  setHarmonicBumps(index: number, on: boolean): void {
-    if (index < 0 || index >= SHINE_HARMONIC_COUNT) {
-      return
-    }
-    this.bumps[index] = on && this.auto[index]
+  setBumpAmount(amount: number): void {
+    this.bumpAmount = Math.min(1, Math.max(0, amount))
   }
 
   setAllLevels(level: number): void {
@@ -686,12 +683,6 @@ export class ShineEngine {
   setAllAuto(on: boolean): void {
     for (let index = 0; index < SHINE_HARMONIC_COUNT; index += 1) {
       this.setHarmonicAuto(index, on)
-    }
-  }
-
-  setAllBumps(on: boolean): void {
-    for (let index = 0; index < SHINE_HARMONIC_COUNT; index += 1) {
-      this.setHarmonicBumps(index, on)
     }
   }
 
@@ -797,7 +788,7 @@ export class ShineEngine {
 
     const crossedHalf =
       (this.lastAutoLevel[index] - 0.5) * (autoLevel - 0.5) < 0
-    if (crossedHalf && this.bumps[index] && !this.bumpActive[index]) {
+    if (crossedHalf && this.bumpAmount > 0.02 && !this.bumpActive[index]) {
       this.bumpActive[index] = true
       this.bumpStart[index] = now
     }
@@ -816,7 +807,7 @@ export class ShineEngine {
                 0,
                 1 - (elapsed - BUMP_ATTACK_SECONDS) / (BUMP_DURATION_SECONDS - BUMP_ATTACK_SECONDS),
               )
-        factor = 1 + BUMP_PEAK * envelope
+        factor = 1 + BUMP_PEAK * this.bumpAmount * envelope
       }
     }
 

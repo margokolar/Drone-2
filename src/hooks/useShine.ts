@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { shineEngine, SHINE_HARMONIC_COUNT } from '../audio/ShineEngine'
+import { shineEngine } from '../audio/ShineEngine'
 import { useDroneStore } from '../store/useDroneStore'
 import {
   DEFAULT_SHINE_OCTAVE_INDEX,
   DEFAULT_SHINE_VOLUME,
+  SHINE_HARMONIC_COUNT,
+  shineBumpsFromMotion,
+  shineMotionFromConfig,
 } from '../presets/defaultPresets'
 
 export const SHINE_OCTAVE_LABELS = ['0', '1', '2', '3', '4'] as const
@@ -28,19 +31,17 @@ export type ShineState = {
   running: boolean
   levels: number[]
   autos: boolean[]
-  bumps: boolean[]
   displayLevels: number[]
   volume: number
+  motion: number
   octaveIndex: number
   toggleRunning: () => void
   setLevel: (index: number, level: number) => void
   setAuto: (index: number, on: boolean) => void
-  setBumps: (index: number, on: boolean) => void
   allOn: () => void
   allOff: () => void
-  setAllAuto: (on: boolean) => void
-  setAllBumps: (on: boolean) => void
   setVolume: (volume: number) => void
+  setMotion: (motion: number) => void
   setOctaveIndex: (index: number) => void
 }
 
@@ -60,7 +61,8 @@ export function useShine(
   const playbackFadeInSeconds = useDroneStore((state) => state.playbackFadeInSeconds)
   const playbackFadeOutSeconds = useDroneStore((state) => state.playbackFadeOutSeconds)
   const presetCrossfadeSeconds = useDroneStore((state) => state.presetCrossfadeSeconds)
-  const { enabled, levels, autos, bumps, volume, octaveIndex } = shine
+  const { enabled, levels, autos, volume, octaveIndex } = shine
+  const motion = shineMotionFromConfig(shine)
 
   const isActive = enabled && playing
 
@@ -103,9 +105,9 @@ export function useShine(
     shineEngine.setMasterGainDb(masterGainDb)
     levels.forEach((level, index) => shineEngine.setHarmonicLevel(index, level))
     autos.forEach((on, index) => shineEngine.setHarmonicAuto(index, on))
-    bumps.forEach((on, index) => shineEngine.setHarmonicBumps(index, on))
+    shineEngine.setBumpAmount(motion)
     shineEngine.setVolume(volume)
-  }, [a4Hz, autos, bumps, levels, masterGainDb, noteIndex, octaveIndex, volume])
+  }, [a4Hz, autos, levels, masterGainDb, motion, noteIndex, octaveIndex, volume])
 
   useEffect(() => {
     if (!isActive) {
@@ -228,24 +230,13 @@ export function useShine(
       const current = useDroneStore.getState().shine
       const nextAutos = current.autos.slice()
       nextAutos[index] = on
-      const nextBumps = current.bumps
-      if (!on && nextBumps[index]) {
-        const cleared = nextBumps.slice()
-        cleared[index] = false
-        setShine({ ...current, autos: nextAutos, bumps: cleared })
-        return
-      }
-      setShine({ ...current, autos: nextAutos })
-    },
-    [setShine],
-  )
-
-  const setBumps = useCallback(
-    (index: number, on: boolean) => {
-      const current = useDroneStore.getState().shine
-      const next = current.bumps.slice()
-      next[index] = on
-      setShine({ ...current, bumps: next })
+      const nextMotion = shineMotionFromConfig(current)
+      setShine({
+        ...current,
+        autos: nextAutos,
+        motion: nextMotion,
+        bumps: shineBumpsFromMotion(nextAutos, nextMotion),
+      })
     },
     [setShine],
   )
@@ -260,32 +251,26 @@ export function useShine(
     setShine({ ...current, levels: zeros() })
   }, [setShine])
 
-  const setAllAuto = useCallback(
-    (on: boolean) => {
-      const current = useDroneStore.getState().shine
-      const nextAutos = new Array<boolean>(SHINE_HARMONIC_COUNT).fill(on)
-      setShine({
-        ...current,
-        autos: nextAutos,
-        bumps: on ? current.bumps : new Array<boolean>(SHINE_HARMONIC_COUNT).fill(false),
-      })
-    },
-    [setShine],
-  )
-
-  const setAllBumps = useCallback(
-    (on: boolean) => {
-      const current = useDroneStore.getState().shine
-      const nextBumps = current.autos.map((autoOn) => (on ? autoOn : false))
-      setShine({ ...current, bumps: nextBumps })
-    },
-    [setShine],
-  )
-
   const setVolume = useCallback(
     (value: number) => {
       const current = useDroneStore.getState().shine
       setShine({ ...current, volume: value })
+    },
+    [setShine],
+  )
+
+  const setMotion = useCallback(
+    (value: number) => {
+      const current = useDroneStore.getState().shine
+      const autos = current.autos.every((autoOn) => !autoOn)
+        ? new Array<boolean>(SHINE_HARMONIC_COUNT).fill(true)
+        : current.autos
+      setShine({
+        ...current,
+        motion: value,
+        autos,
+        bumps: shineBumpsFromMotion(autos, value),
+      })
     },
     [setShine],
   )
@@ -303,19 +288,17 @@ export function useShine(
     running: isActive,
     levels,
     autos,
-    bumps,
     displayLevels,
     volume,
+    motion,
     octaveIndex,
     toggleRunning,
     setLevel,
     setAuto,
-    setBumps,
     allOn,
     allOff,
-    setAllAuto,
-    setAllBumps,
     setVolume,
+    setMotion,
     setOctaveIndex,
   }
 }

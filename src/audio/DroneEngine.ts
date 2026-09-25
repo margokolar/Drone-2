@@ -427,6 +427,14 @@ export class DroneEngine {
       if (voice.usesWavetable) {
         const bundle = voice.oscillators[0]
         if (bundle) {
+          const frequency = getFrequency(
+            toneConfig.noteId,
+            config.tuningSystemId,
+            config.tonalCenter,
+            config.referenceA4Hz,
+            config.baseOctave,
+          )
+          this.applyWavetableWave(bundle.oscillator, config, toneConfig, frequency)
           bundle.gainNode.gain.cancelScheduledValues(now)
           bundle.gainNode.gain.setValueAtTime(1, now)
         }
@@ -978,7 +986,9 @@ export class DroneEngine {
       return
     }
     const partials = toneConfig.partials ?? config.partials
-    const scaled = scaleWavetableByPartials(toneConfig.wavetable, partials)
+    const blend = normalizedBlend(toneConfig.timbreBlend ?? config.timbreBlend)
+    const morph = morphFromBlend(blend.sine, blend.saw, blend.square)
+    const scaled = scaleWavetableByPartials(toneConfig.wavetable, partials, morph)
     oscillator.setPeriodicWave(wavetableToPeriodicWave(this.context, scaled, frequencyHz))
   }
 

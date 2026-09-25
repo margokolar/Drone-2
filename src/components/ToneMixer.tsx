@@ -2,10 +2,11 @@ import clsx from 'clsx'
 import { ArrowDownUp, AudioWaveform } from 'lucide-react'
 import type { ChangeEvent } from 'react'
 import type { ToneConfig, TimbreBlend } from '../audio/types'
-import { getTonePageLabel, type NoteId, type TonalCenter } from '../music/notes'
+import { getTonePageLabel, SEMITONES_FROM_C, type NoteId, type TonalCenter } from '../music/notes'
 import { getFrequency, type TuningSystemId } from '../music/tuning'
 import { SHINE_OCTAVE_LABELS } from '../hooks/useShine'
 import {
+  DEFAULT_SHINE_MOTION,
   DEFAULT_SHINE_VOLUME,
   DEFAULT_TONE_DETUNE_CENTS,
   DEFAULT_TONE_PAN,
@@ -135,13 +136,11 @@ type ToneMixerProps = {
   fallbackTimbreBlend: TimbreBlend
   shineEnabled: boolean
   shineVolume: number
-  shineAutos: boolean[]
-  shineBumps: boolean[]
+  shineMotion: number
   shineOctaveIndex: number
   onShineToggle: () => void
   onShineVolume: (volume: number) => void
-  onShineAllAuto: (on: boolean) => void
-  onShineAllBumps: (on: boolean) => void
+  onShineMotion: (motion: number) => void
   onShineOctaveIndex: (index: number) => void
   onToneGain: (noteId: NoteId, gainDb: number) => void
   onTonePan: (noteId: NoteId, pan: number) => void
@@ -151,33 +150,41 @@ type ToneMixerProps = {
   onEditOvertones: (noteId: NoteId) => void
 }
 
+function shineBaseFrequencyHz(
+  tonalCenter: TonalCenter,
+  octaveIndex: number,
+  a4Hz: number,
+): number {
+  const midi = 12 * (octaveIndex + 1) + SEMITONES_FROM_C[tonalCenter]
+  return a4Hz * 2 ** ((midi - 69) / 12)
+}
+
 function ShineMixerChannel({
   enabled,
   volume,
-  autos,
-  bumps,
+  motion,
   octaveIndex,
   spatialExpanded,
+  tonalCenter,
+  referenceA4Hz,
   onToggle,
   onVolume,
-  onAllAuto,
-  onAllBumps,
+  onMotion,
   onOctaveIndex,
 }: {
   enabled: boolean
   volume: number
-  autos: boolean[]
-  bumps: boolean[]
+  motion: number
   octaveIndex: number
   spatialExpanded: boolean
+  tonalCenter: TonalCenter
+  referenceA4Hz: number
   onToggle: () => void
   onVolume: (volume: number) => void
-  onAllAuto: (on: boolean) => void
-  onAllBumps: (on: boolean) => void
+  onMotion: (motion: number) => void
   onOctaveIndex: (index: number) => void
 }) {
-  const allAuto = autos.every(Boolean)
-  const allBumps = autos.some(Boolean) && autos.every((autoOn, index) => (autoOn ? bumps[index] : true))
+  const shineFrequencyHz = shineBaseFrequencyHz(tonalCenter, octaveIndex, referenceA4Hz)
 
   return (
     <article
@@ -192,7 +199,7 @@ function ShineMixerChannel({
       <button
         type="button"
         className={clsx(
-          'button-safe flex h-9 w-full items-center justify-center rounded-lg border px-1 text-center text-[10px] font-semibold uppercase tracking-[0.1em] transition',
+          'button-safe flex h-9 w-full items-center justify-center whitespace-nowrap rounded-lg border px-1 text-center text-[10px] font-semibold uppercase tracking-[0.06em] transition',
           enabled
             ? 'border-cyan-300/60 bg-cyan-300/25 text-cyan-50 shadow-[0_0_14px_rgba(103,232,249,0.22)] hover:bg-cyan-300/35'
             : 'border-white/15 bg-white/5 text-white/55 hover:bg-white/10 hover:text-white/80',
@@ -221,48 +228,27 @@ function ShineMixerChannel({
           />
         </div>
       </div>
-      {/* Same footer rhythm as tone channels: pan row → Hz row → OT button row. */}
       <div className="tone-mixer-pan grid w-full grid-cols-[1fr_auto] items-center gap-1.5 border-t border-white/10 pt-2 text-xs">
-        <span className="invisible text-white/60">Pan</span>
-        <span className="invisible tabular-nums text-white/70">0.00</span>
-        <div className="relative col-span-2 flex h-2 w-full items-center">
-          <div className="absolute inset-x-0 flex items-center gap-1">
-            <button
-              type="button"
-              className={clsx(
-                'button-safe flex h-8 flex-1 items-center justify-center rounded-lg border text-[11px] font-bold transition',
-                allAuto
-                  ? 'border-cyan-300/60 bg-cyan-300/20 text-cyan-50'
-                  : 'border-white/15 bg-white/5 text-white/55 hover:bg-white/10 hover:text-white/80',
-              )}
-              onClick={() => onAllAuto(!allAuto)}
-              aria-pressed={allAuto}
-              aria-label="Shine auto for all harmonics"
-              title="Auto"
-            >
-              A
-            </button>
-            <button
-              type="button"
-              className={clsx(
-                'button-safe flex h-8 flex-1 items-center justify-center rounded-lg border text-[11px] font-bold transition',
-                allBumps
-                  ? 'border-cyan-300/60 bg-cyan-300/20 text-cyan-50'
-                  : 'border-white/15 bg-white/5 text-white/55 hover:bg-white/10 hover:text-white/80',
-              )}
-              onClick={() => onAllBumps(!allBumps)}
-              aria-pressed={allBumps}
-              aria-label="Shine bumps for all harmonics"
-              title="Bumps"
-            >
-              B
-            </button>
-          </div>
-        </div>
+        <span className="text-white/60" title="Auto">
+          A
+        </span>
+        <span className="text-white/70" title="Bumps">
+          B
+        </span>
+        <ResettableRangeInput
+          min={0}
+          max={1}
+          step={0.01}
+          value={motion}
+          onChange={(event) => onMotion(Number(event.target.value))}
+          onReset={() => onMotion(DEFAULT_SHINE_MOTION)}
+          aria-label="Shine motion, auto to bumps. Double-click or double-tap to reset to auto."
+          className="col-span-2 h-2 w-full accent-cyan-300"
+        />
       </div>
-      <div className="tone-mixer-value-row" aria-hidden>
-        <span className="tone-mixer-hz invisible tabular-nums text-[10px] leading-tight text-white/55">
-          000.0 Hz
+      <div className="tone-mixer-value-row">
+        <span className="tone-mixer-hz tabular-nums text-[10px] leading-tight text-white/55">
+          {formatToneFrequencyHz(shineFrequencyHz)}
         </span>
       </div>
       <select
@@ -293,13 +279,11 @@ export function ToneMixer({
   fallbackTimbreBlend,
   shineEnabled,
   shineVolume,
-  shineAutos,
-  shineBumps,
+  shineMotion,
   shineOctaveIndex,
   onShineToggle,
   onShineVolume,
-  onShineAllAuto,
-  onShineAllBumps,
+  onShineMotion,
   onShineOctaveIndex,
   onToneGain,
   onTonePan,
@@ -312,14 +296,14 @@ export function ToneMixer({
     <ShineMixerChannel
       enabled={shineEnabled}
       volume={shineVolume}
-      autos={shineAutos}
-      bumps={shineBumps}
+      motion={shineMotion}
       octaveIndex={shineOctaveIndex}
       spatialExpanded={spatialExpanded}
+      tonalCenter={tonalCenter}
+      referenceA4Hz={referenceA4Hz}
       onToggle={onShineToggle}
       onVolume={onShineVolume}
-      onAllAuto={onShineAllAuto}
-      onAllBumps={onShineAllBumps}
+      onMotion={onShineMotion}
       onOctaveIndex={onShineOctaveIndex}
     />
   )

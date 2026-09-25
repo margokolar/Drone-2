@@ -1,4 +1,4 @@
-import { dbToGain } from './audioMath'
+import { dbToGain, partialBrightnessGain } from './audioMath'
 import type { PartialConfig, WavetableCoeffs } from './types'
 
 export const WAVETABLE_SIZE = 2048
@@ -193,10 +193,17 @@ export function harmonicMagnitudesDb(wave: WavetableCoeffs, count: number): numb
 export function scaleWavetableByPartials(
   wave: WavetableCoeffs,
   partials: PartialConfig[],
+  morph = 0.5,
 ): WavetableCoeffs {
   const real = wave.real.slice()
   const imag = wave.imag.slice()
+  // Peak-normalize keeps a rich table quiet; lift H1 to amplitude 1 like a 0 dB sine.
   const fundMag = Math.max(Math.hypot(real[1] ?? 0, imag[1] ?? 0), 1e-9)
+  const unity = 1 / fundMag
+  for (let harmonic = 1; harmonic < real.length; harmonic += 1) {
+    real[harmonic] = (real[harmonic] ?? 0) * unity
+    imag[harmonic] = (imag[harmonic] ?? 0) * unity
+  }
   const limit = Math.min(partials.length, real.length - 1)
   for (let index = 0; index < limit; index += 1) {
     const harmonic = index + 1
@@ -206,7 +213,7 @@ export function scaleWavetableByPartials(
       imag[harmonic] = 0
       continue
     }
-    const target = fundMag * dbToGain(partial.gainDb)
+    const target = dbToGain(partial.gainDb)
     const current = Math.hypot(real[harmonic] ?? 0, imag[harmonic] ?? 0)
     if (current < 1e-12) {
       real[harmonic] = target
@@ -216,6 +223,14 @@ export function scaleWavetableByPartials(
     const scale = target / current
     real[harmonic] = (real[harmonic] ?? 0) * scale
     imag[harmonic] = (imag[harmonic] ?? 0) * scale
+  }
+  for (let harmonic = 1; harmonic < real.length; harmonic += 1) {
+    const brightness = partialBrightnessGain(harmonic, morph)
+    if (brightness === 1) {
+      continue
+    }
+    real[harmonic] = (real[harmonic] ?? 0) * brightness
+    imag[harmonic] = (imag[harmonic] ?? 0) * brightness
   }
   return { real, imag }
 }

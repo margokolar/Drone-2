@@ -52,6 +52,7 @@ import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL } from './utils/nowPlayingL
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig, WavetableCoeffs } from './audio/types'
 import { cloneWavetable, sameWavetable } from './audio/wavetable'
+import { blendFromMorph } from './audio/audioMath'
 import { AddFollowerControls, AddMicToolbarButton } from './components/AddFollowerControls'
 import { MicMenuSection } from './components/MicMenuSection'
 import { MetronomeControls } from './components/MetronomeControls'
@@ -1290,7 +1291,7 @@ function App() {
       } else {
         setToneWavetable(selectedOvertoneNoteId, wavetable)
       }
-      setSelectedOvertoneTimbreBlend({ sine: 1, saw: 0, square: 0 })
+      setSelectedOvertoneTimbreBlend(blendFromMorph(0.5))
       saveDroneState()
       setPendingOvertoneAnalysis(null)
     },
@@ -2681,13 +2682,11 @@ function App() {
                 fallbackTimbreBlend={timbreBlend}
                 shineEnabled={shine.enabled}
                 shineVolume={shine.volume}
-                shineAutos={shine.autos}
-                shineBumps={shine.bumps}
+                shineMotion={shine.motion}
                 shineOctaveIndex={shine.octaveIndex}
                 onShineToggle={shine.toggleRunning}
                 onShineVolume={shine.setVolume}
-                onShineAllAuto={shine.setAllAuto}
-                onShineAllBumps={shine.setAllBumps}
+                onShineMotion={shine.setMotion}
                 onShineOctaveIndex={shine.setOctaveIndex}
                 onToneGain={setToneGain}
                 onTonePan={setTonePan}

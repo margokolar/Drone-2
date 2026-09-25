@@ -19,12 +19,12 @@ type TimbreMorphSliderProps = {
   accentClassName?: string
 }
 
-function timbreFeel(morph: number): 'Pehme' | 'Keskmine' | 'Terav' {
+function timbreFeel(morph: number): 'Pehme' | 'Keskmine' | 'Särav' {
   if (morph < 0.33) {
     return 'Pehme'
   }
   if (morph > 0.66) {
-    return 'Terav'
+    return 'Särav'
   }
   return 'Keskmine'
 }
@@ -88,7 +88,7 @@ export function TimbreMorphSlider({
     onReset: restoreToDefault,
     onTripleReset: restoreToSineOnly,
     'aria-label':
-      'Timbre. Double-click or double-tap to reset to default. Triple-click or triple-tap for sine only.',
+      'Timbre, pehme kuni särav. Double-click or double-tap to reset to default. Triple-click or triple-tap for extra soft.',
     'aria-valuetext': timbreFeel(timbreMorph),
   }
 
@@ -137,14 +137,11 @@ export function TimbreMorphSlider({
               <AudioWaveform size={12} strokeWidth={2} />
             </span>
           ) : (
-            <span className="text-[9px] leading-none text-white/60">Sine</span>
+            <span className="text-[9px] leading-none text-white/60">Särav</span>
           )}
           {fader}
           {!compact ? (
-            <span className="flex items-center justify-between gap-2 text-[9px] text-white/45">
-              <span>Saw</span>
-              <span>Sq</span>
-            </span>
+            <span className="text-[9px] leading-none text-white/45">Pehme</span>
           ) : null}
         </div>
       )

@@ -1,3 +1,4 @@
+import { blendFromMorph, clamp } from '../audio/audioMath'
 import type { PartialConfig, ToneConfig, TimbreBlend } from '../audio/types'
 import type { NoteId } from '../music/notes'
 import type { TonalCenter } from '../music/notes'
@@ -14,11 +15,7 @@ export const DEFAULT_TONE_PAN = 0
 export const DEFAULT_TONE_DETUNE_CENTS = 0
 export const MIN_TONE_DETUNE_CENTS = -100
 export const MAX_TONE_DETUNE_CENTS = 100
-export const DEFAULT_TIMBRE_BLEND: TimbreBlend = {
-  sine: 0.55,
-  saw: 0.35,
-  square: 0.1,
-}
+export const DEFAULT_TIMBRE_BLEND: TimbreBlend = blendFromMorph(0.5)
 
 export const DEFAULT_ENTRY_GLIDE_LOWEST_CENTS = 0
 export const DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS = 2.5
@@ -41,6 +38,8 @@ export function defaultPartialGainDb(harmonicIndex: number): number {
 export const SHINE_HARMONIC_COUNT = 16
 export const DEFAULT_SHINE_VOLUME = 0.6
 export const DEFAULT_SHINE_OCTAVE_INDEX = 2
+/** 0 = auto motion only, 1 = full bumps. */
+export const DEFAULT_SHINE_MOTION = 0
 
 export type ShineConfig = {
   enabled: boolean
@@ -49,6 +48,39 @@ export type ShineConfig = {
   levels: number[]
   autos: boolean[]
   bumps: boolean[]
+  /** 0 = auto, 1 = bumps. Missing on older presets. */
+  motion?: number
+}
+
+export function shineMotionFromConfig(source: {
+  motion?: number
+  autos?: boolean[]
+  bumps?: boolean[]
+}): number {
+  if (typeof source.motion === 'number' && Number.isFinite(source.motion)) {
+    return clamp(source.motion, 0, 1)
+  }
+  const autos = Array.isArray(source.autos) ? source.autos : []
+  const bumps = Array.isArray(source.bumps) ? source.bumps : []
+  let autoCount = 0
+  let bumpCount = 0
+  for (let index = 0; index < SHINE_HARMONIC_COUNT; index += 1) {
+    if (autos[index] !== false) {
+      autoCount += 1
+      if (bumps[index] === true) {
+        bumpCount += 1
+      }
+    }
+  }
+  if (autoCount === 0) {
+    return 0
+  }
+  return bumpCount / autoCount
+}
+
+export function shineBumpsFromMotion(autos: boolean[], motion: number): boolean[] {
+  const bumpOn = motion > 0.02
+  return autos.map((autoOn) => autoOn && bumpOn)
 }
 
 export function createDefaultShine(): ShineConfig {
@@ -59,6 +91,7 @@ export function createDefaultShine(): ShineConfig {
     levels: new Array<number>(SHINE_HARMONIC_COUNT).fill(0),
     autos: new Array<boolean>(SHINE_HARMONIC_COUNT).fill(true),
     bumps: new Array<boolean>(SHINE_HARMONIC_COUNT).fill(false),
+    motion: DEFAULT_SHINE_MOTION,
   }
 }
 

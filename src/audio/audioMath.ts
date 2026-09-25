@@ -70,14 +70,14 @@ export function partialTimbreWeights(
   return harmonicTimbreWeights(harmonicIndex, blend)
 }
 
-/** 0 = sine (soft) … 1 = saw/square (sharp), like Just Keys. */
+/** 0 = darker … 0.5 = stored spectrum … 1 = brighter. */
 export function morphFromBlend(sine: number, saw: number, square: number): number {
   const s = Math.max(0, sine)
   const w = Math.max(0, saw)
   const q = Math.max(0, square)
   const total = s + w + q
   if (total <= 0) {
-    return 0
+    return 0.5
   }
   return (w + q) / total
 }
@@ -91,11 +91,15 @@ export function blendFromMorph(morph: number): { sine: number; saw: number; squa
   }
 }
 
-/** Duck upper partials when the morph is soft so brightness is actually audible. */
+/** Tilt upper partials: 0.5 leaves them as stored, 0 darkens, 1 brightens. */
 export function partialBrightnessGain(harmonicIndex: number, morph: number): number {
   const t = clamp(morph, 0, 1)
   if (harmonicIndex <= 1) {
     return 1
   }
-  return 1 / harmonicIndex ** ((1 - t) * 1.85)
+  const tilt = (t - 0.5) * 2
+  if (tilt <= 0) {
+    return 1 / harmonicIndex ** (-tilt * 1.85)
+  }
+  return harmonicIndex ** (tilt * 0.4)
 }

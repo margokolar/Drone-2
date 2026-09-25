@@ -31,6 +31,8 @@ import {
   MAX_TONE_DETUNE_CENTS,
   MIN_TONE_DETUNE_CENTS,
   SHINE_HARMONIC_COUNT,
+  shineBumpsFromMotion,
+  shineMotionFromConfig,
   type Preset,
   type ShineConfig,
 } from '../presets/defaultPresets'
@@ -269,6 +271,8 @@ function normalizeBooleanArray(source: unknown, fallback: boolean): boolean[] {
 function normalizeShine(shine: ShineConfig | undefined): ShineConfig {
   const source = shine ?? createDefaultShine()
   const levelsInput = Array.isArray(source.levels) ? source.levels : []
+  const autos = normalizeBooleanArray(source.autos, true)
+  const motion = shineMotionFromConfig(source)
   return {
     enabled: Boolean(source.enabled),
     volume: clamp(typeof source.volume === 'number' ? source.volume : 0.6, 0, 1),
@@ -276,8 +280,9 @@ function normalizeShine(shine: ShineConfig | undefined): ShineConfig {
     levels: Array.from({ length: SHINE_HARMONIC_COUNT }, (_, index) =>
       clamp(typeof levelsInput[index] === 'number' ? levelsInput[index] : 0, 0, 1),
     ),
-    autos: normalizeBooleanArray(source.autos, true),
-    bumps: normalizeBooleanArray(source.bumps, false),
+    autos,
+    bumps: shineBumpsFromMotion(autos, motion),
+    motion,
   }
 }
 
@@ -1928,7 +1933,7 @@ export const useDroneStore = create<DroneState>()(
     }),
     {
       name: 'bourdon-store-v1',
-      version: 23,
+      version: 24,
       migrate: (persistedState) => {
         try {
           const typed = persistedState as Partial<DroneState> | undefined
