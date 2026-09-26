@@ -93,6 +93,8 @@ type DroneState = {
   globalOvertoneEditEnabled: boolean
   tones: ToneConfig[]
   partials: PartialConfig[]
+  /** Wavetable + overtone bars shared by every preset; pehme–särav stays per preset. */
+  sharedInstrument: SharedInstrument
   shine: ShineConfig
   metronomeEnabled: boolean
   metronomeBpm: number
@@ -268,6 +270,101 @@ function normalizeBooleanArray(source: unknown, fallback: boolean): boolean[] {
   )
 }
 
+type SharedToneInstrument = {
+  wavetable?: WavetableCoeffs
+  partials: PartialConfig[]
+}
+
+type SharedInstrument = {
+  partials: PartialConfig[]
+  tones: Partial<Record<NoteId, SharedToneInstrument>>
+}
+
+function cloneSharedToneInstrument(entry: SharedToneInstrument): SharedToneInstrument {
+  const wavetable = cloneWavetable(entry.wavetable)
+  return {
+    partials: normalizePartials(entry.partials.map((partial) => ({ ...partial }))),
+    ...(wavetable ? { wavetable } : {}),
+  }
+}
+
+function collectSharedInstrument(tones: ToneConfig[], partials: PartialConfig[]): SharedInstrument {
+  const normalizedPartials = normalizePartials(partials.map((partial) => ({ ...partial })))
+  const byNote: Partial<Record<NoteId, SharedToneInstrument>> = {}
+  for (const tone of tones) {
+    byNote[tone.noteId] = cloneSharedToneInstrument({
+      partials: tone.partials ?? normalizedPartials,
+      wavetable: tone.wavetable,
+    })
+  }
+  return { partials: normalizedPartials, tones: byNote }
+}
+
+function normalizeSharedInstrument(
+  source: unknown,
+  fallbackTones: ToneConfig[],
+  fallbackPartials: PartialConfig[],
+): SharedInstrument {
+  const fallback = collectSharedInstrument(fallbackTones, fallbackPartials)
+  if (!source || typeof source !== 'object') {
+    return fallback
+  }
+  const raw = source as Partial<SharedInstrument>
+  const partials = normalizePartials(
+    (Array.isArray(raw.partials) && raw.partials.length > 0
+      ? raw.partials
+      : fallback.partials
+    ).map((partial) => ({ ...partial })),
+  )
+  const rawTones =
+    raw.tones && typeof raw.tones === 'object' && !Array.isArray(raw.tones)
+      ? (raw.tones as Partial<Record<NoteId, SharedToneInstrument>>)
+      : {}
+  const byNote: Partial<Record<NoteId, SharedToneInstrument>> = { ...fallback.tones }
+  for (const noteId of NOTE_IDS) {
+    const entry = rawTones[noteId]
+    if (!entry) {
+      continue
+    }
+    byNote[noteId] = cloneSharedToneInstrument({
+      partials:
+        Array.isArray(entry.partials) && entry.partials.length > 0 ? entry.partials : partials,
+      wavetable: entry.wavetable,
+    })
+  }
+  return { partials, tones: byNote }
+}
+
+function applySharedInstrumentToTones(tones: ToneConfig[], shared: SharedInstrument): ToneConfig[] {
+  return tones.map((tone) => {
+    const entry = shared.tones[tone.noteId]
+    const partials = normalizePartials((entry?.partials ?? shared.partials).map((partial) => ({ ...partial })))
+    const wavetable = cloneWavetable(entry?.wavetable)
+    const next: ToneConfig = {
+      ...tone,
+      partials,
+    }
+    if (wavetable) {
+      next.wavetable = wavetable
+    } else {
+      delete next.wavetable
+    }
+    return next
+  })
+}
+
+function withSharedInstrument<T extends { tones?: ToneConfig[]; partials?: PartialConfig[] }>(
+  state: Pick<DroneState, 'tones' | 'partials'>,
+  patch: T,
+): T & { sharedInstrument: SharedInstrument } {
+  const tones = patch.tones ?? state.tones
+  const partials = patch.partials ?? state.partials
+  return {
+    ...patch,
+    sharedInstrument: collectSharedInstrument(tones, partials),
+  }
+}
+
 function normalizeShine(shine: ShineConfig | undefined): ShineConfig {
   const source = shine ?? createDefaultShine()
   const levelsInput = Array.isArray(source.levels) ? source.levels : []
@@ -307,6 +404,7 @@ type ApplyPresetClickTempoContext = {
 function applyPresetState(
   preset: Preset,
   clickTempo?: ApplyPresetClickTempoContext,
+  shared?: SharedInstrument,
 ): Pick<
   DroneState,
   | 'activePresetId'
@@ -329,6 +427,12 @@ function applyPresetState(
       preset.id,
       clickTempo.globalSyncEnabled,
     )
+  const presetTimbre = normalizeTimbreBlend(preset.timbreBlend ?? DEFAULT_TIMBRE_BLEND)
+  const migratedTones = migrateTones(
+    preset.tones,
+    preset.partials ?? DEFAULT_PARTIALS,
+    presetTimbre,
+  )
   return {
     activePresetId: preset.id,
     activeNavigationKey: preset.id,
@@ -336,13 +440,11 @@ function applyPresetState(
     tonalCenter: preset.tonalCenter,
     baseOctave: clamp(preset.baseOctave, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
     masterGainDb: preset.masterGainDb,
-    tones: migrateTones(
-      preset.tones,
-      preset.partials ?? DEFAULT_PARTIALS,
-      normalizeTimbreBlend(preset.timbreBlend ?? DEFAULT_TIMBRE_BLEND),
-    ),
-    partials: normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial }))),
-    timbreBlend: normalizeTimbreBlend(preset.timbreBlend ?? DEFAULT_TIMBRE_BLEND),
+    tones: shared ? applySharedInstrumentToTones(migratedTones, shared) : migratedTones,
+    partials: shared
+      ? normalizePartials(shared.partials.map((partial) => ({ ...partial })))
+      : normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial }))),
+    timbreBlend: presetTimbre,
     shine: normalizeShine(preset.shine),
     ...(applyClickTempo && typeof preset.metronomeBpm === 'number'
       ? { metronomeBpm: clamp(preset.metronomeBpm, MIN_METRONOME_BPM, MAX_METRONOME_BPM) }
@@ -672,6 +774,10 @@ export const useDroneStore = create<DroneState>()(
       globalOvertoneEditEnabled: false,
       tones: INITIAL_PRESET.tones.map((tone) => ({ ...tone })),
       partials: normalizePartials(INITIAL_PRESET.partials.map((partial) => ({ ...partial }))),
+      sharedInstrument: collectSharedInstrument(
+        INITIAL_PRESET.tones.map((tone) => ({ ...tone })),
+        normalizePartials(INITIAL_PRESET.partials.map((partial) => ({ ...partial }))),
+      ),
       shine: normalizeShine(INITIAL_PRESET.shine),
       metronomeEnabled: false,
       metronomeBpm: 72,
@@ -785,76 +891,93 @@ export const useDroneStore = create<DroneState>()(
           )
           return {
             globalOvertoneEditEnabled: true,
-            partials: partialSync.partials,
             timbreBlend: timbreSync.timbreBlend,
-            tones: syncAllTonesWithWavetable(timbreSync.tones, tone?.wavetable),
+            ...withSharedInstrument(state, {
+              partials: partialSync.partials,
+              tones: syncAllTonesWithWavetable(timbreSync.tones, tone?.wavetable),
+            }),
           }
         }),
       applyPartialsGlobally: (partials) =>
-        set((state) => syncAllTonesWithPartials(state, partials)),
+        set((state) => withSharedInstrument(state, syncAllTonesWithPartials(state, partials))),
       setAllPartialGain: (partialId, gainDb) =>
-        set((state) => ({
-          ...syncAllTonesWithPartials(
+        set((state) =>
+          withSharedInstrument(
             state,
-            state.partials.map((partial) =>
-              partial.id === partialId
-                ? {
-                    ...partial,
-                    gainDb: clamp(gainDb, -48, 0),
-                  }
-                : partial,
+            syncAllTonesWithPartials(
+              state,
+              state.partials.map((partial) =>
+                partial.id === partialId
+                  ? {
+                      ...partial,
+                      gainDb: clamp(gainDb, -48, 0),
+                    }
+                  : partial,
+              ),
             ),
           ),
-        })),
+        ),
       setAllPartialRatio: (partialId, ratio) =>
-        set((state) => ({
-          ...syncAllTonesWithPartials(
+        set((state) =>
+          withSharedInstrument(
             state,
-            state.partials.map((partial) =>
-              partial.id === partialId
-                ? {
-                    ...partial,
-                    ratio: clamp(ratio, 0.0625, 32),
-                  }
-                : partial,
+            syncAllTonesWithPartials(
+              state,
+              state.partials.map((partial) =>
+                partial.id === partialId
+                  ? {
+                      ...partial,
+                      ratio: clamp(ratio, 0.0625, 32),
+                    }
+                  : partial,
+              ),
             ),
           ),
-        })),
+        ),
       setAllPartialEnabled: (partialId, enabled) =>
-        set((state) => ({
-          ...syncAllTonesWithPartials(
+        set((state) =>
+          withSharedInstrument(
             state,
-            state.partials.map((partial) =>
-              partial.id === partialId
-                ? {
-                    ...partial,
-                    enabled,
-                  }
-                : partial,
+            syncAllTonesWithPartials(
+              state,
+              state.partials.map((partial) =>
+                partial.id === partialId
+                  ? {
+                      ...partial,
+                      enabled,
+                    }
+                  : partial,
+              ),
             ),
           ),
-        })),
+        ),
       addPartialGlobally: () =>
         set((state) => {
           const nextIndex = state.partials.length + 1
-          return syncAllTonesWithPartials(state, [
-            ...state.partials,
-            {
-              id: `p-${Date.now()}-${nextIndex}`,
-              ratio: nextIndex,
-              gainDb: -24,
-              enabled: true,
-            },
-          ])
+          return withSharedInstrument(
+            state,
+            syncAllTonesWithPartials(state, [
+              ...state.partials,
+              {
+                id: `p-${Date.now()}-${nextIndex}`,
+                ratio: nextIndex,
+                gainDb: -24,
+                enabled: true,
+              },
+            ]),
+          )
         }),
       removePartialGlobally: (partialId) =>
         set((state) => {
           if (state.partials.length <= 1) {
             return state
           }
-          return syncAllTonesWithPartials(
+          return withSharedInstrument(
             state,
-            state.partials.filter((partial) => partial.id !== partialId),
+            syncAllTonesWithPartials(
+              state,
+              state.partials.filter((partial) => partial.id !== partialId),
+            ),
           )
         }),
       toggleToneEnabled: (noteId) =>
@@ -919,49 +1042,57 @@ export const useDroneStore = create<DroneState>()(
         })),
       setShine: (shine) => set({ shine: normalizeShine(shine) }),
       setPartialGain: (partialId, gainDb) =>
-        set((state) => ({
-          partials: state.partials.map((partial) => {
-            if (partial.id !== partialId) {
-              return partial
-            }
-            return {
-              ...partial,
-              gainDb: clamp(gainDb, -48, 0),
-            }
+        set((state) =>
+          withSharedInstrument(state, {
+            partials: state.partials.map((partial) => {
+              if (partial.id !== partialId) {
+                return partial
+              }
+              return {
+                ...partial,
+                gainDb: clamp(gainDb, -48, 0),
+              }
+            }),
           }),
-        })),
+        ),
       setPartialRatio: (partialId, ratio) =>
-        set((state) => ({
-          partials: state.partials.map((partial) => {
-            if (partial.id !== partialId) {
-              return partial
-            }
-            return {
-              ...partial,
-              ratio: clamp(ratio, 0.0625, 32),
-            }
+        set((state) =>
+          withSharedInstrument(state, {
+            partials: state.partials.map((partial) => {
+              if (partial.id !== partialId) {
+                return partial
+              }
+              return {
+                ...partial,
+                ratio: clamp(ratio, 0.0625, 32),
+              }
+            }),
           }),
-        })),
+        ),
       setPartialEnabled: (partialId, enabled) =>
-        set((state) => ({
-          partials: state.partials.map((partial) => {
-            if (partial.id !== partialId) {
-              return partial
-            }
-            return {
-              ...partial,
-              enabled,
-            }
+        set((state) =>
+          withSharedInstrument(state, {
+            partials: state.partials.map((partial) => {
+              if (partial.id !== partialId) {
+                return partial
+              }
+              return {
+                ...partial,
+                enabled,
+              }
+            }),
           }),
-        })),
+        ),
       setPartials: (partials) =>
-        set({
-          partials: normalizePartials(partials.map((partial) => ({ ...partial }))),
-        }),
+        set((state) =>
+          withSharedInstrument(state, {
+            partials: normalizePartials(partials.map((partial) => ({ ...partial }))),
+          }),
+        ),
       addPartial: () =>
         set((state) => {
           const nextIndex = state.partials.length + 1
-          return {
+          return withSharedInstrument(state, {
             partials: [
               ...state.partials,
               {
@@ -971,154 +1102,170 @@ export const useDroneStore = create<DroneState>()(
                 enabled: true,
               },
             ],
-          }
+          })
         }),
       removePartial: (partialId) =>
         set((state) => {
           if (state.partials.length <= 1) {
             return state
           }
-          return {
+          return withSharedInstrument(state, {
             partials: state.partials.filter((partial) => partial.id !== partialId),
-          }
+          })
         }),
       setToneWavetable: (noteId, wavetable) =>
-        set((state) => ({
-          tones: state.tones.map((tone) => {
-            if (tone.noteId !== noteId) {
-              return tone
-            }
-            const next = cloneWavetable(wavetable)
-            if (!next) {
-              if (!tone.wavetable) {
+        set((state) =>
+          withSharedInstrument(state, {
+            tones: state.tones.map((tone) => {
+              if (tone.noteId !== noteId) {
                 return tone
               }
-              const copy = { ...tone }
-              delete copy.wavetable
-              return copy
-            }
-            return { ...tone, wavetable: next }
-          }),
-        })),
-      applyWavetableGlobally: (wavetable) =>
-        set((state) => ({
-          tones: syncAllTonesWithWavetable(state.tones, wavetable),
-        })),
-      setTonePartials: (noteId, partials) =>
-        set((state) => ({
-          tones: state.tones.map((tone) =>
-            tone.noteId === noteId
-              ? {
-                  ...tone,
-                  partials: normalizePartials(partials.map((partial) => ({ ...partial }))),
+              const next = cloneWavetable(wavetable)
+              if (!next) {
+                if (!tone.wavetable) {
+                  return tone
                 }
-              : tone,
-          ),
-        })),
+                const copy = { ...tone }
+                delete copy.wavetable
+                return copy
+              }
+              return { ...tone, wavetable: next }
+            }),
+          }),
+        ),
+      applyWavetableGlobally: (wavetable) =>
+        set((state) =>
+          withSharedInstrument(state, {
+            tones: syncAllTonesWithWavetable(state.tones, wavetable),
+          }),
+        ),
+      setTonePartials: (noteId, partials) =>
+        set((state) =>
+          withSharedInstrument(state, {
+            tones: state.tones.map((tone) =>
+              tone.noteId === noteId
+                ? {
+                    ...tone,
+                    partials: normalizePartials(partials.map((partial) => ({ ...partial }))),
+                  }
+                : tone,
+            ),
+          }),
+        ),
       setTonePartialGain: (noteId, partialId, gainDb) =>
-        set((state) => ({
-          tones: state.tones.map((tone) => {
-            if (tone.noteId !== noteId) {
-              return tone
-            }
-            const source = tone.partials ?? state.partials
-            return {
-              ...tone,
-              partials: normalizePartials(
-                source.map((partial) =>
-                  partial.id === partialId
-                    ? {
-                        ...partial,
-                        gainDb: clamp(gainDb, -48, 0),
-                      }
-                    : partial,
+        set((state) =>
+          withSharedInstrument(state, {
+            tones: state.tones.map((tone) => {
+              if (tone.noteId !== noteId) {
+                return tone
+              }
+              const source = tone.partials ?? state.partials
+              return {
+                ...tone,
+                partials: normalizePartials(
+                  source.map((partial) =>
+                    partial.id === partialId
+                      ? {
+                          ...partial,
+                          gainDb: clamp(gainDb, -48, 0),
+                        }
+                      : partial,
+                  ),
                 ),
-              ),
-            }
+              }
+            }),
           }),
-        })),
+        ),
       setTonePartialRatio: (noteId, partialId, ratio) =>
-        set((state) => ({
-          tones: state.tones.map((tone) => {
-            if (tone.noteId !== noteId) {
-              return tone
-            }
-            const source = tone.partials ?? state.partials
-            return {
-              ...tone,
-              partials: normalizePartials(
-                source.map((partial) =>
-                  partial.id === partialId
-                    ? {
-                        ...partial,
-                        ratio: clamp(ratio, 0.0625, 32),
-                      }
-                    : partial,
+        set((state) =>
+          withSharedInstrument(state, {
+            tones: state.tones.map((tone) => {
+              if (tone.noteId !== noteId) {
+                return tone
+              }
+              const source = tone.partials ?? state.partials
+              return {
+                ...tone,
+                partials: normalizePartials(
+                  source.map((partial) =>
+                    partial.id === partialId
+                      ? {
+                          ...partial,
+                          ratio: clamp(ratio, 0.0625, 32),
+                        }
+                      : partial,
+                  ),
                 ),
-              ),
-            }
+              }
+            }),
           }),
-        })),
+        ),
       setTonePartialEnabled: (noteId, partialId, enabled) =>
-        set((state) => ({
-          tones: state.tones.map((tone) => {
-            if (tone.noteId !== noteId) {
-              return tone
-            }
-            const source = tone.partials ?? state.partials
-            return {
-              ...tone,
-              partials: normalizePartials(
-                source.map((partial) =>
-                  partial.id === partialId
-                    ? {
-                        ...partial,
-                        enabled,
-                      }
-                    : partial,
+        set((state) =>
+          withSharedInstrument(state, {
+            tones: state.tones.map((tone) => {
+              if (tone.noteId !== noteId) {
+                return tone
+              }
+              const source = tone.partials ?? state.partials
+              return {
+                ...tone,
+                partials: normalizePartials(
+                  source.map((partial) =>
+                    partial.id === partialId
+                      ? {
+                          ...partial,
+                          enabled,
+                        }
+                      : partial,
+                  ),
                 ),
-              ),
-            }
+              }
+            }),
           }),
-        })),
+        ),
       addTonePartial: (noteId) =>
-        set((state) => ({
-          tones: state.tones.map((tone) => {
-            if (tone.noteId !== noteId) {
-              return tone
-            }
-            const source = normalizePartials(tone.partials ?? state.partials)
-            const nextIndex = source.length + 1
-            return {
-              ...tone,
-              partials: [
-                ...source,
-                {
-                  id: `p-${Date.now()}-${nextIndex}`,
-                  ratio: nextIndex,
-                  gainDb: -24,
-                  enabled: true,
-                },
-              ],
-            }
+        set((state) =>
+          withSharedInstrument(state, {
+            tones: state.tones.map((tone) => {
+              if (tone.noteId !== noteId) {
+                return tone
+              }
+              const source = normalizePartials(tone.partials ?? state.partials)
+              const nextIndex = source.length + 1
+              return {
+                ...tone,
+                partials: [
+                  ...source,
+                  {
+                    id: `p-${Date.now()}-${nextIndex}`,
+                    ratio: nextIndex,
+                    gainDb: -24,
+                    enabled: true,
+                  },
+                ],
+              }
+            }),
           }),
-        })),
+        ),
       removeTonePartial: (noteId, partialId) =>
-        set((state) => ({
-          tones: state.tones.map((tone) => {
-            if (tone.noteId !== noteId) {
-              return tone
-            }
-            const source = normalizePartials(tone.partials ?? state.partials)
-            if (source.length <= 1) {
-              return tone
-            }
-            return {
-              ...tone,
-              partials: source.filter((partial) => partial.id !== partialId),
-            }
+        set((state) =>
+          withSharedInstrument(state, {
+            tones: state.tones.map((tone) => {
+              if (tone.noteId !== noteId) {
+                return tone
+              }
+              const source = normalizePartials(tone.partials ?? state.partials)
+              if (source.length <= 1) {
+                return tone
+              }
+              return {
+                ...tone,
+                partials: source.filter((partial) => partial.id !== partialId),
+              }
+            }),
           }),
-        })),
+        ),
       setMetronomeEnabled: (enabled) => set({ metronomeEnabled: enabled }),
       setMetronomeBpm: (bpm) =>
         set({ metronomeBpm: clamp(bpm, MIN_METRONOME_BPM, MAX_METRONOME_BPM) }),
@@ -1178,7 +1325,7 @@ export const useDroneStore = create<DroneState>()(
           return {
             presets: [...state.presets, nextPreset],
             presetNavigation,
-            ...applyPresetState(nextPreset),
+            ...applyPresetState(nextPreset, undefined, state.sharedInstrument),
             ...syncPresetsToCurrentSong({
               ...state,
               presets: [...state.presets, nextPreset],
@@ -1202,7 +1349,7 @@ export const useDroneStore = create<DroneState>()(
               ...state.presetNavigation,
               { kind: 'preset', presetId: nextPreset.id },
             ],
-            ...applyPresetState(nextPreset),
+            ...applyPresetState(nextPreset, undefined, state.sharedInstrument),
             ...syncPresetsToCurrentSong({
               ...state,
               presets: [...state.presets, nextPreset],
@@ -1222,7 +1369,7 @@ export const useDroneStore = create<DroneState>()(
           return
         }
         set({
-          ...applyPresetState(preset, clickTempoFromState(state)),
+          ...applyPresetState(preset, clickTempoFromState(state), state.sharedInstrument),
         })
       },
       renamePreset: (presetId, name) =>
@@ -1262,7 +1409,7 @@ export const useDroneStore = create<DroneState>()(
               navigation: nextNavigation,
               presets: [...state.presets, duplicate],
               globalSyncEnabled: state.metronomeSyncEnabled,
-            }),
+            }, state.sharedInstrument),
             ...syncPresetsToCurrentSong({
               ...state,
               presets: [...state.presets, duplicate],
@@ -1307,7 +1454,7 @@ export const useDroneStore = create<DroneState>()(
               navigation: nextNavigation,
               presets: filtered,
               globalSyncEnabled: state.metronomeSyncEnabled,
-            }),
+            }, state.sharedInstrument),
             ...syncPresetsToCurrentSong({
               ...state,
               presets: filtered,
@@ -1482,7 +1629,7 @@ export const useDroneStore = create<DroneState>()(
               navigation: buildDefaultPresetNavigation(imported),
               presets: imported,
               globalSyncEnabled: state.metronomeSyncEnabled,
-            }),
+            }, state.sharedInstrument),
           }
         }),
       importSongLibrary: (songs) =>
@@ -1568,7 +1715,7 @@ export const useDroneStore = create<DroneState>()(
               navigation: importedNavigation,
               presets: copiedPresets,
               globalSyncEnabled: state.metronomeSyncEnabled,
-            }),
+            }, state.sharedInstrument),
           }
         }),
       loadSongFromLibrary: (songId) =>
@@ -1605,7 +1752,7 @@ export const useDroneStore = create<DroneState>()(
             songLibrary: state.songLibrary,
             presets: copiedPresets,
             presetNavigation,
-            ...applyPresetState(landingPreset, songClickTempo),
+            ...applyPresetState(landingPreset, songClickTempo, state.sharedInstrument),
             activeNavigationKey: firstActive.navigationKey,
             ...(landingOnTransport
               ? {
@@ -1649,7 +1796,7 @@ export const useDroneStore = create<DroneState>()(
               navigation: fallbackNavigation,
               presets: copiedPresets,
               globalSyncEnabled: state.metronomeSyncEnabled,
-            }),
+            }, state.sharedInstrument),
           }
         }),
       moveSongInLibrary: (songId, direction) =>
@@ -1933,7 +2080,7 @@ export const useDroneStore = create<DroneState>()(
     }),
     {
       name: 'bourdon-store-v1',
-      version: 24,
+      version: 25,
       migrate: (persistedState) => {
         try {
           const typed = persistedState as Partial<DroneState> | undefined
@@ -1981,15 +2128,21 @@ export const useDroneStore = create<DroneState>()(
             incomingPartials,
             incomingTimbre,
           )
+          const sharedInstrument = normalizeSharedInstrument(
+            typed.sharedInstrument,
+            migratedTones,
+            incomingPartials,
+          )
           return {
             ...typed,
             presets: resolvedPresets,
             presetNavigation,
             activePresetId: resolvedActivePresetId,
             activeNavigationKey,
-            partials: incomingPartials,
+            partials: normalizePartials(sharedInstrument.partials.map((partial) => ({ ...partial }))),
             timbreBlend: incomingTimbre,
-            tones: migratedTones,
+            tones: applySharedInstrumentToTones(migratedTones, sharedInstrument),
+            sharedInstrument,
             shine: normalizeShine(typed.shine),
             baseOctave: clamp(typed.baseOctave ?? 3, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
             songName: typed.songName ?? 'My Song',
@@ -2102,6 +2255,7 @@ export const useDroneStore = create<DroneState>()(
         globalOvertoneEditEnabled: state.globalOvertoneEditEnabled,
         tones: state.tones,
         partials: state.partials,
+        sharedInstrument: state.sharedInstrument,
         shine: state.shine,
         metronomeEnabled: state.metronomeEnabled,
         metronomeBpm: state.metronomeBpm,
