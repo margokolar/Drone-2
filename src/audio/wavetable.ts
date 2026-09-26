@@ -3,7 +3,7 @@ import type { PartialConfig, ResidualNoise, WavetableCoeffs } from './types'
 
 export const WAVETABLE_SIZE = 2048
 export const WAVETABLE_MAX_HARMONICS = 64
-export const RESIDUAL_NOISE_MAKEUP = 3
+export const RESIDUAL_NOISE_MAKEUP = 1
 export const RESIDUAL_MIN_GAIN = 0.008
 
 function interpolateCycle(samples: ArrayLike<number>, index: number): number {
@@ -249,12 +249,21 @@ export function normalizeResidual(residual?: ResidualNoise | null): ResidualNois
   }
 }
 
-export function residualPlaybackGain(residual?: ResidualNoise | null): number {
+/** 0 = pehme / no air … 0.5 = analyzed amount … 1 = särav / more air. */
+export function residualMorphAmount(morph: number): number {
+  const t = Math.max(0, Math.min(1, morph))
+  if (t <= 0.5) {
+    return t / 0.5
+  }
+  return 1 + (t - 0.5) * 0.7
+}
+
+export function residualPlaybackGain(residual?: ResidualNoise | null, morph = 0.5): number {
   const normalized = normalizeResidual(residual)
   if (!normalized) {
     return 0
   }
-  return Math.min(0.55, normalized.gain * RESIDUAL_NOISE_MAKEUP)
+  return Math.min(0.28, normalized.gain * RESIDUAL_NOISE_MAKEUP * residualMorphAmount(morph))
 }
 
 export function residualCenterForMorph(centerHz: number, morph: number): number {

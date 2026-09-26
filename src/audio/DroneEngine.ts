@@ -19,6 +19,7 @@ import {
 import { isNativeSynth } from './isNativeSynth'
 import { nativeOscillatorsFromConfig, packNativeWavetables } from './nativeDroneGraph'
 import {
+  normalizeResidual,
   residualCenterForMorph,
   residualPlaybackGain,
   scaleWavetableByPartials,
@@ -987,7 +988,7 @@ export class DroneEngine {
       if (wavetableOscCount !== voice.oscillators.length) {
         return true
       }
-      return Boolean(voice.residual) !== (residualPlaybackGain(toneConfig.wavetable?.residual) > 0)
+      return Boolean(voice.residual) !== Boolean(normalizeResidual(toneConfig.wavetable?.residual))
     }
     const activePartials = partials.filter((partial) => partial.enabled)
     return activePartials.length !== voice.oscillators.length
@@ -1031,9 +1032,8 @@ export class DroneEngine {
     if (!this.context) {
       return undefined
     }
-    const residual = toneConfig.wavetable?.residual
-    const gain = residualPlaybackGain(residual)
-    if (!residual || gain <= 0) {
+    const residual = normalizeResidual(toneConfig.wavetable?.residual)
+    if (!residual) {
       return undefined
     }
     const source = this.context.createBufferSource()
@@ -1061,10 +1061,10 @@ export class DroneEngine {
   ): void {
     const residual = voice.residual
     const source = toneConfig.wavetable?.residual
-    const gain = residualPlaybackGain(source)
-    if (!residual || !source || gain <= 0) {
+    if (!residual || !source || !normalizeResidual(source)) {
       return
     }
+    const gain = Math.max(MIN_AUDIBLE_GAIN, residualPlaybackGain(source, morph))
     residual.filter.frequency.cancelScheduledValues(now)
     residual.filter.frequency.setValueAtTime(residual.filter.frequency.value, now)
     residual.filter.frequency.linearRampToValueAtTime(
@@ -1221,7 +1221,10 @@ export class DroneEngine {
 
     const residual = usesWavetable ? this.createResidualVoice(outputGain, toneConfig, morph) : undefined
     if (residual) {
-      const residualGain = residualPlaybackGain(toneConfig.wavetable?.residual)
+      const residualGain = Math.max(
+        MIN_AUDIBLE_GAIN,
+        residualPlaybackGain(toneConfig.wavetable?.residual, morph),
+      )
       residual.gainNode.gain.cancelScheduledValues(now)
       if (usesSmoothCrossfade(attackSeconds)) {
         scheduleSmoothVoiceFadeIn(residual.gainNode.gain, residualGain, now, attackSeconds)

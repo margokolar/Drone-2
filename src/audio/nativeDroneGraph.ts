@@ -77,7 +77,7 @@ export function nativeOscillatorsFromConfig(config: DroneRuntimeConfig): NativeD
     if (wavetable) {
       if (!partials.some((partial) => partial.enabled)) continue
       const freq = Math.max(1, toneFrequency)
-      const noiseGain = residualPlaybackGain(wavetable.residual)
+      const noiseGain = residualPlaybackGain(wavetable.residual, morph)
       const osc = attachGlide(
         {
           id: `${tone.noteId}:wavetable`,
@@ -86,7 +86,7 @@ export function nativeOscillatorsFromConfig(config: DroneRuntimeConfig): NativeD
           pan: tone.pan,
           wave: 3,
           tableId: tone.noteId,
-          ...(noiseGain > 0 && wavetable.residual
+          ...(wavetable.residual
             ? {
                 noiseGain,
                 noiseCenterHz: residualCenterForMorph(wavetable.residual.centerHz, morph),
