@@ -23,6 +23,9 @@ final class DroneSynthEngine {
         var glideFrom: Double
         var glideSeconds: Double
         var tableId: String = ""
+        var noiseGain: Double = 0
+        var noiseCenterHz: Double = 0
+        var noiseQ: Double = 0
     }
 
     private struct Osc {
@@ -38,6 +41,17 @@ final class DroneSynthEngine {
         var gainInc = 0.0
         var pan = 0.0
         var panTarget = 0.0
+        var noiseMix = 0.0
+        var noiseB0 = 0.0
+        var noiseB1 = 0.0
+        var noiseB2 = 0.0
+        var noiseA1 = 0.0
+        var noiseA2 = 0.0
+        var noiseX1 = 0.0
+        var noiseX2 = 0.0
+        var noiseY1 = 0.0
+        var noiseY2 = 0.0
+        var noiseSeed: UInt32 = 1
         var active = false
         var releasing = false
     }
@@ -453,6 +467,9 @@ final class DroneSynthEngine {
             osc.id = spec.id
             osc.wave = spec.wave
             osc.tableId = spec.tableId
+            osc.noiseMix = max(0, spec.noiseGain)
+            osc.noiseSeed = Self.noiseSeed(for: spec.id)
+            Self.setBandpass(&osc, centerHz: spec.noiseCenterHz, q: spec.noiseQ, sampleRate: sr)
             osc.freqTarget = max(1, spec.freq)
             osc.gainTarget = max(0, spec.gain)
             osc.panTarget = max(-1, min(1, spec.pan))
@@ -474,6 +491,11 @@ final class DroneSynthEngine {
                 osc.phase = existing.phase
                 osc.gain = existing.gain
                 osc.pan = existing.pan
+                osc.noiseX1 = existing.noiseX1
+                osc.noiseX2 = existing.noiseX2
+                osc.noiseY1 = existing.noiseY1
+                osc.noiseY2 = existing.noiseY2
+                osc.noiseSeed = existing.noiseSeed
                 let delta = spec.freq - existing.freq
                 if overlap {
                     osc.gainInc = (osc.gainTarget - existing.gain) / (fadeSeconds * sr)
@@ -830,7 +852,13 @@ final class DroneSynthEngine {
                 if oscs[i].freq >= nyquist { continue }
                 let dt = oscs[i].freq * invSr
                 oscs[i].phase = wrap01(oscs[i].phase + dt)
-                let sample = waveform(oscs[i].wave, phase: oscs[i].phase, freq: oscs[i].freq, tableId: oscs[i].tableId) * oscs[i].gain
+                var sample = waveform(oscs[i].wave, phase: oscs[i].phase, freq: oscs[i].freq, tableId: oscs[i].tableId) * oscs[i].gain
+                let noiseMix = oscs[i].noiseMix
+                if noiseMix > 0.0002 {
+                    let gain = oscs[i].gain
+                    let hiss = tickNoise(&oscs[i])
+                    sample += hiss * gain * noiseMix
+                }
                 let pan = oscs[i].pan
                 mixL += sample * sqrt((1 - pan) * 0.5)
                 mixR += sample * sqrt((1 + pan) * 0.5)
@@ -906,6 +934,50 @@ final class DroneSynthEngine {
         if phase >= 1 { phase -= floor(phase) }
         if phase < 0 { phase += 1 }
         return phase
+    }
+
+    private static func noiseSeed(for id: String) -> UInt32 {
+        var hash: UInt32 = 2_166_136_261
+        for byte in id.utf8 {
+            hash ^= UInt32(byte)
+            hash = hash &* 16_777_619
+        }
+        return hash == 0 ? 1 : hash
+    }
+
+    private static func setBandpass(_ osc: inout Osc, centerHz: Double, q: Double, sampleRate: Double) {
+        guard centerHz > 20, q > 0.05 else {
+            osc.noiseB0 = 0
+            osc.noiseB1 = 0
+            osc.noiseB2 = 0
+            osc.noiseA1 = 0
+            osc.noiseA2 = 0
+            return
+        }
+        let nyquist = sampleRate * 0.45
+        let freq = max(80, min(nyquist, centerHz))
+        let qSafe = max(0.35, min(2.2, q))
+        let w0 = 2 * Double.pi * freq / sampleRate
+        let cosw = cos(w0)
+        let alpha = sin(w0) / (2 * qSafe)
+        let a0 = 1 + alpha
+        osc.noiseB0 = alpha / a0
+        osc.noiseB1 = 0
+        osc.noiseB2 = -alpha / a0
+        osc.noiseA1 = (-2 * cosw) / a0
+        osc.noiseA2 = (1 - alpha) / a0
+    }
+
+    private func tickNoise(_ osc: inout Osc) -> Double {
+        osc.noiseSeed = osc.noiseSeed &* 1_664_525 &+ 1_013_904_223
+        let white = Double(Int32(bitPattern: osc.noiseSeed)) * (1.0 / 2_147_483_648.0)
+        let y = osc.noiseB0 * white + osc.noiseB1 * osc.noiseX1 + osc.noiseB2 * osc.noiseX2
+            - osc.noiseA1 * osc.noiseY1 - osc.noiseA2 * osc.noiseY2
+        osc.noiseX2 = osc.noiseX1
+        osc.noiseX1 = white
+        osc.noiseY2 = osc.noiseY1
+        osc.noiseY1 = y
+        return y
     }
 
     /// 0 = sine, 1 = saw, 2 = square, 3 = sample wavetable.

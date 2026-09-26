@@ -2,7 +2,13 @@ import { dbToGain, morphFromBlend, normalizedBlend, partialBrightnessGain } from
 import { getFrequency } from '../music/tuning'
 import type { NativeDroneOsc } from '../native/droneSynth'
 import type { DroneRuntimeConfig, EntryGlideParams, ToneConfig, WavetableCoeffs } from './types'
-import { cloneWavetable, packWavetables, scaleWavetableByPartials } from './wavetable'
+import {
+  cloneWavetable,
+  packWavetables,
+  residualCenterForMorph,
+  residualPlaybackGain,
+  scaleWavetableByPartials,
+} from './wavetable'
 
 const DEFAULT_ENTRY_GLIDE: EntryGlideParams = {
   cents: 0,
@@ -71,6 +77,7 @@ export function nativeOscillatorsFromConfig(config: DroneRuntimeConfig): NativeD
     if (wavetable) {
       if (!partials.some((partial) => partial.enabled)) continue
       const freq = Math.max(1, toneFrequency)
+      const noiseGain = residualPlaybackGain(wavetable.residual)
       const osc = attachGlide(
         {
           id: `${tone.noteId}:wavetable`,
@@ -79,6 +86,13 @@ export function nativeOscillatorsFromConfig(config: DroneRuntimeConfig): NativeD
           pan: tone.pan,
           wave: 3,
           tableId: tone.noteId,
+          ...(noiseGain > 0 && wavetable.residual
+            ? {
+                noiseGain,
+                noiseCenterHz: residualCenterForMorph(wavetable.residual.centerHz, morph),
+                noiseQ: wavetable.residual.q,
+              }
+            : {}),
         },
         glide,
         freq,

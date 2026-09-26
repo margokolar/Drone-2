@@ -51,7 +51,7 @@ import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isPreset
 import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL } from './utils/nowPlayingLabels'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig, WavetableCoeffs } from './audio/types'
-import { cloneWavetable, sameWavetable } from './audio/wavetable'
+import { cloneWavetable, cloneWavetableWithoutResidual, sameWavetable } from './audio/wavetable'
 import { blendFromMorph } from './audio/audioMath'
 import { AddFollowerControls, AddMicToolbarButton } from './components/AddFollowerControls'
 import { MicMenuSection } from './components/MicMenuSection'
@@ -154,7 +154,7 @@ type PendingOvertoneAnalysis = {
   analysis: OvertoneAnalysisResult
 }
 
-type OvertoneAnalysisApplyMode = 'gain-only' | 'gain-ratios' | 'gain-integer-ratios'
+type OvertoneAnalysisApplyMode = 'gain-ratios' | 'gain-integer-ratios' | 'gain-integer-residual'
 
 type ToneSetLayout = {
   name: string
@@ -1264,18 +1264,15 @@ function App() {
         return
       }
       const { analysis } = pendingOvertoneAnalysis
-      const integerRatios =
-        mode === 'gain-integer-ratios'
-          ? integerizeAnalysisRatios(analysis.ratios, selectedOvertonePartials.length)
-          : null
+      const useIntegerRatios = mode !== 'gain-ratios'
+      const integerRatios = useIntegerRatios
+        ? integerizeAnalysisRatios(analysis.ratios, selectedOvertonePartials.length)
+        : null
       const analyzed = selectedOvertonePartials.map((partial, index) => {
         const gainDb = analysis.gainsDb[index] ?? -48
-        let ratio = partial.ratio
-        if (mode === 'gain-ratios') {
-          ratio = analysis.ratios[index] ?? partial.ratio
-        } else if (mode === 'gain-integer-ratios') {
-          ratio = integerRatios?.[index] ?? index + 1
-        }
+        const ratio = useIntegerRatios
+          ? (integerRatios?.[index] ?? index + 1)
+          : (analysis.ratios[index] ?? partial.ratio)
         return {
           ...partial,
           ratio,
@@ -1285,7 +1282,10 @@ function App() {
       })
       rememberOvertoneState()
       setSelectedOvertonePartials(analyzed)
-      const wavetable = analysis.wavetable ?? null
+      const wavetable =
+        (mode === 'gain-integer-residual'
+          ? cloneWavetable(analysis.wavetable)
+          : cloneWavetableWithoutResidual(analysis.wavetable)) ?? null
       if (globalOvertoneEditEnabled) {
         applyWavetableGlobally(wavetable)
       } else {
@@ -3748,7 +3748,7 @@ function App() {
                   Apply analysis
                 </h2>
                 <p className="mt-1 text-sm text-white/70">
-                  Sample waveform is applied as a wavetable. Choose how overtone bars get ratios.
+                  Sample waveform is applied as a wavetable. Integer or measured ratios for the bars, or integer plus leftover air/reed.
                 </p>
               </div>
               <button
@@ -3778,9 +3778,9 @@ function App() {
               <button
                 type="button"
                 className="button-safe min-h-[44px] rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
-                onClick={() => applyPendingOvertoneAnalysis('gain-only')}
+                onClick={() => applyPendingOvertoneAnalysis('gain-integer-residual')}
               >
-                Gain only
+                Gain + integer ratios + air/reed
               </button>
             </div>
           </div>
