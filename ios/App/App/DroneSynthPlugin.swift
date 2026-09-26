@@ -121,7 +121,7 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
         return fallback
     }
 
-    /// `id \t wave \t freq \t gain \t pan \t glideFrom \t glideSeconds \t tableId \t noiseGain \t noiseCenterHz \t noiseQ`
+    /// `id \t wave \t freq \t gain \t pan \t glideFrom \t glideSeconds \t tableId`, lines split by `\n`.
     private static func parsePacked(_ packed: String) -> [DroneSynthEngine.OscSpec] {
         guard !packed.isEmpty else { return [] }
         var out: [DroneSynthEngine.OscSpec] = []
@@ -137,10 +137,7 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
                     pan: Double(parts[4]) ?? 0,
                     glideFrom: parts.count > 5 ? (Double(parts[5]) ?? 0) : 0,
                     glideSeconds: parts.count > 6 ? (Double(parts[6]) ?? 0) : 0,
-                    tableId: parts.count > 7 ? String(parts[7]) : "",
-                    noiseGain: parts.count > 8 ? (Double(parts[8]) ?? 0) : 0,
-                    noiseCenterHz: parts.count > 9 ? (Double(parts[9]) ?? 0) : 0,
-                    noiseQ: parts.count > 10 ? (Double(parts[10]) ?? 0) : 0
+                    tableId: parts.count > 7 ? String(parts[7]) : ""
                 )
             )
         }

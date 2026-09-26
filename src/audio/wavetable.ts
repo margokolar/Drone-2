@@ -1,23 +1,8 @@
 import { dbToGain, partialBrightnessGain } from './audioMath'
-import type { PartialConfig, ResidualNoise, WavetableCoeffs } from './types'
+import type { PartialConfig, WavetableCoeffs } from './types'
 
 export const WAVETABLE_SIZE = 2048
 export const WAVETABLE_MAX_HARMONICS = 64
-export const RESIDUAL_NOISE_MAKEUP = 1
-export const RESIDUAL_MIN_GAIN = 0.008
-
-function interpolateCycle(samples: ArrayLike<number>, index: number): number {
-  const length = samples.length
-  if (length === 0) {
-    return 0
-  }
-  const wrapped = ((index % length) + length) % length
-  const i0 = Math.floor(wrapped)
-  const frac = wrapped - i0
-  const s0 = samples[i0] ?? 0
-  const s1 = samples[(i0 + 1) % length] ?? 0
-  return s0 + (s1 - s0) * frac
-}
 
 function interpolateLinear(samples: ArrayLike<number>, index: number): number {
   if (samples.length === 0) {
@@ -116,161 +101,6 @@ function peakNormalize(wave: WavetableCoeffs, tableSize = WAVETABLE_SIZE): Wavet
   return { real, imag }
 }
 
-function reconstructPeriod(wave: WavetableCoeffs, tableSize = WAVETABLE_SIZE): Float64Array {
-  const table = new Float64Array(tableSize)
-  const last = Math.max(1, Math.min(wave.real.length, wave.imag.length) - 1)
-  for (let i = 0; i < tableSize; i += 1) {
-    const phase = (2 * Math.PI * i) / tableSize
-    let sample = 0
-    for (let harmonic = 1; harmonic <= last; harmonic += 1) {
-      const angle = harmonic * phase
-      sample += (wave.real[harmonic] ?? 0) * Math.cos(angle) + (wave.imag[harmonic] ?? 0) * Math.sin(angle)
-    }
-    table[i] = sample
-  }
-  return table
-}
-
-function goertzelEnergy(samples: ArrayLike<number>, sampleRate: number, frequency: number): number {
-  const omega = (2 * Math.PI * frequency) / sampleRate
-  const coeff = 2 * Math.cos(omega)
-  let q0 = 0
-  let q1 = 0
-  let q2 = 0
-  const length = samples.length
-  for (let i = 0; i < length; i += 1) {
-    q0 = coeff * q1 - q2 + (samples[i] ?? 0)
-    q2 = q1
-    q1 = q0
-  }
-  const real = q1 - q2 * Math.cos(omega)
-  const imag = q2 * Math.sin(omega)
-  const mag = Math.hypot(real, imag) / Math.max(1, length)
-  return mag * mag
-}
-
-function residualSpectrum(
-  samples: ArrayLike<number>,
-  sampleRate: number,
-  minHz: number,
-  maxHz: number,
-): { centerHz: number; q: number } {
-  const bands = 24
-  let weighted = 0
-  let weightedSq = 0
-  let total = 0
-  const span = Math.max(minHz * 1.01, maxHz)
-  for (let i = 0; i < bands; i += 1) {
-    const t = i / Math.max(1, bands - 1)
-    const hz = minHz * (span / minHz) ** t
-    const energy = goertzelEnergy(samples, sampleRate, hz)
-    weighted += hz * energy
-    weightedSq += hz * hz * energy
-    total += energy
-  }
-  if (total < 1e-18) {
-    return { centerHz: Math.min(3500, span), q: 0.7 }
-  }
-  const centerHz = weighted / total
-  const variance = Math.max(0, weightedSq / total - centerHz * centerHz)
-  const spread = Math.sqrt(variance)
-  const q = centerHz / Math.max(2 * spread, 1)
-  return {
-    centerHz: Math.max(minHz, Math.min(span, centerHz)),
-    q: Math.max(0.45, Math.min(1.6, q)),
-  }
-}
-
-function extractResidualNoise(
-  samples: ArrayLike<number>,
-  sampleRate: number,
-  fundamentalHz: number,
-  wave: WavetableCoeffs,
-): ResidualNoise | undefined {
-  const cycle = reconstructPeriod(wave)
-  const periodSamples = sampleRate / Math.max(1, fundamentalHz)
-  const start = Math.floor(samples.length * 0.35)
-  const end = Math.min(samples.length - 2, Math.floor(samples.length * 0.72))
-  if (end - start < periodSamples * 2) {
-    return undefined
-  }
-  const hpCutoff = Math.max(700, Math.min(2200, fundamentalHz * 6))
-  const hpCoeff = 1 / (2 * Math.PI * hpCutoff)
-  const dt = 1 / sampleRate
-  const hpAlpha = hpCoeff / (hpCoeff + dt)
-  const residualLength = Math.min(8192, end - start)
-  const stride = Math.max(1, Math.floor((end - start) / residualLength))
-  const residual = new Float32Array(Math.ceil((end - start) / stride))
-  let prevX = 0
-  let prevY = 0
-  let resEnergy = 0
-  let toneEnergy = 0
-  let residualIndex = 0
-  for (let i = start; i < end; i += 1) {
-    const rec = interpolateCycle(cycle, ((i - start) / periodSamples) * WAVETABLE_SIZE)
-    const leftover = (samples[i] ?? 0) - rec
-    const highpassed = hpAlpha * (prevY + leftover - prevX)
-    prevX = leftover
-    prevY = highpassed
-    resEnergy += highpassed * highpassed
-    toneEnergy += rec * rec
-    if ((i - start) % stride === 0 && residualIndex < residual.length) {
-      residual[residualIndex] = highpassed
-      residualIndex += 1
-    }
-  }
-  const gain = Math.sqrt(resEnergy / Math.max(toneEnergy, 1e-12))
-  if (!Number.isFinite(gain) || gain < RESIDUAL_MIN_GAIN) {
-    return undefined
-  }
-  const maxHz = Math.min(sampleRate * 0.45, 10000)
-  const spectrum = residualSpectrum(residual.subarray(0, residualIndex), sampleRate, hpCutoff, maxHz)
-  return {
-    gain: Math.min(0.4, gain),
-    centerHz: spectrum.centerHz,
-    q: spectrum.q,
-  }
-}
-
-export function normalizeResidual(residual?: ResidualNoise | null): ResidualNoise | undefined {
-  if (!residual) {
-    return undefined
-  }
-  const gain = Number(residual.gain)
-  const centerHz = Number(residual.centerHz)
-  const q = Number(residual.q)
-  if (!Number.isFinite(gain) || !Number.isFinite(centerHz) || !Number.isFinite(q) || gain < RESIDUAL_MIN_GAIN) {
-    return undefined
-  }
-  return {
-    gain: Math.max(0, Math.min(0.4, gain)),
-    centerHz: Math.max(180, Math.min(12000, centerHz)),
-    q: Math.max(0.35, Math.min(2.2, q)),
-  }
-}
-
-/** 0 = pehme / no air … 0.5 = analyzed amount … 1 = särav / more air. */
-export function residualMorphAmount(morph: number): number {
-  const t = Math.max(0, Math.min(1, morph))
-  if (t <= 0.5) {
-    return t / 0.5
-  }
-  return 1 + (t - 0.5) * 0.7
-}
-
-export function residualPlaybackGain(residual?: ResidualNoise | null, morph = 0.5): number {
-  const normalized = normalizeResidual(residual)
-  if (!normalized) {
-    return 0
-  }
-  return Math.min(0.28, normalized.gain * RESIDUAL_NOISE_MAKEUP * residualMorphAmount(morph))
-}
-
-export function residualCenterForMorph(centerHz: number, morph: number): number {
-  const tilt = 0.72 + Math.max(0, Math.min(1, morph)) * 0.56
-  return Math.max(180, Math.min(12000, centerHz * tilt))
-}
-
 export function extractWavetableFromSamples(
   samples: ArrayLike<number>,
   sampleRate: number,
@@ -289,10 +119,7 @@ export function extractWavetableFromSamples(
   }
   const nyquistHarmonics = Math.floor((sampleRate * 0.49) / Math.max(1, fundamentalHz))
   const harmonicCount = Math.max(1, Math.min(WAVETABLE_MAX_HARMONICS, nyquistHarmonics))
-  const coeffs = dftWavetableCoeffs(period, harmonicCount)
-  const residual = extractResidualNoise(samples, sampleRate, fundamentalHz, coeffs)
-  const wave = peakNormalize(coeffs)
-  return residual ? { ...wave, residual } : wave
+  return peakNormalize(dftWavetableCoeffs(period, harmonicCount))
 }
 
 export function normalizeWavetable(wave?: WavetableCoeffs | null): WavetableCoeffs | undefined {
@@ -320,8 +147,7 @@ export function normalizeWavetable(wave?: WavetableCoeffs | null): WavetableCoef
   }
   real[0] = 0
   imag[0] = 0
-  const residual = normalizeResidual(wave.residual)
-  return residual ? { real, imag, residual } : { real, imag }
+  return { real, imag }
 }
 
 export function cloneWavetable(wave?: WavetableCoeffs | null): WavetableCoeffs | undefined {
@@ -329,21 +155,7 @@ export function cloneWavetable(wave?: WavetableCoeffs | null): WavetableCoeffs |
   if (!normalized) {
     return undefined
   }
-  return normalized.residual
-    ? {
-        real: normalized.real.slice(),
-        imag: normalized.imag.slice(),
-        residual: { ...normalized.residual },
-      }
-    : { real: normalized.real.slice(), imag: normalized.imag.slice() }
-}
-
-export function cloneWavetableWithoutResidual(wave?: WavetableCoeffs | null): WavetableCoeffs | undefined {
-  const cloned = cloneWavetable(wave)
-  if (!cloned) {
-    return undefined
-  }
-  return { real: cloned.real, imag: cloned.imag }
+  return { real: normalized.real.slice(), imag: normalized.imag.slice() }
 }
 
 export function sameWavetable(a?: WavetableCoeffs | null, b?: WavetableCoeffs | null): boolean {
@@ -363,19 +175,7 @@ export function sameWavetable(a?: WavetableCoeffs | null, b?: WavetableCoeffs | 
       return false
     }
   }
-  const leftResidual = left.residual
-  const rightResidual = right.residual
-  if (!leftResidual && !rightResidual) {
-    return true
-  }
-  if (!leftResidual || !rightResidual) {
-    return false
-  }
-  return (
-    Math.abs(leftResidual.gain - rightResidual.gain) < 1e-6 &&
-    Math.abs(leftResidual.centerHz - rightResidual.centerHz) < 0.5 &&
-    Math.abs(leftResidual.q - rightResidual.q) < 1e-4
-  )
+  return true
 }
 
 export function harmonicMagnitudesDb(wave: WavetableCoeffs, count: number): number[] {
@@ -432,8 +232,7 @@ export function scaleWavetableByPartials(
     real[harmonic] = (real[harmonic] ?? 0) * brightness
     imag[harmonic] = (imag[harmonic] ?? 0) * brightness
   }
-  const residual = normalizeResidual(wave.residual)
-  return residual ? { real, imag, residual } : { real, imag }
+  return { real, imag }
 }
 
 export function bandLimitedWavetable(

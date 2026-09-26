@@ -9,9 +9,6 @@ export type NativeDroneOsc = {
   tableId?: string
   glideFrom?: number
   glideSeconds?: number
-  noiseGain?: number
-  noiseCenterHz?: number
-  noiseQ?: number
 }
 
 export type NativeShinePartial = {

@@ -481,14 +481,7 @@ function syncAllTonesWithWavetable(
       delete copy.wavetable
       return copy
     }
-    return {
-      ...tone,
-      wavetable: {
-        real: cloned.real.slice(),
-        imag: cloned.imag.slice(),
-        ...(cloned.residual ? { residual: { ...cloned.residual } } : {}),
-      },
-    }
+    return { ...tone, wavetable: { real: cloned.real.slice(), imag: cloned.imag.slice() } }
   })
 }
 

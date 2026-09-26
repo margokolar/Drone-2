@@ -14,18 +14,10 @@ export type PartialConfig = {
   enabled: boolean
 }
 
-/** Filtered leftover air/reed energy, stored with a wavetable (not a looped buffer). */
-export type ResidualNoise = {
-  gain: number
-  centerHz: number
-  q: number
-}
-
 /** Cosine/sine terms for one drone cycle. Index 0 is DC; 1 is the fundamental. */
 export type WavetableCoeffs = {
   real: number[]
   imag: number[]
-  residual?: ResidualNoise
 }
 
 export type ToneConfig = {

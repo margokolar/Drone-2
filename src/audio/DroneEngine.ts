@@ -18,13 +18,7 @@ import {
 } from './fadeCurves'
 import { isNativeSynth } from './isNativeSynth'
 import { nativeOscillatorsFromConfig, packNativeWavetables } from './nativeDroneGraph'
-import {
-  normalizeResidual,
-  residualCenterForMorph,
-  residualPlaybackGain,
-  scaleWavetableByPartials,
-  wavetableToPeriodicWave,
-} from './wavetable'
+import { scaleWavetableByPartials, wavetableToPeriodicWave } from './wavetable'
 
 type OscBundle = {
   oscillator: OscillatorNode
@@ -33,19 +27,12 @@ type OscBundle = {
   ratio: number
 }
 
-type ResidualVoice = {
-  source: AudioBufferSourceNode
-  filter: BiquadFilterNode
-  gainNode: GainNode
-}
-
 type ToneVoice = {
   noteId: string
   outputGain: GainNode
   panner: StereoPannerNode
   oscillators: OscBundle[]
   usesWavetable: boolean
-  residual?: ResidualVoice
   /** AudioContext time after which entry pitch glide may be overridden by updates. */
   entryGlideEndTime: number | null
 }
@@ -138,7 +125,6 @@ export class DroneEngine {
   private lastNativePacked = ''
   private lastNativeTables = ''
   private lastNativeMaster = -1
-  private noiseBuffer: AudioBuffer | null = null
 
   setPlaybackIntent(shouldPlay: boolean): void {
     this.shouldPlay = shouldPlay
@@ -216,7 +202,7 @@ export class DroneEngine {
     const rows = audible
       ? oscillators.map(
           (osc) =>
-            `${osc.id}\t${osc.wave}\t${osc.freq}\t${osc.gain}\t${osc.pan}\t${osc.glideFrom ?? 0}\t${osc.glideSeconds ?? 0}\t${osc.tableId ?? ''}\t${osc.noiseGain ?? 0}\t${osc.noiseCenterHz ?? 0}\t${osc.noiseQ ?? 0}`,
+            `${osc.id}\t${osc.wave}\t${osc.freq}\t${osc.gain}\t${osc.pan}\t${osc.glideFrom ?? 0}\t${osc.glideSeconds ?? 0}\t${osc.tableId ?? ''}`,
         )
       : []
     const packed = rows.join('\n')
@@ -942,7 +928,6 @@ export class DroneEngine {
     }
     this.context = null
     this.masterGain = null
-    this.noiseBuffer = null
   }
 
   private upsertVoice(
@@ -985,10 +970,7 @@ export class DroneEngine {
     }
     if (wantsWavetable) {
       const wavetableOscCount = partials.some((partial) => partial.enabled) ? 1 : 0
-      if (wavetableOscCount !== voice.oscillators.length) {
-        return true
-      }
-      return Boolean(voice.residual) !== Boolean(normalizeResidual(toneConfig.wavetable?.residual))
+      return wavetableOscCount !== voice.oscillators.length
     }
     const activePartials = partials.filter((partial) => partial.enabled)
     return activePartials.length !== voice.oscillators.length
@@ -1008,75 +990,6 @@ export class DroneEngine {
     const morph = morphFromBlend(blend.sine, blend.saw, blend.square)
     const scaled = scaleWavetableByPartials(toneConfig.wavetable, partials, morph)
     oscillator.setPeriodicWave(wavetableToPeriodicWave(this.context, scaled, frequencyHz))
-  }
-
-  private getNoiseBuffer(context: AudioContext): AudioBuffer {
-    if (this.noiseBuffer && this.noiseBuffer.sampleRate === context.sampleRate) {
-      return this.noiseBuffer
-    }
-    const length = Math.max(1, Math.floor(context.sampleRate * 2))
-    const buffer = context.createBuffer(1, length, context.sampleRate)
-    const data = buffer.getChannelData(0)
-    for (let i = 0; i < length; i += 1) {
-      data[i] = Math.random() * 2 - 1
-    }
-    this.noiseBuffer = buffer
-    return buffer
-  }
-
-  private createResidualVoice(
-    outputGain: GainNode,
-    toneConfig: ToneConfig,
-    morph: number,
-  ): ResidualVoice | undefined {
-    if (!this.context) {
-      return undefined
-    }
-    const residual = normalizeResidual(toneConfig.wavetable?.residual)
-    if (!residual) {
-      return undefined
-    }
-    const source = this.context.createBufferSource()
-    source.buffer = this.getNoiseBuffer(this.context)
-    source.loop = true
-    const filter = this.context.createBiquadFilter()
-    filter.type = 'bandpass'
-    filter.frequency.value = residualCenterForMorph(residual.centerHz, morph)
-    filter.Q.value = residual.q
-    const gainNode = this.context.createGain()
-    gainNode.gain.value = 0.0001
-    source.connect(filter)
-    filter.connect(gainNode)
-    gainNode.connect(outputGain)
-    source.start()
-    return { source, filter, gainNode }
-  }
-
-  private updateResidualVoice(
-    voice: ToneVoice,
-    toneConfig: ToneConfig,
-    morph: number,
-    now: number,
-    updateSeconds: number,
-  ): void {
-    const residual = voice.residual
-    const source = toneConfig.wavetable?.residual
-    if (!residual || !source || !normalizeResidual(source)) {
-      return
-    }
-    const gain = Math.max(MIN_AUDIBLE_GAIN, residualPlaybackGain(source, morph))
-    residual.filter.frequency.cancelScheduledValues(now)
-    residual.filter.frequency.setValueAtTime(residual.filter.frequency.value, now)
-    residual.filter.frequency.linearRampToValueAtTime(
-      residualCenterForMorph(source.centerHz, morph),
-      now + updateSeconds,
-    )
-    residual.filter.Q.cancelScheduledValues(now)
-    residual.filter.Q.setValueAtTime(residual.filter.Q.value, now)
-    residual.filter.Q.linearRampToValueAtTime(source.q, now + updateSeconds)
-    residual.gainNode.gain.cancelScheduledValues(now)
-    residual.gainNode.gain.setValueAtTime(residual.gainNode.gain.value, now)
-    residual.gainNode.gain.linearRampToValueAtTime(gain, now + updateSeconds)
   }
 
   private getEntryGlideSpec(
@@ -1219,33 +1132,12 @@ export class DroneEngine {
       }
     }
 
-    const residual = usesWavetable ? this.createResidualVoice(outputGain, toneConfig, morph) : undefined
-    if (residual) {
-      const residualGain = Math.max(
-        MIN_AUDIBLE_GAIN,
-        residualPlaybackGain(toneConfig.wavetable?.residual, morph),
-      )
-      residual.gainNode.gain.cancelScheduledValues(now)
-      if (usesSmoothCrossfade(attackSeconds)) {
-        scheduleSmoothVoiceFadeIn(residual.gainNode.gain, residualGain, now, attackSeconds)
-      } else if (this.playbackFadeInSeconds > 0) {
-        residual.gainNode.gain.setValueAtTime(Math.max(MIN_AUDIBLE_GAIN, residualGain), now)
-      } else {
-        residual.gainNode.gain.setValueAtTime(MIN_AUDIBLE_GAIN, now)
-        residual.gainNode.gain.exponentialRampToValueAtTime(
-          Math.max(MIN_AUDIBLE_GAIN, residualGain),
-          now + attackSeconds,
-        )
-      }
-    }
-
     return {
       noteId: toneConfig.noteId,
       outputGain,
       panner,
       oscillators,
       usesWavetable,
-      residual,
       entryGlideEndTime:
         entryGlide && entryGlide.cents !== 0 && entryGlide.seconds > 0 ? now + entryGlide.seconds : null,
     }
@@ -1299,8 +1191,6 @@ export class DroneEngine {
     }
 
     if (voice.usesWavetable) {
-      const blend = normalizedBlend(toneConfig.timbreBlend ?? config.timbreBlend)
-      const morph = morphFromBlend(blend.sine, blend.saw, blend.square)
       const bundle = voice.oscillators[0]
       if (bundle) {
         bundle.ratio = 1
@@ -1317,7 +1207,6 @@ export class DroneEngine {
         bundle.gainNode.gain.cancelScheduledValues(now)
         bundle.gainNode.gain.setValueAtTime(1, now)
       }
-      this.updateResidualVoice(voice, toneConfig, morph, now, updateSeconds)
       return
     }
 
@@ -1374,15 +1263,6 @@ export class DroneEngine {
         // Oscillator may already be stopped/disconnected.
       }
     }
-    if (voice.residual) {
-      try {
-        voice.residual.source.disconnect()
-        voice.residual.filter.disconnect()
-        voice.residual.gainNode.disconnect()
-      } catch {
-        // Residual nodes may already be stopped/disconnected.
-      }
-    }
     try {
       voice.panner.disconnect()
       voice.outputGain.disconnect()
@@ -1411,7 +1291,6 @@ export class DroneEngine {
     for (const bundle of voice.oscillators) {
       bundle.oscillator.stop(stopAt)
     }
-    voice.residual?.source.stop(stopAt)
 
     window.setTimeout(() => {
       if (this.context !== context) {
