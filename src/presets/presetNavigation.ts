@@ -1,4 +1,5 @@
 import type { Preset } from './defaultPresets'
+import { presetLoopSyncSlot } from '../audio/loopSlots'
 
 export type PresetTransportMarker = {
   kind: 'transport'
@@ -283,6 +284,14 @@ export function isPresetClickSyncEnabled(
     return false
   }
   return presets.some((preset) => preset.id === presetId && preset.metronomeSyncEnabled === true)
+}
+
+export function hasPresetLoopSync(presets: Preset[]): boolean {
+  return presets.some((preset) => presetLoopSyncSlot(preset) != null)
+}
+
+export function isPresetLoopSyncEnabled(presets: Preset[], presetId: string): boolean {
+  return presets.some((preset) => preset.id === presetId && presetLoopSyncSlot(preset) != null)
 }
 
 /** Preset card highlight: falls back to activePresetId when nav key is a disabled/missing marker. */

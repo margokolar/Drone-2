@@ -1,5 +1,7 @@
 import clsx from 'clsx'
+import { loopSlotLabel, type LoopSlot } from '../audio/loopSlots'
 import { ClickSyncButton } from './ClickSyncButton'
+import { LoopSyncButton } from './LoopSyncButton'
 import { ShineListButton } from './ShineListButton'
 import { PlayPauseIcon } from './PlayPauseIcon'
 import { PLAY_PAUSE_SEQUENCE_LABEL } from '../utils/nowPlayingLabels'
@@ -16,10 +18,14 @@ type SequenceListRowProps = {
   metronomeLit?: boolean
   metronomeBpm?: number
   shineEnabled?: boolean
+  loopSyncEnabled?: boolean
+  loopSyncSlot?: LoopSlot | null
   accent?: 'amber' | 'cyan'
   onSelect?: () => void
   onToggleMetronomeSync?: () => void
   onLongPressMetronome?: () => void
+  onToggleLoopSync?: () => void
+  onLongPressLoop?: () => void
   onOpenShine?: () => void
 }
 
@@ -32,10 +38,14 @@ export function SequenceListRow({
   metronomeLit,
   metronomeBpm,
   shineEnabled = false,
+  loopSyncEnabled = false,
+  loopSyncSlot = null,
   accent = 'amber',
   onSelect,
   onToggleMetronomeSync,
   onLongPressMetronome,
+  onToggleLoopSync,
+  onLongPressLoop,
   onOpenShine,
 }: SequenceListRowProps) {
   const showTransport = isTransport || name === PLAY_PAUSE_SEQUENCE_LABEL
@@ -117,8 +127,31 @@ export function SequenceListRow({
         ) : null}
       </span>
     ) : null
+  const loopButton = onToggleLoopSync ? (
+    <LoopSyncButton
+      enabled={loopSyncEnabled}
+      slot={loopSyncSlot}
+      onClick={(event) => {
+        event.stopPropagation()
+        onToggleLoopSync()
+      }}
+      onLongPress={onLongPressLoop}
+      inactiveClassName={
+        isActive
+          ? 'border-white/20 bg-white/10 text-white/70'
+          : 'border-white/10 bg-white/5 text-white/55'
+      }
+      ariaLabel={
+        `${
+          loopSyncSlot != null
+            ? `Loop sync ${loopSlotLabel(loopSyncSlot)}. Tap to cycle.`
+            : 'Sync loop start and stop with this preset'
+        }${onLongPressLoop ? '. Long-press to open Loop.' : ''}`
+      }
+    />
+  ) : null
   const trailingCluster =
-    shineButton || onToggleMetronomeSync ? (
+    shineButton || onToggleMetronomeSync || loopButton ? (
       <div className="ml-auto flex h-9 shrink-0 items-center gap-1.5">
         {shineButton}
         {bpmSlot}
@@ -147,14 +180,15 @@ export function SequenceListRow({
               }${onLongPressMetronome ? '. Long-press to open Click.' : ''}`
             }
           />
-        ) : (
+        ) : shineButton ? (
           <span className="size-9 shrink-0" aria-hidden />
-        )}
+        ) : null}
+        {loopButton}
       </div>
     ) : null
 
   if (onSelect) {
-    if (onToggleMetronomeSync || shineButton) {
+    if (onToggleMetronomeSync || shineButton || loopButton) {
       return (
         <div className={rowClass}>
           <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={onSelect}>

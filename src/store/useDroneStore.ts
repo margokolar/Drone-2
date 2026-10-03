@@ -1,5 +1,14 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { copyLoopAudio, deleteLoopAudio } from '../audio/loopAudioStore'
+import {
+  emptyLoopSlots,
+  normalizeLoopSlot,
+  normalizeLoopSlots,
+  withMigratedPresetLoopSync,
+  type LoopSlot,
+  type LoopSlotFiles,
+} from '../audio/loopSlots'
 import type { PartialConfig, TimbreBlend, ToneConfig, WavetableCoeffs } from '../audio/types'
 import { cloneWavetable } from '../audio/wavetable'
 import type { BtControlMode } from '../bluetooth/types'
@@ -60,6 +69,12 @@ type SongEntry = {
   presetNavigation?: PresetNavigationEntry[]
   activePresetId: string
   activeNavigationKey?: string
+  loopFileName?: string | null
+  loopSlots?: LoopSlotFiles
+  activeLoopSlot?: LoopSlot
+  loopVolumeDb?: number
+  loopMuted?: boolean
+  loopSyncEnabled?: boolean
 }
 
 type DroneState = {
@@ -102,6 +117,15 @@ type DroneState = {
   metronomeMuted: boolean
   /** When true, drone transport play/pause also starts/stops the click. */
   metronomeSyncEnabled: boolean
+  loopSlots: LoopSlotFiles
+  activeLoopSlot: LoopSlot
+  loopVolumeDb: number
+  loopMuted: boolean
+  loopEnabled: boolean
+  /** When true and no preset has loop sync, transport play/pause starts/stops the loop. */
+  loopSyncEnabled: boolean
+  /** When false, Loop tab and loop sync controls are hidden. */
+  loopFeaturesEnabled: boolean
   /** When false, Mic tab and transport mic control are hidden. */
   micFeaturesEnabled: boolean
   controlsLocked: boolean
@@ -165,6 +189,13 @@ type DroneState = {
   setMetronomeMuted: (muted: boolean) => void
   setMetronomeSyncEnabled: (enabled: boolean) => void
   toggleMetronomeSyncEnabled: () => void
+  setLoopSlotFileName: (slot: LoopSlot, fileName: string | null) => void
+  setActiveLoopSlot: (slot: LoopSlot) => void
+  setLoopVolumeDb: (db: number) => void
+  setLoopMuted: (muted: boolean) => void
+  setLoopEnabled: (enabled: boolean) => void
+  setLoopSyncEnabled: (enabled: boolean) => void
+  setLoopFeaturesEnabled: (enabled: boolean) => void
   setMicFeaturesEnabled: (enabled: boolean) => void
   setControlsLocked: (locked: boolean) => void
   toggleControlsLocked: () => void
@@ -185,6 +216,7 @@ type DroneState = {
   toggleTransportMarkerNavigationEnabled: (markerId: string) => void
   setTransportMarkerMetronomeSync: (markerId: string, enabled: boolean) => void
   setPresetMetronomeSync: (presetId: string, enabled: boolean) => void
+  setPresetLoopSyncSlot: (presetId: string, slot: LoopSlot | null) => void
   setPresetNavigationEnabled: (presetId: string, enabled: boolean) => void
   togglePresetNavigationEnabled: (presetId: string) => void
   importSong: (songPresets: Preset[], activePresetId?: string, songName?: string) => void
@@ -386,13 +418,15 @@ function normalizeShine(shine: ShineConfig | undefined): ShineConfig {
 function duplicatePresetData(preset: Preset): Preset {
   const partials = normalizePartials((preset.partials ?? DEFAULT_PARTIALS).map((partial) => ({ ...partial })))
   const timbreBlend = normalizeTimbreBlend(preset.timbreBlend ?? DEFAULT_TIMBRE_BLEND)
-  return normalizePresetNavigationEnabled({
-    ...preset,
-    tones: migrateTones(preset.tones, partials, timbreBlend),
-    partials,
-    timbreBlend,
-    shine: normalizeShine(preset.shine),
-  })
+  return withMigratedPresetLoopSync(
+    normalizePresetNavigationEnabled({
+      ...preset,
+      tones: migrateTones(preset.tones, partials, timbreBlend),
+      partials,
+      timbreBlend,
+      shine: normalizeShine(preset.shine),
+    }),
+  )
 }
 
 type ApplyPresetClickTempoContext = {
@@ -660,7 +694,17 @@ function migrateTones(
 function syncPresetsToCurrentSong(
   state: Pick<
     DroneState,
-    'presets' | 'presetNavigation' | 'activePresetId' | 'activeNavigationKey' | 'songName' | 'songLibrary'
+    | 'presets'
+    | 'presetNavigation'
+    | 'activePresetId'
+    | 'activeNavigationKey'
+    | 'songName'
+    | 'songLibrary'
+    | 'loopSlots'
+    | 'activeLoopSlot'
+    | 'loopVolumeDb'
+    | 'loopMuted'
+    | 'loopSyncEnabled'
   >,
 ): Pick<DroneState, 'songLibrary'> | Record<string, never> {
   const currentIndex = state.songLibrary.findIndex((entry) => entry.name === state.songName)
@@ -676,8 +720,43 @@ function syncPresetsToCurrentSong(
     ),
     activePresetId: state.activePresetId,
     activeNavigationKey: state.activeNavigationKey,
+    loopSlots: [...state.loopSlots],
+    activeLoopSlot: state.activeLoopSlot,
+    loopVolumeDb: state.loopVolumeDb,
+    loopMuted: state.loopMuted,
+    loopSyncEnabled: state.loopSyncEnabled,
   }
   return { songLibrary: nextLibrary }
+}
+
+function loopFieldsFromState(
+  state: Pick<DroneState, 'loopSlots' | 'activeLoopSlot' | 'loopVolumeDb' | 'loopMuted' | 'loopSyncEnabled'>,
+): Pick<SongEntry, 'loopSlots' | 'activeLoopSlot' | 'loopVolumeDb' | 'loopMuted' | 'loopSyncEnabled'> {
+  return {
+    loopSlots: [...state.loopSlots],
+    activeLoopSlot: state.activeLoopSlot,
+    loopVolumeDb: state.loopVolumeDb,
+    loopMuted: state.loopMuted,
+    loopSyncEnabled: state.loopSyncEnabled,
+  }
+}
+
+function loopStateFromSong(song: SongEntry): Pick<
+  DroneState,
+  'loopSlots' | 'activeLoopSlot' | 'loopVolumeDb' | 'loopMuted' | 'loopSyncEnabled' | 'loopEnabled'
+> {
+  return {
+    loopSlots: normalizeLoopSlots(song.loopSlots, song.loopFileName),
+    activeLoopSlot: normalizeLoopSlot(song.activeLoopSlot) ?? 1,
+    loopVolumeDb: clamp(
+      song.loopVolumeDb ?? DEFAULT_METRONOME_VOLUME_DB,
+      MIN_METRONOME_VOLUME_DB,
+      MAX_METRONOME_VOLUME_DB,
+    ),
+    loopMuted: song.loopMuted ?? false,
+    loopSyncEnabled: song.loopSyncEnabled ?? false,
+    loopEnabled: false,
+  }
 }
 
 function cloneNavigationForSongCopy(
@@ -784,6 +863,13 @@ export const useDroneStore = create<DroneState>()(
       metronomeVolumeDb: DEFAULT_METRONOME_VOLUME_DB,
       metronomeMuted: false,
       metronomeSyncEnabled: false,
+      loopSlots: emptyLoopSlots(),
+      activeLoopSlot: 1,
+      loopVolumeDb: DEFAULT_METRONOME_VOLUME_DB,
+      loopMuted: false,
+      loopEnabled: false,
+      loopSyncEnabled: false,
+      loopFeaturesEnabled: true,
       micFeaturesEnabled: true,
       controlsLocked: false,
       btControlMode: 'pedal',
@@ -1275,6 +1361,48 @@ export const useDroneStore = create<DroneState>()(
       setMetronomeSyncEnabled: (enabled) => set({ metronomeSyncEnabled: enabled }),
       toggleMetronomeSyncEnabled: () =>
         set((state) => ({ metronomeSyncEnabled: !state.metronomeSyncEnabled })),
+      setLoopSlotFileName: (slot, fileName) =>
+        set((state) => {
+          const loopSlots: LoopSlotFiles = [
+            state.loopSlots[0],
+            state.loopSlots[1],
+            state.loopSlots[2],
+          ]
+          loopSlots[slot - 1] = fileName
+          return {
+            loopSlots,
+            ...syncPresetsToCurrentSong({ ...state, loopSlots }),
+          }
+        }),
+      setActiveLoopSlot: (slot) =>
+        set((state) => ({
+          activeLoopSlot: slot,
+          ...syncPresetsToCurrentSong({ ...state, activeLoopSlot: slot }),
+        })),
+      setLoopVolumeDb: (db) =>
+        set((state) => {
+          const loopVolumeDb = clamp(db, MIN_METRONOME_VOLUME_DB, MAX_METRONOME_VOLUME_DB)
+          return {
+            loopVolumeDb,
+            ...syncPresetsToCurrentSong({ ...state, loopVolumeDb }),
+          }
+        }),
+      setLoopMuted: (muted) =>
+        set((state) => ({
+          loopMuted: muted,
+          ...syncPresetsToCurrentSong({ ...state, loopMuted: muted }),
+        })),
+      setLoopEnabled: (enabled) => set({ loopEnabled: enabled }),
+      setLoopSyncEnabled: (enabled) =>
+        set((state) => ({
+          loopSyncEnabled: enabled,
+          ...syncPresetsToCurrentSong({ ...state, loopSyncEnabled: enabled }),
+        })),
+      setLoopFeaturesEnabled: (enabled) =>
+        set({
+          loopFeaturesEnabled: enabled,
+          ...(enabled ? {} : { loopEnabled: false }),
+        }),
       setMicFeaturesEnabled: (enabled) => set({ micFeaturesEnabled: enabled }),
       setControlsLocked: (locked) => set({ controlsLocked: locked }),
       toggleControlsLocked: () => set((state) => ({ controlsLocked: !state.controlsLocked })),
@@ -1585,6 +1713,21 @@ export const useDroneStore = create<DroneState>()(
             ...syncPresetsToCurrentSong({ ...state, presets }),
           }
         }),
+      setPresetLoopSyncSlot: (presetId, slot) =>
+        set((state) => {
+          if (!state.presets.some((preset) => preset.id === presetId)) {
+            return state
+          }
+          const presets = state.presets.map((preset) =>
+            preset.id === presetId
+              ? { ...preset, loopSyncSlot: slot, loopSyncEnabled: slot != null }
+              : preset,
+          )
+          return {
+            presets,
+            ...syncPresetsToCurrentSong({ ...state, presets }),
+          }
+        }),
       importSong: (songPresets, activePresetId, songName) =>
         set((state) => {
           if (!Array.isArray(songPresets) || songPresets.length === 0) {
@@ -1754,6 +1897,7 @@ export const useDroneStore = create<DroneState>()(
             presetNavigation,
             ...applyPresetState(landingPreset, songClickTempo, state.sharedInstrument),
             activeNavigationKey: firstActive.navigationKey,
+            ...loopStateFromSong(song),
             ...(landingOnTransport
               ? {
                   playing: false,
@@ -1775,6 +1919,7 @@ export const useDroneStore = create<DroneState>()(
           if (filtered.length === 0) {
             return state
           }
+          void deleteLoopAudio(songId)
           const isDeletingActiveSong = state.songName === target.name
           if (!isDeletingActiveSong) {
             return {
@@ -1797,6 +1942,7 @@ export const useDroneStore = create<DroneState>()(
               presets: copiedPresets,
               globalSyncEnabled: state.metronomeSyncEnabled,
             }, state.sharedInstrument),
+            ...loopStateFromSong(fallbackSong),
           }
         }),
       moveSongInLibrary: (songId, direction) =>
@@ -1826,6 +1972,7 @@ export const useDroneStore = create<DroneState>()(
           const snapshot: Omit<SongEntry, 'id' | 'name'> = {
             presets: base.presets.map((preset) => duplicatePresetData(preset)),
             activePresetId: base.activePresetId,
+            ...loopFieldsFromState(base),
           }
           let nextLibrary = [...base.songLibrary]
           if (currentIndex >= 0) {
@@ -1868,11 +2015,17 @@ export const useDroneStore = create<DroneState>()(
             resolvedName = `${baseName} ${collisionIndex}`
             collisionIndex += 1
           }
+          const newSongId = `song-${Date.now()}`
+          const sourceSong = base.songLibrary.find((entry) => entry.name === state.songName)
+          if (sourceSong) {
+            void copyLoopAudio(sourceSong.id, newSongId)
+          }
           const newSong: SongEntry = {
-            id: `song-${Date.now()}`,
+            id: newSongId,
             name: resolvedName,
             presets: base.presets.map((preset) => duplicatePresetData(preset)),
             activePresetId: base.activePresetId,
+            ...loopFieldsFromState(base),
           }
           return {
             ...(saved ?? {}),
@@ -1927,14 +2080,25 @@ export const useDroneStore = create<DroneState>()(
             isActiveSong ? state.activeNavigationKey : source.activeNavigationKey,
             isActiveSong ? state.activePresetId : source.activePresetId,
           )
+          const newSongId = `song-${Date.now()}`
           const newSong: SongEntry = {
-            id: `song-${Date.now()}`,
+            id: newSongId,
             name: resolvedName,
             presets: duplicatedPresets,
             presetNavigation,
             activePresetId: isActiveSong ? state.activePresetId : source.activePresetId,
             activeNavigationKey,
+            ...(isActiveSong
+              ? loopFieldsFromState(state)
+              : {
+                  loopSlots: normalizeLoopSlots(source.loopSlots, source.loopFileName),
+                  activeLoopSlot: normalizeLoopSlot(source.activeLoopSlot) ?? 1,
+                  loopVolumeDb: source.loopVolumeDb,
+                  loopMuted: source.loopMuted,
+                  loopSyncEnabled: source.loopSyncEnabled,
+                }),
           }
+          void copyLoopAudio(source.id, newSongId)
           return {
             songLibrary: [...state.songLibrary, newSong],
           }
@@ -2080,10 +2244,10 @@ export const useDroneStore = create<DroneState>()(
     }),
     {
       name: 'bourdon-store-v1',
-      version: 25,
+      version: 28,
       migrate: (persistedState) => {
         try {
-          const typed = persistedState as Partial<DroneState> | undefined
+          const typed = persistedState as (Partial<DroneState> & { loopFileName?: string | null }) | undefined
           if (!typed) {
             return persistedState
           }
@@ -2155,6 +2319,8 @@ export const useDroneStore = create<DroneState>()(
                   enabled: song.enabled ?? true,
                   presets: songPresets,
                   presetNavigation: songPresetNavigation,
+                  loopSlots: normalizeLoopSlots(song.loopSlots, song.loopFileName),
+                  activeLoopSlot: normalizeLoopSlot(song.activeLoopSlot) ?? 1,
                   activeNavigationKey:
                     song.activeNavigationKey &&
                     songPresetNavigation.some(
@@ -2182,6 +2348,17 @@ export const useDroneStore = create<DroneState>()(
             ),
             metronomeMuted: typed.metronomeMuted ?? false,
             metronomeSyncEnabled: typed.metronomeSyncEnabled ?? false,
+            loopSlots: normalizeLoopSlots(typed.loopSlots, typed.loopFileName),
+            activeLoopSlot: normalizeLoopSlot(typed.activeLoopSlot) ?? 1,
+            loopVolumeDb: clamp(
+              typed.loopVolumeDb ?? DEFAULT_METRONOME_VOLUME_DB,
+              MIN_METRONOME_VOLUME_DB,
+              MAX_METRONOME_VOLUME_DB,
+            ),
+            loopMuted: typed.loopMuted ?? false,
+            loopEnabled: false,
+            loopSyncEnabled: typed.loopSyncEnabled ?? false,
+            loopFeaturesEnabled: typed.loopFeaturesEnabled ?? true,
             micFeaturesEnabled: typed.micFeaturesEnabled ?? true,
             harmonicTimbreEnabled: typed.harmonicTimbreEnabled ?? true,
             entryGlideEnabled: typed.entryGlideEnabled ?? true,
@@ -2262,6 +2439,12 @@ export const useDroneStore = create<DroneState>()(
         metronomeVolumeDb: state.metronomeVolumeDb,
         metronomeMuted: state.metronomeMuted,
         metronomeSyncEnabled: state.metronomeSyncEnabled,
+        loopSlots: state.loopSlots,
+        activeLoopSlot: state.activeLoopSlot,
+        loopVolumeDb: state.loopVolumeDb,
+        loopMuted: state.loopMuted,
+        loopSyncEnabled: state.loopSyncEnabled,
+        loopFeaturesEnabled: state.loopFeaturesEnabled,
         micFeaturesEnabled: state.micFeaturesEnabled,
         controlsLocked: state.controlsLocked,
         btControlMode: state.btControlMode,

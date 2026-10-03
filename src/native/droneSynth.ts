@@ -41,6 +41,17 @@ export type NativeDroneSynthPlugin = {
   }): Promise<void>
   setShine(options: { packed: string }): Promise<void>
   clearShine(): Promise<void>
+  setLoopAudio(options: { data: string }): Promise<{ duration?: number }>
+  setLoopPlayback(options: {
+    on?: number
+    enabled?: boolean
+    volumeDb: number
+    mute?: number
+    muted?: boolean
+    restart?: number
+    stopAtEnd?: number
+  }): Promise<void>
+  clearLoop(): Promise<void>
 }
 
 export const DroneSynth = registerPlugin<NativeDroneSynthPlugin>('DroneSynth')

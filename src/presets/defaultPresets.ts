@@ -1,5 +1,6 @@
 import { blendFromMorph, clamp } from '../audio/audioMath'
 import type { PartialConfig, ToneConfig, TimbreBlend } from '../audio/types'
+import type { LoopSlot } from '../audio/loopSlots'
 import type { NoteId } from '../music/notes'
 import type { TonalCenter } from '../music/notes'
 import type { TuningSystemId } from '../music/tuning'
@@ -102,6 +103,10 @@ export type Preset = {
   enabled?: boolean
   /** When true, playing this preset starts the click and transport pause stops it. */
   metronomeSyncEnabled?: boolean
+  /** When true, playing this preset starts the loop and transport pause stops it. */
+  loopSyncEnabled?: boolean
+  /** Which loop slot this preset starts: L1, L2, or L3. */
+  loopSyncSlot?: LoopSlot | null
   metronomeBpm?: number
   metronomeVolumeDb?: number
   metronomeMuted?: boolean

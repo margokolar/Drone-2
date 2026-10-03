@@ -37,6 +37,10 @@ import {
   type TouchEvent as ReactTouchEvent,
 } from 'react'
 import { metronomeEngine } from './audio/MetronomeEngine'
+import { loopEngine } from './audio/LoopEngine'
+import { deleteLoopSlotAudio, putLoopAudio } from './audio/loopAudioStore'
+import { loadedLoopSlots, loopSlotFileName, loopSlotLabel, nextLoopSyncSlot, presetLoopSyncSlot } from './audio/loopSlots'
+import { invalidateLoadedLoopSlot, markLoopSlotLoaded } from './audio/loopSlotPlayback'
 import { claimMixableAudioSession } from './audio/iosAudioSession'
 import {
   transportNextPreset,
@@ -47,7 +51,7 @@ import {
   transportTogglePlay,
 } from './audio/transportControls'
 import { buildRuntimeConfigFromStore } from './audio/runtimeConfigFromStore'
-import { activateTransportMarker, applyClickSyncForPreset, playNextPresetAfterTransportMarker } from './audio/presetNavigationTransport'
+import { activatePresetFromNavigation, activateTransportMarker, applyClickSyncForPreset, applyLoopSyncForPreset, cancelPendingLoopQuantize, playNextPresetAfterTransportMarker } from './audio/presetNavigationTransport'
 import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isPresetInClickSyncSegment, isTransportMarkerKey, navigationEntryKey, resolveNavigationClickBpm, transportMarkerHasActiveFollowingClick } from './presets/presetNavigation'
 import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL } from './utils/nowPlayingLabels'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
@@ -57,7 +61,10 @@ import { blendFromMorph } from './audio/audioMath'
 import { AddFollowerControls, AddMicToolbarButton } from './components/AddFollowerControls'
 import { MicMenuSection } from './components/MicMenuSection'
 import { MetronomeControls } from './components/MetronomeControls'
+import { LoopControls } from './components/LoopControls'
+import { LoopMenuSection } from './components/LoopMenuSection'
 import { ClickSyncButton } from './components/ClickSyncButton'
+import { LoopSyncButton } from './components/LoopSyncButton'
 import { NoteSelector } from './components/NoteSelector'
 import { OvertoneBars } from './components/OvertoneBars'
 import { OvertoneAllSoloButton, OvertoneToneNavControls, HarmonicTimbreToggleButton, overtoneControlButtonSizeClass, overtoneIconButtonClass } from './components/OvertoneToneNavControls'
@@ -79,6 +86,7 @@ import { HomeScreenOverlay, type HomeScreenItem } from './components/HomeScreenO
 import { useAddFollower } from './hooks/useAddFollower'
 import { useAudioEngine } from './hooks/useAudioEngine'
 import { useMetronome } from './hooks/useMetronome'
+import { useLoop } from './hooks/useLoop'
 import { useOvertoneMidi } from './hooks/useOvertoneMidi'
 import { useShine } from './hooks/useShine'
 import {
@@ -108,13 +116,14 @@ import {
 import { triggerSaveFlash } from './utils/saveFlash'
 import { isIosApp } from './utils/platform'
 
-type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'add' | 'midi' | 'shine'
+type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'loop' | 'add' | 'midi' | 'shine'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'tone', label: 'Tone' },
   { id: 'overtones', label: 'Timbre' },
   { id: 'presets', label: 'Presets' },
   { id: 'metronome', label: 'Click' },
+  { id: 'loop', label: 'Loop' },
   { id: 'shine', label: 'Shine' },
   { id: 'add', label: 'Mic' },
 ]
@@ -501,6 +510,13 @@ function App() {
   const metronomeVolumeDb = useDroneStore((state) => state.metronomeVolumeDb)
   const metronomeMuted = useDroneStore((state) => state.metronomeMuted)
   const metronomeSyncEnabled = useDroneStore((state) => state.metronomeSyncEnabled)
+  const loopSlots = useDroneStore((state) => state.loopSlots)
+  const activeLoopSlot = useDroneStore((state) => state.activeLoopSlot)
+  const loopVolumeDb = useDroneStore((state) => state.loopVolumeDb)
+  const loopMuted = useDroneStore((state) => state.loopMuted)
+  const loopEnabled = useDroneStore((state) => state.loopEnabled)
+  const loopSyncEnabled = useDroneStore((state) => state.loopSyncEnabled)
+  const loopFeaturesEnabled = useDroneStore((state) => state.loopFeaturesEnabled)
   const liveShineEnabled = useDroneStore((state) => state.shine.enabled)
   const micFeaturesEnabled = useDroneStore((state) => state.micFeaturesEnabled)
   const controlsLocked = useDroneStore((state) => state.controlsLocked)
@@ -549,6 +565,13 @@ function App() {
   const setMetronomeVolumeDb = useDroneStore((state) => state.setMetronomeVolumeDb)
   const setMetronomeMuted = useDroneStore((state) => state.setMetronomeMuted)
   const setMetronomeSyncEnabled = useDroneStore((state) => state.setMetronomeSyncEnabled)
+  const setLoopSlotFileName = useDroneStore((state) => state.setLoopSlotFileName)
+  const setActiveLoopSlot = useDroneStore((state) => state.setActiveLoopSlot)
+  const setLoopVolumeDb = useDroneStore((state) => state.setLoopVolumeDb)
+  const setLoopMuted = useDroneStore((state) => state.setLoopMuted)
+  const setLoopEnabled = useDroneStore((state) => state.setLoopEnabled)
+  const setLoopSyncEnabled = useDroneStore((state) => state.setLoopSyncEnabled)
+  const setPresetLoopSyncSlot = useDroneStore((state) => state.setPresetLoopSyncSlot)
   const saveDroneState = useDroneStore((state) => state.saveDroneState)
   const saveAsPreset = useDroneStore((state) => state.saveAsPreset)
   const loadPreset = useDroneStore((state) => state.loadPreset)
@@ -622,6 +645,12 @@ function App() {
           : navigationEntryKey(entry) === activeNavigationKey
             ? liveShineEnabled
             : preset?.shine.enabled === true,
+        loopSyncEnabled: isTransport ? false : presetLoopSyncSlot(preset) != null,
+        loopSyncSlot: isTransport ? null : presetLoopSyncSlot(preset),
+        showLoopSync:
+          loopFeaturesEnabled &&
+          !isTransport &&
+          loadedLoopSlots(loopSlots).length > 0,
       }
     })
     const enabledSongs = songLibrary.filter((song) => song.enabled !== false)
@@ -635,6 +664,8 @@ function App() {
   }, [
     activeNavigationKey,
     liveShineEnabled,
+    loopFeaturesEnabled,
+    loopSlots,
     metronomeBpm,
     presetNavigation,
     presets,
@@ -642,8 +673,17 @@ function App() {
     songName,
   ])
   const visibleTabs = useMemo(
-    () => (micFeaturesEnabled ? TABS : TABS.filter((tab) => tab.id !== 'add')),
-    [micFeaturesEnabled],
+    () =>
+      TABS.filter((tab) => {
+        if (tab.id === 'add' && !micFeaturesEnabled) {
+          return false
+        }
+        if (tab.id === 'loop' && !loopFeaturesEnabled) {
+          return false
+        }
+        return true
+      }),
+    [loopFeaturesEnabled, micFeaturesEnabled],
   )
 
   const selectedOvertoneTone = useMemo(
@@ -1609,6 +1649,119 @@ function App() {
     [handlePresetMetronomeSyncChange, handleTransportMarkerMetronomeSyncChange],
   )
 
+  const handleLoopEnabledChange = useCallback(
+    (enabled: boolean) => {
+      if (enabled) {
+        const state = useDroneStore.getState()
+        if (!loopSlotFileName(state.loopSlots, state.activeLoopSlot)) {
+          return
+        }
+        if (state.loopMuted) {
+          setLoopMuted(false)
+        }
+        loopEngine.prepareContext()
+        loopEngine.playFromStart()
+      } else {
+        loopEngine.stopFromGesture()
+      }
+      setLoopEnabled(enabled)
+    },
+    [setLoopEnabled, setLoopMuted],
+  )
+
+  const handleLoopSyncChange = useCallback(
+    (enabled: boolean) => {
+      setLoopSyncEnabled(enabled)
+      const state = useDroneStore.getState()
+      if (enabled && playing && loopSlotFileName(state.loopSlots, state.activeLoopSlot)) {
+        if (state.loopMuted) {
+          setLoopMuted(false)
+        }
+        loopEngine.prepareContext()
+        loopEngine.playFromStart()
+        setLoopEnabled(true)
+      }
+    },
+    [playing, setLoopEnabled, setLoopMuted, setLoopSyncEnabled],
+  )
+
+  const handleSelectLoopSlot = useCallback(
+    (slot: typeof activeLoopSlot) => {
+      const state = useDroneStore.getState()
+      setActiveLoopSlot(slot)
+      if (!loopSlotFileName(state.loopSlots, slot) && state.loopEnabled) {
+        loopEngine.stopFromGesture()
+        setLoopEnabled(false)
+      }
+    },
+    [setActiveLoopSlot, setLoopEnabled],
+  )
+
+  const handleLoopFilePick = useCallback(
+    async (file: File) => {
+      const state = useDroneStore.getState()
+      const songId = state.songLibrary.find((song) => song.name === state.songName)?.id
+      if (!songId) {
+        return
+      }
+      const slot = state.activeLoopSlot
+      await putLoopAudio(songId, slot, file.name, file)
+      await loopEngine.loadBlob(file)
+      markLoopSlotLoaded(songId, slot)
+      setLoopSlotFileName(slot, file.name)
+    },
+    [setLoopSlotFileName],
+  )
+
+  const handleLoopFileClear = useCallback(async () => {
+    const state = useDroneStore.getState()
+    const songId = state.songLibrary.find((song) => song.name === state.songName)?.id
+    const slot = state.activeLoopSlot
+    if (songId) {
+      await deleteLoopSlotAudio(songId, slot)
+    }
+    invalidateLoadedLoopSlot()
+    loopEngine.clear()
+    setLoopEnabled(false)
+    setLoopSlotFileName(slot, null)
+  }, [setLoopEnabled, setLoopSlotFileName])
+
+  const handlePresetLoopSyncChange = useCallback(
+    (presetId: string) => {
+      const state = useDroneStore.getState()
+      const preset = state.presets.find((item) => item.id === presetId)
+      const next = nextLoopSyncSlot(presetLoopSyncSlot(preset), loadedLoopSlots(state.loopSlots))
+      setPresetLoopSyncSlot(presetId, next)
+      const onThisPreset =
+        activePresetId === presetId &&
+        !isTransportMarkerKey(activeNavigationKey, useDroneStore.getState().presetNavigation)
+      if (!onThisPreset) {
+        return
+      }
+      if (next != null) {
+        if (playing) {
+          applyLoopSyncForPreset(presetId)
+        }
+        return
+      }
+      if (playing) {
+        loopEngine.stopFromGesture()
+        setLoopEnabled(false)
+      }
+    },
+    [activeNavigationKey, activePresetId, playing, setLoopEnabled, setPresetLoopSyncSlot],
+  )
+
+  const handleHomeItemLoopSyncChange = useCallback(
+    (id: string) => {
+      if (isTransportMarkerKey(id, useDroneStore.getState().presetNavigation)) {
+        return
+      }
+      handlePresetLoopSyncChange(id)
+    },
+    [handlePresetLoopSyncChange],
+  )
+
   const activeTones = useMemo(() => tonesInToneSet.filter((tone) => tone.enabled), [tonesInToneSet])
   const toneMixerTones = useMemo(() => {
     const toneById = new Map(tones.map((tone) => [tone.noteId, tone]))
@@ -1895,10 +2048,9 @@ function App() {
         activateTransportMarker(id)
         return
       }
-      loadPreset(id)
-      applyClickSyncForPreset(id)
+      activatePresetFromNavigation(id, false)
     },
-    [loadPreset, presetNavigation],
+    [presetNavigation],
   )
 
   const startsWithPause = useCallback(() => {
@@ -1926,10 +2078,9 @@ function App() {
         transportPause()
         return
       }
-      handlePresetPickerSelect(id)
-      transportPlay(buildRuntimeConfigFromStore(useDroneStore.getState()))
+      activatePresetFromNavigation(id, true)
     },
-    [handlePresetPickerSelect, presetNavigation],
+    [presetNavigation],
   )
 
   const handleHomeSongSelect = useCallback(
@@ -2024,11 +2175,24 @@ function App() {
     addFollower.stopListening()
     setActiveTab((tab) => (tab === 'add' ? 'tone' : tab))
   }, [addFollower.stopListening, micFeaturesEnabled])
+  useEffect(() => {
+    if (loopFeaturesEnabled) {
+      return
+    }
+    cancelPendingLoopQuantize()
+    loopEngine.stopNow()
+    setActiveTab((tab) => (tab === 'loop' ? 'tone' : tab))
+  }, [loopFeaturesEnabled])
   useMetronome({
     enabled: metronomeEnabled,
     bpm: metronomeBpm,
     volumeDb: metronomeVolumeDb,
     muted: metronomeMuted,
+  })
+  useLoop({
+    enabled: loopFeaturesEnabled && loopEnabled,
+    volumeDb: loopVolumeDb,
+    muted: loopMuted,
   })
   const shine = useShine(referenceA4Hz, SEMITONES_FROM_C[tonalCenter], masterGainDb, playing)
 
@@ -2165,7 +2329,7 @@ function App() {
   }, [activeTab])
 
   useLayoutEffect(() => {
-    if (activeTab !== 'overtones' && activeTab !== 'presets' && activeTab !== 'metronome' && activeTab !== 'add') {
+    if (activeTab !== 'overtones' && activeTab !== 'presets' && activeTab !== 'metronome' && activeTab !== 'loop' && activeTab !== 'add') {
       return
     }
     resetTabScroll()
@@ -2312,11 +2476,21 @@ function App() {
       onSelectPreset={handleHomePresetSelect}
       onSelectSong={handleHomeSongSelect}
       onToggleTransportMetronomeSync={handleHomeItemMetronomeSyncChange}
+      onToggleLoopSync={loopFeaturesEnabled ? handleHomeItemLoopSyncChange : undefined}
       onOpenClickTab={() => {
         suppressTrailingClickAfterLongPress()
         setActiveTab('metronome')
         setHomeScreenOpen(false)
       }}
+      onOpenLoopTab={
+        loopFeaturesEnabled
+          ? () => {
+              suppressTrailingClickAfterLongPress()
+              setActiveTab('loop')
+              setHomeScreenOpen(false)
+            }
+          : undefined
+      }
       onOpenShineTab={(id) => {
         suppressTrailingClickAfterLongPress()
         const state = useDroneStore.getState()
@@ -2329,14 +2503,17 @@ function App() {
       }}
       liveClickPlaying={metronomeEnabled}
       liveClickBpm={metronomeBpm}
+      liveLoopPlaying={loopFeaturesEnabled && loopEnabled}
+      liveLoopSlot={activeLoopSlot}
       onStopLiveClick={() => handleMetronomeEnabledChange(false)}
+      onStopLiveLoop={() => handleLoopEnabledChange(false)}
     />
   )
   const iosHomeOpen = isIosApp() && homeScreenOpen
   const appShell = (
     <div
       className={`relative bg-[#111019] text-[#f2f2f7] ${
-        iosHomeOpen || activeTab === 'metronome' || activeTab === 'presets'
+        iosHomeOpen || activeTab === 'metronome' || activeTab === 'loop' || activeTab === 'presets'
           ? 'flex h-[100dvh] flex-col overflow-hidden overscroll-none'
           : activeTab === 'shine'
             ? 'landscape:flex landscape:h-[100dvh] landscape:flex-col landscape:overflow-hidden landscape:overscroll-none max-h-[500px]:flex max-h-[500px]:h-[100dvh] max-h-[500px]:flex-col max-h-[500px]:overflow-hidden max-h-[500px]:overscroll-none'
@@ -2388,7 +2565,7 @@ function App() {
       )}
       <div
         className={`mx-auto w-full max-w-md pt-0 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] landscape:max-w-none max-h-[500px]:max-w-none md:max-w-5xl ${
-          iosHomeOpen || activeTab === 'presets' || activeTab === 'metronome'
+          iosHomeOpen || activeTab === 'presets' || activeTab === 'metronome' || activeTab === 'loop'
             ? 'flex min-h-0 flex-1 flex-col pb-0'
             : activeTab === 'shine'
               ? 'landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:pb-0 landscape:pt-[env(safe-area-inset-top,0px)] max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:pb-0 max-h-[500px]:pt-[env(safe-area-inset-top,0px)]'
@@ -2582,7 +2759,7 @@ function App() {
 
         <main
           className={`${iosHomeOpen ? 'hidden' : ''} landscape:pb-2 max-h-[500px]:pb-2 ${
-            activeTab === 'metronome'
+            activeTab === 'metronome' || activeTab === 'loop'
               ? 'pb-32'
               : activeTab === 'presets'
                 ? 'flex min-h-0 flex-1 flex-col pb-0'
@@ -2927,6 +3104,49 @@ function App() {
           <div
             className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
             role="tabpanel"
+            id="panel-loop"
+            aria-labelledby="tab-loop"
+            hidden={activeTab !== 'loop'}
+          >
+            <SectionCard
+              title="Loop"
+              className="[&>header]:mb-0"
+              rightSlot={
+                <LoopSyncButton
+                  enabled={loopSyncEnabled}
+                  slot={loopSyncEnabled ? activeLoopSlot : null}
+                  onClick={() => handleLoopSyncChange(!loopSyncEnabled)}
+                  inactiveClassName="border-white/15 bg-white/5 text-white/55 hover:bg-white/10"
+                  ariaLabel={
+                    loopSyncEnabled
+                      ? `Disable loop sync with drone transport play and pause (${loopSlotLabel(activeLoopSlot)})`
+                      : 'Sync loop start and stop with drone transport play and pause'
+                  }
+                />
+              }
+            >
+              <LoopControls
+                enabled={loopEnabled}
+                activeSlot={activeLoopSlot}
+                slots={loopSlots}
+                volumeDb={loopVolumeDb}
+                muted={loopMuted}
+                onEnabledChange={handleLoopEnabledChange}
+                onSelectSlot={handleSelectLoopSlot}
+                onPickFile={(file) => {
+                  void handleLoopFilePick(file)
+                }}
+                onClearFile={() => {
+                  void handleLoopFileClear()
+                }}
+                onVolumeChange={setLoopVolumeDb}
+                onMutedChange={setLoopMuted}
+              />
+            </SectionCard>
+          </div>
+          <div
+            className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
+            role="tabpanel"
             id="panel-add"
             aria-labelledby="tab-add"
             hidden={activeTab !== 'add'}
@@ -2975,6 +3195,7 @@ function App() {
                       onToggleTransportNavigationEnabled={toggleTransportMarkerNavigationEnabled}
                       onSetTransportMetronomeSync={handleTransportMarkerMetronomeSyncChange}
                       onSetPresetMetronomeSync={handlePresetMetronomeSyncChange}
+                      onSetPresetLoopSync={handlePresetLoopSyncChange}
                       onActivateTransport={activateTransportMarker}
                     />
                   </div>
@@ -3062,7 +3283,7 @@ function App() {
                   aria-selected={activeTab === id}
                   aria-controls={`panel-${id}`}
                   id={`tab-${id}`}
-                  className={`button-safe shrink-0 rounded-lg border px-3 py-2 text-center text-sm font-medium transition ios-app:flex ios-app:h-11 ios-app:min-w-0 ios-app:flex-1 ios-app:items-center ios-app:justify-center ios-app:overflow-hidden ios-app:rounded-xl ios-app:px-0 ios-app:py-0 ios-app:text-sm ios-app:leading-none ios-app:tracking-tight ios-app:font-semibold ios-app:whitespace-nowrap ios-app:[overflow-wrap:normal] ${
+                  className={`button-safe shrink-0 rounded-lg border px-3 py-2 text-center text-sm font-medium transition ios-app:flex ios-app:h-11 ios-app:min-w-0 ios-app:flex-1 ios-app:items-center ios-app:justify-center ios-app:overflow-hidden ios-app:rounded-xl ios-app:px-0 ios-app:py-0 ios-app:text-[11px] ios-app:leading-none ios-app:tracking-tight ios-app:font-semibold ios-app:whitespace-nowrap ios-app:[overflow-wrap:normal] ${
                     activeTab === id
                       ? 'border-white/25 bg-white/15 text-white ios-app:border-fuchsia-300/60 ios-app:bg-fuchsia-400/15 ios-app:text-white'
                       : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 ios-app:border-white/15 ios-app:bg-white/5 ios-app:text-white ios-app:hover:bg-white/10'
@@ -3404,6 +3625,9 @@ function App() {
                 <Menu size={20} />
                 MIDI
               </button>
+              <div data-keep-menu-open>
+                <LoopMenuSection />
+              </div>
               <div data-keep-menu-open>
                 <MicMenuSection />
               </div>

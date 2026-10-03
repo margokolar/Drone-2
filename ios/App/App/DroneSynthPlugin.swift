@@ -16,6 +16,9 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setMetronome", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setShine", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearShine", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setLoopAudio", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setLoopPlayback", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearLoop", returnType: CAPPluginReturnPromise),
     ]
 
     @objc func reclaim(_ call: CAPPluginCall) {
@@ -86,6 +89,37 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func clearShine(_ call: CAPPluginCall) {
         DroneSynthEngine.shared.clearShine()
+        call.resolve()
+    }
+
+    @objc func setLoopAudio(_ call: CAPPluginCall) {
+        let encoded = call.getString("data") ?? ""
+        guard let data = Data(base64Encoded: encoded) else {
+            call.reject("Invalid loop audio data")
+            return
+        }
+        DroneSynthEngine.shared.setLoopAudio(data: data) { duration in
+            call.resolve(["duration": duration])
+        }
+    }
+
+    @objc func setLoopPlayback(_ call: CAPPluginCall) {
+        let on = Self.number(call, "on", Self.flag(call, "enabled") ? 1 : 0) > 0.5
+        let mute = Self.number(call, "mute", Self.flag(call, "muted") ? 1 : 0) > 0.5
+        let restart = Self.number(call, "restart", 0) > 0.5
+        let stopAtEnd = Self.number(call, "stopAtEnd", 0) > 0.5
+        DroneSynthEngine.shared.setLoopPlayback(
+            enabled: on,
+            volumeDb: Self.number(call, "volumeDb", -6),
+            muted: mute,
+            restart: restart,
+            stopAtEnd: stopAtEnd
+        )
+        call.resolve()
+    }
+
+    @objc func clearLoop(_ call: CAPPluginCall) {
+        DroneSynthEngine.shared.clearLoopAudio()
         call.resolve()
     }
 

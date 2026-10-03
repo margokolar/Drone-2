@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Check, Copy, Pencil, Plus, Trash2 } from 'lucide-re
 import { useRef, useState, useMemo } from 'react'
 import { flushSync } from 'react-dom'
 import type { Preset } from '../presets/defaultPresets'
+import { loopSlotLabel, presetLoopSyncSlot } from '../audio/loopSlots'
 import {
   isPresetInClickSyncSegment,
   resolveActivePresetHighlightKey,
@@ -10,8 +11,10 @@ import {
 } from '../presets/presetNavigation'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ClickSyncButton } from './ClickSyncButton'
+import { LoopSyncButton } from './LoopSyncButton'
 import { PlayPauseIcon } from './PlayPauseIcon'
 import { NavigationCheckbox } from './NavigationCheckbox'
+import { useDroneStore } from '../store/useDroneStore'
 
 type PendingDelete =
   | { kind: 'preset'; id: string; name: string }
@@ -33,6 +36,7 @@ type PresetListProps = {
   onToggleTransportNavigationEnabled: (markerId: string) => void
   onSetTransportMetronomeSync: (markerId: string, enabled: boolean) => void
   onSetPresetMetronomeSync: (presetId: string, enabled: boolean) => void
+  onSetPresetLoopSync: (presetId: string) => void
   onActivateTransport: (markerId: string) => void
 }
 
@@ -52,8 +56,10 @@ export function PresetList({
   onToggleTransportNavigationEnabled,
   onSetTransportMetronomeSync,
   onSetPresetMetronomeSync,
+  onSetPresetLoopSync,
   onActivateTransport,
 }: PresetListProps) {
+  const loopFeaturesEnabled = useDroneStore((state) => state.loopFeaturesEnabled)
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
@@ -382,6 +388,26 @@ export function PresetList({
                             : 'Sync click start and stop with this preset'
                         }
                       />
+                    ) : null}
+                    {loopFeaturesEnabled ? (
+                    <LoopSyncButton
+                      enabled={presetLoopSyncSlot(preset) != null}
+                      slot={presetLoopSyncSlot(preset)}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onSetPresetLoopSync(preset.id)
+                      }}
+                      inactiveClassName={
+                        isActive
+                          ? 'border-white/20 bg-[#2a2238] text-white/70 hover:bg-[#352a48]'
+                          : 'border-white/10 bg-white/5 text-white/55 hover:bg-white/10'
+                      }
+                      ariaLabel={
+                        presetLoopSyncSlot(preset) != null
+                          ? `Loop sync ${loopSlotLabel(presetLoopSyncSlot(preset)!)}. Tap to cycle.`
+                          : 'Sync loop start and stop with this preset'
+                      }
+                    />
                     ) : null}
                     <NavigationCheckbox
                       checked={isNavigationEnabled}

@@ -1,9 +1,12 @@
 import { droneEngine } from './DroneEngine'
 import type { DroneRuntimeConfig } from './types'
 import {
+  playLoopSyncedTransport,
   playNextPresetFromTransportMarker,
+  shouldStartLoopWithCurrentItem,
   stepPresetNavigation,
   syncClickWithTransportPlayState,
+  syncLoopWithTransportPlayState,
   syncTransportPaused,
 } from './presetNavigationTransport'
 import { isTransportMarkerKey } from '../presets/presetNavigation'
@@ -40,6 +43,10 @@ export function transportPlay(config: DroneRuntimeConfig): void {
     playNextPresetFromTransportMarker()
     return
   }
+  if (shouldStartLoopWithCurrentItem()) {
+    playLoopSyncedTransport(config)
+    return
+  }
   droneEngine.setPlaybackIntent(true)
   droneEngine.markGesturePlaybackStarted()
   if (droneEngine.canFastResume()) {
@@ -49,6 +56,7 @@ export function transportPlay(config: DroneRuntimeConfig): void {
   }
   useDroneStore.getState().setPlaying(true)
   syncClickWithTransportPlayState(true)
+  syncLoopWithTransportPlayState(true)
   if (needsIosMediaRemoteIntegration()) {
     syncMediaSessionPlaybackState(true)
   }
@@ -64,6 +72,10 @@ export function transportPlayFromRemote(config: DroneRuntimeConfig): void {
     playNextPresetFromTransportMarker()
     return
   }
+  if (shouldStartLoopWithCurrentItem()) {
+    playLoopSyncedTransport(config)
+    return
+  }
   droneEngine.setPlaybackIntent(true)
   droneEngine.markGesturePlaybackStarted()
   droneEngine.prepareContextForGesture()
@@ -74,6 +86,7 @@ export function transportPlayFromRemote(config: DroneRuntimeConfig): void {
   }
   useDroneStore.getState().setPlaying(true)
   syncClickWithTransportPlayState(true)
+  syncLoopWithTransportPlayState(true)
   if (needsIosMediaRemoteIntegration()) {
     syncMediaSessionPlaybackState(true)
   }
@@ -83,6 +96,7 @@ export function transportPlayFromRemote(config: DroneRuntimeConfig): void {
 export function transportPause(): void {
   syncTransportPaused()
   syncClickWithTransportPlayState(false)
+  syncLoopWithTransportPlayState(false)
   recordBleDebug('note', `paused ctx=${droneEngine.contextDebugLabel()}`)
   window.setTimeout(() => {
     recordBleDebug(
@@ -100,6 +114,7 @@ export function transportPauseFromRemote(): void {
   }
   syncTransportPaused()
   syncClickWithTransportPlayState(false)
+  syncLoopWithTransportPlayState(false)
   recordBleDebug('note', `remote pause ctx=${droneEngine.contextDebugLabel()}`)
 }
 
@@ -114,10 +129,15 @@ export function transportTogglePlay(config: DroneRuntimeConfig): void {
 }
 
 export function transportResume(config: DroneRuntimeConfig): void {
+  if (shouldStartLoopWithCurrentItem()) {
+    playLoopSyncedTransport(config)
+    return
+  }
   droneEngine.setPlaybackIntent(true)
   droneEngine.fastResume(config)
   useDroneStore.getState().setPlaying(true)
   syncClickWithTransportPlayState(true)
+  syncLoopWithTransportPlayState(true)
   if (needsIosMediaRemoteIntegration()) {
     syncMediaSessionPlaybackState(true)
   }

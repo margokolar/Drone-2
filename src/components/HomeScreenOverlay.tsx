@@ -1,6 +1,7 @@
 import clsx from 'clsx'
-import { Sparkles } from 'lucide-react'
+import { Repeat, Sparkles } from 'lucide-react'
 import { useEffect, useRef } from 'react'
+import { loopSlotLabel, type LoopSlot } from '../audio/loopSlots'
 import { METRONOME_LONG_PRESS_MS } from './ClickSyncButton'
 import { MetronomeIcon } from './MetronomeIcon'
 import { PlayPauseIcon } from './PlayPauseIcon'
@@ -17,6 +18,9 @@ export type HomeScreenItem = {
   showMetronomeSync?: boolean
   metronomeBpm?: number
   shineEnabled?: boolean
+  loopSyncEnabled?: boolean
+  loopSyncSlot?: LoopSlot | null
+  showLoopSync?: boolean
 }
 
 type HomeScreenOverlayProps = {
@@ -28,11 +32,16 @@ type HomeScreenOverlayProps = {
   onSelectPreset: (id: string) => void
   onSelectSong: (id: string) => void
   onToggleTransportMetronomeSync?: (id: string, enabled: boolean) => void
+  onToggleLoopSync?: (id: string) => void
   onOpenClickTab?: () => void
+  onOpenLoopTab?: () => void
   onOpenShineTab?: (id: string) => void
   liveClickPlaying?: boolean
   liveClickBpm?: number
+  liveLoopPlaying?: boolean
+  liveLoopSlot?: LoopSlot | null
   onStopLiveClick?: () => void
+  onStopLiveLoop?: () => void
 }
 
 const boxClass =
@@ -68,20 +77,33 @@ export function HomeScreenOverlay({
   onSelectPreset,
   onSelectSong,
   onToggleTransportMetronomeSync,
+  onToggleLoopSync,
   onOpenClickTab,
+  onOpenLoopTab,
   onOpenShineTab,
   liveClickPlaying = false,
   liveClickBpm,
+  liveLoopPlaying = false,
+  liveLoopSlot = null,
   onStopLiveClick,
+  onStopLiveLoop,
 }: HomeScreenOverlayProps) {
   const presetListRef = useScrollActiveIntoView(presets)
   const songListRef = useScrollActiveIntoView(songs)
   const metroLongPressTimerRef = useRef<number | null>(null)
   const metroLongPressFiredRef = useRef(false)
+  const loopLongPressTimerRef = useRef<number | null>(null)
+  const loopLongPressFiredRef = useRef(false)
   const clearMetroLongPressTimer = () => {
     if (metroLongPressTimerRef.current !== null) {
       window.clearTimeout(metroLongPressTimerRef.current)
       metroLongPressTimerRef.current = null
+    }
+  }
+  const clearLoopLongPressTimer = () => {
+    if (loopLongPressTimerRef.current !== null) {
+      window.clearTimeout(loopLongPressTimerRef.current)
+      loopLongPressTimerRef.current = null
     }
   }
   const activeItem = presets.find((item) => item.isActive)
@@ -171,6 +193,65 @@ export function HomeScreenOverlay({
         <Sparkles className="h-full w-full" strokeWidth={2} aria-hidden />
       </button>
     ) : null
+  const syncLargeLoop =
+    Boolean(onToggleLoopSync) &&
+    activeItem != null &&
+    !activeItem.isTransport &&
+    activeItem.loopSyncEnabled === true
+  const unsyncedLiveLoop =
+    liveLoopPlaying && !syncLargeLoop && activeItem != null && !activeItem.isTransport
+  const showLargeLoop = Boolean(activeItem) && (syncLargeLoop || unsyncedLiveLoop)
+  const largeLoopButton =
+    showLargeLoop && activeItem ? (
+      <button
+        type="button"
+        onPointerDown={() => {
+          if (!onOpenLoopTab) {
+            return
+          }
+          loopLongPressFiredRef.current = false
+          clearLoopLongPressTimer()
+          loopLongPressTimerRef.current = window.setTimeout(() => {
+            loopLongPressTimerRef.current = null
+            loopLongPressFiredRef.current = true
+            onOpenLoopTab()
+          }, METRONOME_LONG_PRESS_MS)
+        }}
+        onPointerUp={clearLoopLongPressTimer}
+        onPointerLeave={clearLoopLongPressTimer}
+        onPointerCancel={clearLoopLongPressTimer}
+        onClick={() => {
+          if (loopLongPressFiredRef.current) {
+            loopLongPressFiredRef.current = false
+            return
+          }
+          if (unsyncedLiveLoop) {
+            onStopLiveLoop?.()
+            return
+          }
+          onToggleLoopSync?.(activeItem.id)
+        }}
+        className={clsx(largeMetronomeButtonClass, 'text-emerald-100')}
+        aria-pressed
+        aria-label={
+          unsyncedLiveLoop
+            ? `Stop loop${onOpenLoopTab ? '. Long-press to open Loop.' : ''}`
+            : `Cycle loop sync for this preset${onOpenLoopTab ? '. Long-press to open Loop.' : ''}`
+        }
+      >
+        {syncLargeLoop && activeItem.loopSyncSlot != null ? (
+          <span className="text-[0.42em] font-bold leading-none tracking-tight">
+            {loopSlotLabel(activeItem.loopSyncSlot)}
+          </span>
+        ) : unsyncedLiveLoop && liveLoopSlot != null ? (
+          <span className="text-[0.42em] font-bold leading-none tracking-tight">
+            {loopSlotLabel(liveLoopSlot)}
+          </span>
+        ) : (
+          <Repeat className="h-full w-full" strokeWidth={2.25} aria-hidden />
+        )}
+      </button>
+    ) : null
 
   return (
     <div className="home-screen-overlay flex h-full min-h-0 flex-col gap-3 overflow-hidden">
@@ -188,6 +269,7 @@ export function HomeScreenOverlay({
                 {presetTitle}
               </div>
               {largeShineButton}
+              {largeLoopButton}
               {largeMetronomeCluster}
             </div>
           )}
@@ -204,6 +286,8 @@ export function HomeScreenOverlay({
               metronomeLit={item.metronomeLit}
               metronomeBpm={item.metronomeBpm}
               shineEnabled={item.shineEnabled}
+              loopSyncEnabled={item.loopSyncEnabled}
+              loopSyncSlot={item.loopSyncSlot}
               onSelect={() => onSelectPreset(item.id)}
               onToggleMetronomeSync={
                 onToggleTransportMetronomeSync && (item.isTransport || item.showMetronomeSync)
@@ -213,6 +297,16 @@ export function HomeScreenOverlay({
               onLongPressMetronome={
                 onOpenClickTab && (item.isTransport || item.showMetronomeSync)
                   ? onOpenClickTab
+                  : undefined
+              }
+              onToggleLoopSync={
+                onToggleLoopSync && !item.isTransport && item.showLoopSync
+                  ? () => onToggleLoopSync(item.id)
+                  : undefined
+              }
+              onLongPressLoop={
+                onOpenLoopTab && !item.isTransport && item.showLoopSync
+                  ? onOpenLoopTab
                   : undefined
               }
               onOpenShine={
