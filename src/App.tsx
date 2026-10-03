@@ -12,6 +12,7 @@ import {
   LockOpen,
   Menu,
   Pause,
+  Pencil,
   Play,
   PowerOff,
   Redo2,
@@ -2401,7 +2402,7 @@ function App() {
             activeTab === 'tone' || controlsLocked || homeScreenOpen ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}
         >
-          <header className={`title-bar mx-auto flex max-w-[26.5rem] min-w-0 flex-nowrap items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 max-[480px]:px-2 max-[480px]:py-1.5 md:max-w-[62.5rem] ios-app:gap-3 ios-app:px-3 ios-app:py-2 ${
+          <header className={`title-bar mx-auto flex max-w-[26.5rem] min-w-0 flex-nowrap items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 max-[480px]:px-2 max-[480px]:py-1.5 md:max-w-[62.5rem] ios-app:gap-0.5 ios-app:px-2 ios-app:py-2 ${
             controlsLocked ? 'pointer-events-none' : ''
           } ${
             controlsLocked || homeScreenOpen ? '' : 'landscape:hidden max-h-[500px]:hidden'
@@ -2411,7 +2412,7 @@ function App() {
               aria-label={controlsLocked ? 'Menu locked while touch lock is on' : menuLabel}
               aria-disabled={controlsLocked}
               disabled={controlsLocked}
-              className={`flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 max-[480px]:min-h-10 max-[480px]:min-w-10 max-[480px]:p-1.5 ios-app:min-h-[44px] ios-app:min-w-[44px] ios-app:p-2 ${
+              className={`title-bar-icon flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/80 ${
                 controlsLocked ? 'cursor-not-allowed opacity-40' : ''
               }`}
               onClick={() => {
@@ -2430,7 +2431,7 @@ function App() {
             </button>
             <button
               type="button"
-              className="min-w-0 shrink select-none rounded-lg px-0 py-1 text-xl font-semibold tracking-wide text-white transition hover:bg-white/10"
+              className="shrink-0 select-none rounded-lg px-0 py-1 text-xl font-semibold tracking-wide text-white transition hover:bg-white/10"
               onPointerDown={() => {
                 droneTitleLongPressFiredRef.current = false
                 clearDroneTitleLongPressTimer()
@@ -2459,12 +2460,12 @@ function App() {
             </button>
             <button
               type="button"
-              className={`relative z-50 flex min-h-[44px] shrink-0 items-center justify-center rounded-xl border transition max-[480px]:min-h-10 ios-app:min-h-[44px] ${
+              className={`title-bar-icon relative z-50 flex items-center justify-center rounded-xl border transition ${
                 controlsLocked
-                  ? 'min-w-[44px] cursor-not-allowed border-white/10 bg-white/5 px-2.5 text-white/40 opacity-40 max-[480px]:min-w-10 max-[480px]:px-2 ios-app:min-w-[44px] ios-app:px-2.5'
+                  ? 'cursor-not-allowed border-white/10 bg-white/5 text-white/40 opacity-40'
                   : homeScreenOpen
-                    ? 'pointer-events-auto min-w-[44px] border-amber-300/50 bg-amber-300/15 px-2.5 text-amber-100 max-[480px]:min-w-10 max-[480px]:px-2 ios-app:min-w-[44px] ios-app:px-2.5'
-                    : 'pointer-events-auto min-w-[44px] border-cyan-300/50 bg-cyan-300/15 p-2 text-cyan-100 hover:bg-cyan-300/25 max-[480px]:min-w-10 max-[480px]:p-1.5 ios-app:min-w-[44px] ios-app:p-2'
+                    ? 'pointer-events-auto border-amber-300/50 bg-amber-300/15 text-amber-100'
+                    : 'pointer-events-auto border-cyan-300/50 bg-cyan-300/15 text-cyan-100 hover:bg-cyan-300/25'
               }`}
               onClick={() => {
                 if (controlsLocked) {
@@ -2481,16 +2482,24 @@ function App() {
               aria-pressed={homeScreenOpen}
               aria-disabled={controlsLocked}
             >
-              {homeScreenOpen ? (
-                <span className="text-sm font-semibold tracking-wide">EDIT</span>
-              ) : (
-                <Home size={20} />
-              )}
+              {homeScreenOpen ? <Pencil size={20} /> : <Home size={20} />}
             </button>
-            <div className="title-bar-end ml-auto flex shrink-0 items-center gap-3 ios-app:gap-3">
+            <div className="title-bar-end ml-auto flex shrink-0 items-center gap-3 ios-app:gap-1">
             <button
               type="button"
-              className={`relative z-50 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border p-2 transition max-[480px]:min-h-10 max-[480px]:min-w-10 max-[480px]:p-1.5 ios-app:min-h-[44px] ios-app:min-w-[44px] ios-app:p-2 ${
+              className="title-bar-icon button-safe flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition hover:bg-white/10"
+              onClick={(event) => {
+                triggerSaveFlash(event.currentTarget)
+                saveDroneState()
+              }}
+              aria-label="Save drone state"
+              title="Save drone state"
+            >
+              <Save size={20} />
+            </button>
+            <button
+              type="button"
+              className={`title-bar-icon relative z-50 flex items-center justify-center rounded-xl border transition ${
                 controlsLocked
                   ? 'pointer-events-auto border-amber-300/50 bg-amber-300/15 text-amber-100'
                   : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
@@ -2548,17 +2557,6 @@ function App() {
                   <h2 className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
                     Song
                   </h2>
-                  <button
-                    type="button"
-                    className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] text-white/80 transition hover:bg-[#352a48]"
-                    onClick={(event) => {
-                      triggerSaveFlash(event.currentTarget)
-                      saveDroneState()
-                    }}
-                    aria-label="Save drone state"
-                  >
-                    <Save size={15} />
-                  </button>
                 </div>
                 <LibraryPickerMenu
                   selectedId={songLibrary.find((song) => song.name === songName)?.id ?? ''}
@@ -2773,17 +2771,6 @@ function App() {
                         <button
                           type="button"
                           className={overtoneIconButtonClass('portrait-solo')}
-                          onClick={(event) => {
-                            triggerSaveFlash(event.currentTarget)
-                            saveDroneState()
-                          }}
-                          aria-label="Save drone state"
-                        >
-                          <Save size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          className={overtoneIconButtonClass('portrait-solo')}
                           onClick={resetOvertoneBalance}
                           aria-label="Reset overtone balance"
                           disabled={!canResetOvertones}
@@ -2913,19 +2900,7 @@ function App() {
               title="Click"
               className="[&>header]:mb-0"
               rightSlot={
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="button-safe flex size-9 shrink-0 items-center justify-center rounded-lg border border-fuchsia-300/50 bg-fuchsia-300/20 text-fuchsia-100 transition hover:bg-fuchsia-300/30"
-                    onClick={(event) => {
-                      triggerSaveFlash(event.currentTarget)
-                      saveDroneState()
-                    }}
-                    aria-label="Save click settings to the current preset"
-                  >
-                    <Save size={15} />
-                  </button>
-                  <ClickSyncButton
+                <ClickSyncButton
                     enabled={metronomeSyncEnabled}
                     onClick={() => handleMetronomeSyncChange(!metronomeSyncEnabled)}
                     inactiveClassName="border-white/15 bg-white/5 text-white/55 hover:bg-white/10"
@@ -2935,7 +2910,6 @@ function App() {
                         : 'Sync click start and stop with drone transport play and pause'
                     }
                   />
-                </div>
               }
             >
               <MetronomeControls
@@ -2969,19 +2943,6 @@ function App() {
             <SectionCard
               id={PRESETS_SECTION_CARD_ID}
               title="Presets"
-              titleAddon={
-                <button
-                  type="button"
-                  className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-fuchsia-300/50 bg-fuchsia-300/20 text-fuchsia-100 transition hover:bg-fuchsia-300/30"
-                  onClick={(event) => {
-                    triggerSaveFlash(event.currentTarget)
-                    saveDroneState()
-                  }}
-                  aria-label="Save drone state"
-                >
-                  <Save size={15} />
-                </button>
-              }
               className="flex min-h-0 flex-1 flex-col overflow-hidden [&>header]:mb-3 [&>header]:shrink-0"
             >
               <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
@@ -3070,7 +3031,6 @@ function App() {
               {...shine}
               tonalCenter={tonalCenter}
               onTonalCenterChange={setTonalCenter}
-              onSaveDroneState={saveDroneState}
             />
           </div>
         </main>
@@ -3116,17 +3076,6 @@ function App() {
               {activeTab === 'overtones' && (
                 <div className="hidden w-full min-w-0 items-center gap-1.5 landscape:flex max-h-[500px]:flex">
                   <div className="flex shrink-0 items-center gap-1.5">
-                  <button
-                    type="button"
-                    className={overtoneIconButtonClass('landscape-inline')}
-                    onClick={(event) => {
-                      triggerSaveFlash(event.currentTarget)
-                      saveDroneState()
-                    }}
-                    aria-label="Save drone state"
-                  >
-                    <Save size={16} />
-                  </button>
                   <button
                     type="button"
                     className={overtoneIconButtonClass('landscape-inline')}

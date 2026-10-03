@@ -1,16 +1,14 @@
 import { useRef } from 'react'
-import { Play, Save, Square } from 'lucide-react'
+import { Play, Square } from 'lucide-react'
 import { SectionCard } from './SectionCard'
 import { ResettableRangeInput } from './ResettableRangeInput'
 import { ShineMotionSlider } from './ShineMotionSlider'
-import { triggerSaveFlash } from '../utils/saveFlash'
 import { DEFAULT_SHINE_VOLUME, SHINE_OCTAVE_LABELS, type ShineState } from '../hooks/useShine'
 import { TONAL_CENTERS, type TonalCenter } from '../music/notes'
 
 type ShineControlsProps = ShineState & {
   tonalCenter: TonalCenter
   onTonalCenterChange: (value: TonalCenter) => void
-  onSaveDroneState: () => void
 }
 
 type HarmonicBarProps = {
@@ -107,25 +105,9 @@ export function ShineControls({
   setOctaveIndex,
   tonalCenter,
   onTonalCenterChange,
-  onSaveDroneState,
 }: ShineControlsProps) {
   const shineActionButtonClass =
     'button-safe flex min-h-[44px] shrink-0 items-center justify-center rounded-xl border px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.12em] transition landscape:min-h-10 landscape:px-4 landscape:py-2 landscape:text-xs max-h-[500px]:min-h-10 max-h-[500px]:px-4 max-h-[500px]:py-2 max-h-[500px]:text-xs'
-
-  const saveButton = (
-    <button
-      type="button"
-      className={`${shineActionButtonClass} shrink-0 border-white/15 bg-[#2a2238] px-4 text-white/80 hover:bg-[#352a48] landscape:px-3 max-h-[500px]:px-3`}
-      onClick={(event) => {
-        triggerSaveFlash(event.currentTarget)
-        onSaveDroneState()
-      }}
-      aria-label="Save drone state"
-      title="Save drone state"
-    >
-      <Save size={18} />
-    </button>
-  )
 
   const allControlsRow = (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -171,11 +153,8 @@ export function ShineControls({
         </div>
       }
       rightSlot={
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-          <div className="hidden min-w-0 flex-1 justify-end landscape:flex max-h-[500px]:flex">
-            {allControlsRow}
-          </div>
-          {saveButton}
+        <div className="hidden min-w-0 flex-1 justify-end landscape:flex max-h-[500px]:flex">
+          {allControlsRow}
         </div>
       }
       className="[&>header]:items-center landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:overflow-hidden landscape:[&>header]:mb-2 landscape:[&>header]:shrink-0 max-h-[500px]:flex max-h-[500px]:min-h-0 max-h-[500px]:flex-1 max-h-[500px]:flex-col max-h-[500px]:overflow-hidden max-h-[500px]:[&>header]:mb-2 max-h-[500px]:[&>header]:shrink-0"

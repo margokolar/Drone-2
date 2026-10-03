@@ -150,6 +150,26 @@ select {
   background: currentColor;
 }
 
+.ios-app .title-bar {
+  width: 100%;
+  justify-content: space-between;
+  gap: 0.125rem;
+}
+
+.ios-app .title-bar-end {
+  display: contents;
+}
+
+.title-bar-icon {
+  box-sizing: border-box;
+  width: 2.5rem;
+  height: 2.5rem;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0;
+  flex-shrink: 0;
+}
+
 /* Native iOS: enlarge range hit targets (PWA keeps the thin tracks). */
 .ios-app input[type='range']:not(.tone-mixer-fader-vertical-input) {
   height: 2.75rem;
