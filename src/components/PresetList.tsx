@@ -346,7 +346,7 @@ export function PresetList({
                             commitRename(preset.id)
                           }
                         }}
-                        className="min-h-8 w-full appearance-none rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-sm font-semibold leading-tight text-white outline-none focus:border-fuchsia-300/50 [user-select:text] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
+                        className="min-h-8 w-full appearance-none rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-lg font-semibold leading-tight text-white outline-none focus:border-fuchsia-300/50 [user-select:text] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
                         aria-label="Preset title"
                         autoComplete="off"
                         autoCorrect="off"
@@ -359,7 +359,7 @@ export function PresetList({
                       />
                     </form>
                   ) : (
-                    <div className="text-safe min-w-0 truncate text-sm font-semibold text-white">{preset.name}</div>
+                    <div className="text-safe min-w-0 truncate text-lg font-semibold text-white">{preset.name}</div>
                   )}
                 </div>
                 {!isEditing && (
