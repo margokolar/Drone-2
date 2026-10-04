@@ -1,14 +1,18 @@
-# Bourdon Drone PWA
+# Drone (Bourdon)
 
-Mobile-first progressive web app for continuous bourdon / drone reference in tuning, intonation, and rehearsal sessions.
+Mobile-first drone / bourdon reference for tuning, intonation, and rehearsal sessions.
+Ships from one codebase as a **web PWA** (Vercel) and an **iOS app** (Capacitor).
+
+Coding agents: start with [`AGENTS.md`](AGENTS.md) for the code map and invariants.
 
 ## Stack
 
 - React + TypeScript + Vite
 - Tailwind CSS utility system
 - Zustand for app state and preset persistence
-- Web Audio API (custom synthesis engine)
+- Web Audio API on the web; native Swift synth (`AVAudioEngine`) in the iOS app
 - `vite-plugin-pwa` for manifest + service worker registration
+- Capacitor 8 for the iOS shell (see `docs/capacitor-ios-plan.md`)
 
 ## Run
 
@@ -17,10 +21,13 @@ npm install
 npm run dev
 ```
 
-Build:
+Build and check:
 
 ```bash
-npm run build
+npm run build   # production web build
+npm run check   # type check + lint + tests
+npm test        # tests only
+npm run ios     # build and install the iOS app on a connected iPhone
 ```
 
 ## Bluetooth signal probe (macOS)
@@ -59,16 +66,19 @@ python scripts/bt_probe.py --address "<BLE_ADDRESS_OR_UUID>" --scan-timeout 8 --
 ### Separate pitch concepts
 
 - **Reference pitch**: A4 frequency, default `440.0 Hz`
-- **Base octave**: shifts the full note bank register (`c..h` and `c1..h1`)
-- **Tuning system**: `Equal temperament` or `Natural / just intonation`
+- **Base octave**: shifts the full note bank register
+- **Tuning system**: Equal, Natural (5-limit just), Pythagorean, Meantone 1/6, Bohlen-Pierce
 - **Tonal center**: selectable center (`G`, `D`, `A`, `C`, `E`)
 
 The separation lives in `src/music/tuning.ts` and `src/store/useDroneStore.ts`.
 
 ### Note bank
 
-- lower register: `c d e f fis g a h`
-- upper register: `c1 d1 e1 f1 fis1 g1 a1 h1`
+Chromatic, from `g0` up to `d2` (see `NOTE_IDS` in `src/music/notes.ts`):
+
+- sub-octave: `g0 gis0 a0 b0 h0`
+- middle: `c cis d … b h`
+- upper: `c1 … h1`, `c2 cis2 d2`
 
 ## Tuning Details
 

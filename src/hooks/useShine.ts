@@ -159,6 +159,8 @@ export function useShine(
       applyEngineConfig()
     }
 
+    // Meter levels come from the audio engine, which was just reconfigured above.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDisplayLevels(shineEngine.getDisplayLevels())
   }, [
     applyEngineConfig,
@@ -176,6 +178,8 @@ export function useShine(
         cancelAnimationFrame(rafRef.current)
         rafRef.current = null
       }
+      // Idle meters depend on whether the audio engine is still running, which React cannot see.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDisplayLevels(idleDisplayLevels(levels, autos))
       return
     }

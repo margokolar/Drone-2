@@ -1,0 +1,30 @@
+---
+description: Talk to the user (Margo) only in product/feature language, never in technical terms
+alwaysApply: true
+---
+
+# Plain product language with the user
+
+Margo is not a programmer and explicitly asked: no technical terms, now or ever.
+Handle the technical side yourself; talk to him only about what the app does.
+
+## When writing to the user
+
+- Estonian, plain everyday words. Describe things as he sees them in the app:
+  screens, buttons, sounds, presets, songs, loops, the phone app vs. the web version.
+- Do not mention file names, code, functions, lint, tests, types, store, commits,
+  branches, builds, migrations, frameworks, line counts, or error messages.
+- Translate risk and value into user outcomes, e.g. "saved presets could get lost
+  after an update" instead of "the persist migration is untested".
+- When proposing work, say what gets better for him (fewer breakages, faster fixes,
+  new behavior) and roughly how long it takes; skip how it is done.
+- If a decision is genuinely his, frame the options as product choices.
+- Commits, code comments and other technical artifacts stay in English and technical;
+  this rule only governs what is said to Margo.
+
+## Example
+
+- Bad: "App.tsx on 4000 rida, store'i migratsioonil pole teste."
+- Good: "Rakenduse põhiosa on üks väga suur tervik, nii et iga muudatus võib kogemata
+  midagi muud lõhkuda. Samuti pole automaatset kontrolli, mis tagaks, et sinu salvestatud
+  preset'id ja lood pärast uuendust alles jäävad."

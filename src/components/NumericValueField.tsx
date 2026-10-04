@@ -1,5 +1,5 @@
 import { Delete, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { isIosStandalonePwa } from '../utils/platform'
 
@@ -55,11 +55,14 @@ export function NumericValueField({
   const useIosPrompt = useMemo(() => isIosStandalonePwa(), [])
   const allowNegative = min < 0
 
-  useEffect(() => {
+  const draftSyncKey = `${open}|${decimals}|${value}`
+  const [lastDraftSyncKey, setLastDraftSyncKey] = useState(draftSyncKey)
+  if (draftSyncKey !== lastDraftSyncKey) {
+    setLastDraftSyncKey(draftSyncKey)
     if (!open) {
       setDraft(formatValue(value, decimals))
     }
-  }, [decimals, open, value])
+  }
 
   const openEditor = () => {
     setDraft(formatValue(value, decimals))

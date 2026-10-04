@@ -1,5 +1,5 @@
 import { Pause, Play, Volume2, VolumeX } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 import { metronomeEngine } from '../audio/MetronomeEngine'
 import {
   DEFAULT_METRONOME_BPM,
@@ -50,7 +50,9 @@ export function MetronomeControls({
   const bpmRef = useRef(bpm)
   const tempoHoldTimerRef = useRef<number | null>(null)
   const tempoHoldIgnoreClickRef = useRef(false)
-  bpmRef.current = bpm
+  useLayoutEffect(() => {
+    bpmRef.current = bpm
+  }, [bpm])
 
   const stopTempoHold = useCallback(() => {
     if (tempoHoldTimerRef.current !== null) {
@@ -139,14 +141,9 @@ export function MetronomeControls({
 
   useEffect(() => {
     if (!enabled) {
-      setBeatFlash(false)
-      if (beatFlashTimeoutRef.current !== null) {
-        window.clearTimeout(beatFlashTimeoutRef.current)
-        beatFlashTimeoutRef.current = null
-      }
       return
     }
-    return metronomeEngine.onBeat(() => {
+    const unsubscribe = metronomeEngine.onBeat(() => {
       setBeatFlash(true)
       if (beatFlashTimeoutRef.current !== null) {
         window.clearTimeout(beatFlashTimeoutRef.current)
@@ -156,6 +153,14 @@ export function MetronomeControls({
         setBeatFlash(false)
       }, 90)
     })
+    return () => {
+      unsubscribe()
+      if (beatFlashTimeoutRef.current !== null) {
+        window.clearTimeout(beatFlashTimeoutRef.current)
+        beatFlashTimeoutRef.current = null
+      }
+      setBeatFlash(false)
+    }
   }, [enabled])
 
   let powerButtonClass =

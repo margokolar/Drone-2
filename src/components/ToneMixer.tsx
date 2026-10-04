@@ -18,12 +18,7 @@ import { PanFluteIcon } from './PanFluteIcon'
 import { ResettableRangeInput } from './ResettableRangeInput'
 import { TimbreMorphSlider } from './TimbreMorphSlider'
 import { ToneLabel } from './ToneLabel'
-
-export function toneMixerCardElementId(noteId: NoteId): string {
-  return `tone-mixer-${noteId}`
-}
-
-export const TONE_MIXER_SECTION_ID = 'tone-mixer-section'
+import { toneMixerCardElementId } from './toneMixerIds'
 
 function formatToneFrequencyHz(hz: number): string {
   if (hz >= 100) {

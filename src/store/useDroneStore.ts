@@ -811,6 +811,173 @@ function resolveActivePresetId(presets: Preset[], activePresetId: string | undef
   return presets[0]?.id ?? INITIAL_PRESET.id
 }
 
+export const DRONE_STORE_PERSIST_VERSION = 28
+/** Entry glide cents switched polarity in this version; only older saves may be flipped. */
+const ENTRY_GLIDE_POLARITY_SWAP_VERSION = 13
+
+export function migratePersistedDroneState(persistedState: unknown, version: number): unknown {
+  try {
+    const typed = persistedState as (Partial<DroneState> & { loopFileName?: string | null }) | undefined
+    if (!typed) {
+      return persistedState
+    }
+    const entryGlideSign = version < ENTRY_GLIDE_POLARITY_SWAP_VERSION ? -1 : 1
+    const incomingPartials = normalizePartials(typed.partials ?? [])
+    const incomingTimbre = normalizeTimbreBlend(typed.timbreBlend ?? DEFAULT_TIMBRE_BLEND)
+    const migratedPresets = (typed.presets ?? []).map((preset) =>
+      duplicatePresetData({
+        ...preset,
+        enabled: preset.enabled ?? true,
+        baseOctave: clamp(
+          preset.baseOctave ?? 3,
+          MIN_BASE_OCTAVE,
+          MAX_BASE_OCTAVE,
+        ),
+        partials: normalizePartials(preset.partials ?? incomingPartials),
+        timbreBlend: normalizeTimbreBlend(preset.timbreBlend ?? incomingTimbre),
+        tones: migrateTones(
+          preset.tones ?? [],
+          preset.partials ?? incomingPartials,
+          normalizeTimbreBlend(preset.timbreBlend ?? incomingTimbre),
+        ),
+      }),
+    )
+    const resolvedPresets =
+      migratedPresets.length > 0
+        ? migratedPresets
+        : DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset))
+    const resolvedActivePresetId = resolveActivePresetId(
+      resolvedPresets,
+      typed.activePresetId,
+    )
+    const presetNavigation = normalizePresetNavigation(typed.presetNavigation, resolvedPresets)
+    const activeNavigationKey =
+      typed.activeNavigationKey &&
+      presetNavigation.some(
+        (entry) => navigationEntryKey(entry) === typed.activeNavigationKey,
+      )
+        ? typed.activeNavigationKey
+        : resolvedActivePresetId
+    const migratedTones = migrateTones(
+      typed.tones ?? INITIAL_PRESET.tones,
+      incomingPartials,
+      incomingTimbre,
+    )
+    const sharedInstrument = normalizeSharedInstrument(
+      typed.sharedInstrument,
+      migratedTones,
+      incomingPartials,
+    )
+    return {
+      ...typed,
+      presets: resolvedPresets,
+      presetNavigation,
+      activePresetId: resolvedActivePresetId,
+      activeNavigationKey,
+      partials: normalizePartials(sharedInstrument.partials.map((partial) => ({ ...partial }))),
+      timbreBlend: incomingTimbre,
+      tones: applySharedInstrumentToTones(migratedTones, sharedInstrument),
+      sharedInstrument,
+      shine: normalizeShine(typed.shine),
+      baseOctave: clamp(typed.baseOctave ?? 3, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
+      songName: typed.songName ?? 'My Song',
+      songLibrary:
+        typed.songLibrary?.map((song) => {
+          const songPresets = (song.presets ?? []).map((preset) => duplicatePresetData(preset))
+          const songPresetNavigation = normalizePresetNavigation(song.presetNavigation, songPresets)
+          return normalizeSongNavigationEnabled({
+            ...song,
+            enabled: song.enabled ?? true,
+            presets: songPresets,
+            presetNavigation: songPresetNavigation,
+            loopSlots: normalizeLoopSlots(song.loopSlots, song.loopFileName),
+            activeLoopSlot: normalizeLoopSlot(song.activeLoopSlot) ?? 1,
+            activeNavigationKey:
+              song.activeNavigationKey &&
+              songPresetNavigation.some(
+                (entry) => navigationEntryKey(entry) === song.activeNavigationKey,
+              )
+                ? song.activeNavigationKey
+                : song.activePresetId,
+          })
+        }) ?? [
+          {
+            id: INITIAL_SONG_ID,
+            name: typed.songName ?? 'My Song',
+            presets: resolvedPresets.map((preset) => duplicatePresetData(preset)),
+            presetNavigation,
+            activePresetId: resolvedActivePresetId,
+            activeNavigationKey,
+          },
+        ],
+      metronomeEnabled: typed.metronomeEnabled ?? false,
+      metronomeBpm: clamp(typed.metronomeBpm ?? 72, MIN_METRONOME_BPM, MAX_METRONOME_BPM),
+      metronomeVolumeDb: clamp(
+        typed.metronomeVolumeDb ?? DEFAULT_METRONOME_VOLUME_DB,
+        MIN_METRONOME_VOLUME_DB,
+        MAX_METRONOME_VOLUME_DB,
+      ),
+      metronomeMuted: typed.metronomeMuted ?? false,
+      metronomeSyncEnabled: typed.metronomeSyncEnabled ?? false,
+      loopSlots: normalizeLoopSlots(typed.loopSlots, typed.loopFileName),
+      activeLoopSlot: normalizeLoopSlot(typed.activeLoopSlot) ?? 1,
+      loopVolumeDb: clamp(
+        typed.loopVolumeDb ?? DEFAULT_METRONOME_VOLUME_DB,
+        MIN_METRONOME_VOLUME_DB,
+        MAX_METRONOME_VOLUME_DB,
+      ),
+      loopMuted: typed.loopMuted ?? false,
+      loopEnabled: false,
+      loopSyncEnabled: typed.loopSyncEnabled ?? false,
+      loopFeaturesEnabled: typed.loopFeaturesEnabled ?? true,
+      micFeaturesEnabled: typed.micFeaturesEnabled ?? true,
+      harmonicTimbreEnabled: typed.harmonicTimbreEnabled ?? true,
+      entryGlideEnabled: typed.entryGlideEnabled ?? true,
+      entryGlideLowestCents: clamp(
+        entryGlideSign * (typed.entryGlideLowestCents ?? DEFAULT_ENTRY_GLIDE_LOWEST_CENTS),
+        -50,
+        50,
+      ),
+      entryGlideLowestSeconds: clamp(
+        typed.entryGlideLowestSeconds ?? DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS,
+        0,
+        4,
+      ),
+      entryGlideHighestCents: clamp(
+        entryGlideSign * (typed.entryGlideHighestCents ?? DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS),
+        -50,
+        50,
+      ),
+      entryGlideHighestSeconds: clamp(
+        typed.entryGlideHighestSeconds ?? DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS,
+        0,
+        4,
+      ),
+      playbackFadeInSeconds: clamp(
+        typed.playbackFadeInSeconds ?? DEFAULT_PLAYBACK_FADE_IN_SECONDS,
+        0,
+        2,
+      ),
+      playbackFadeOutSeconds: clamp(
+        typed.playbackFadeOutSeconds ?? DEFAULT_PLAYBACK_FADE_OUT_SECONDS,
+        0,
+        2,
+      ),
+      playbackFadeEnabled: typed.playbackFadeEnabled ?? false,
+      presetCrossfadeSeconds: clamp(
+        typed.presetCrossfadeSeconds ?? DEFAULT_PRESET_CROSSFADE_SECONDS,
+        0,
+        2,
+      ),
+      globalOvertoneEditEnabled: typed.globalOvertoneEditEnabled ?? false,
+      controlsLocked: typed.controlsLocked ?? false,
+      btControlMode: typed.btControlMode === 'speaker' ? 'speaker' : 'pedal',
+    }
+  } catch {
+    return persistedState
+  }
+}
+
 export const useDroneStore = create<DroneState>()(
   persist(
     (set, get) => ({
@@ -1974,7 +2141,7 @@ export const useDroneStore = create<DroneState>()(
             activePresetId: base.activePresetId,
             ...loopFieldsFromState(base),
           }
-          let nextLibrary = [...base.songLibrary]
+          const nextLibrary = [...base.songLibrary]
           if (currentIndex >= 0) {
             nextLibrary[currentIndex] = {
               ...nextLibrary[currentIndex],
@@ -2244,168 +2411,8 @@ export const useDroneStore = create<DroneState>()(
     }),
     {
       name: 'bourdon-store-v1',
-      version: 28,
-      migrate: (persistedState) => {
-        try {
-          const typed = persistedState as (Partial<DroneState> & { loopFileName?: string | null }) | undefined
-          if (!typed) {
-            return persistedState
-          }
-          const incomingPartials = normalizePartials(typed.partials ?? [])
-          const incomingTimbre = normalizeTimbreBlend(typed.timbreBlend ?? DEFAULT_TIMBRE_BLEND)
-          const migratedPresets = (typed.presets ?? []).map((preset) =>
-            duplicatePresetData({
-              ...preset,
-              enabled: preset.enabled ?? true,
-              baseOctave: clamp(
-                preset.baseOctave ?? 3,
-                MIN_BASE_OCTAVE,
-                MAX_BASE_OCTAVE,
-              ),
-              partials: normalizePartials(preset.partials ?? incomingPartials),
-              timbreBlend: normalizeTimbreBlend(preset.timbreBlend ?? incomingTimbre),
-              tones: migrateTones(
-                preset.tones ?? [],
-                preset.partials ?? incomingPartials,
-                normalizeTimbreBlend(preset.timbreBlend ?? incomingTimbre),
-              ),
-            }),
-          )
-          const resolvedPresets =
-            migratedPresets.length > 0
-              ? migratedPresets
-              : DEFAULT_PRESETS.map((preset) => duplicatePresetData(preset))
-          const resolvedActivePresetId = resolveActivePresetId(
-            resolvedPresets,
-            typed.activePresetId,
-          )
-          const presetNavigation = normalizePresetNavigation(typed.presetNavigation, resolvedPresets)
-          const activeNavigationKey =
-            typed.activeNavigationKey &&
-            presetNavigation.some(
-              (entry) => navigationEntryKey(entry) === typed.activeNavigationKey,
-            )
-              ? typed.activeNavigationKey
-              : resolvedActivePresetId
-          const migratedTones = migrateTones(
-            typed.tones ?? INITIAL_PRESET.tones,
-            incomingPartials,
-            incomingTimbre,
-          )
-          const sharedInstrument = normalizeSharedInstrument(
-            typed.sharedInstrument,
-            migratedTones,
-            incomingPartials,
-          )
-          return {
-            ...typed,
-            presets: resolvedPresets,
-            presetNavigation,
-            activePresetId: resolvedActivePresetId,
-            activeNavigationKey,
-            partials: normalizePartials(sharedInstrument.partials.map((partial) => ({ ...partial }))),
-            timbreBlend: incomingTimbre,
-            tones: applySharedInstrumentToTones(migratedTones, sharedInstrument),
-            sharedInstrument,
-            shine: normalizeShine(typed.shine),
-            baseOctave: clamp(typed.baseOctave ?? 3, MIN_BASE_OCTAVE, MAX_BASE_OCTAVE),
-            songName: typed.songName ?? 'My Song',
-            songLibrary:
-              typed.songLibrary?.map((song) => {
-                const songPresets = (song.presets ?? []).map((preset) => duplicatePresetData(preset))
-                const songPresetNavigation = normalizePresetNavigation(song.presetNavigation, songPresets)
-                return normalizeSongNavigationEnabled({
-                  ...song,
-                  enabled: song.enabled ?? true,
-                  presets: songPresets,
-                  presetNavigation: songPresetNavigation,
-                  loopSlots: normalizeLoopSlots(song.loopSlots, song.loopFileName),
-                  activeLoopSlot: normalizeLoopSlot(song.activeLoopSlot) ?? 1,
-                  activeNavigationKey:
-                    song.activeNavigationKey &&
-                    songPresetNavigation.some(
-                      (entry) => navigationEntryKey(entry) === song.activeNavigationKey,
-                    )
-                      ? song.activeNavigationKey
-                      : song.activePresetId,
-                })
-              }) ?? [
-                {
-                  id: INITIAL_SONG_ID,
-                  name: typed.songName ?? 'My Song',
-                  presets: resolvedPresets.map((preset) => duplicatePresetData(preset)),
-                  presetNavigation,
-                  activePresetId: resolvedActivePresetId,
-                  activeNavigationKey,
-                },
-              ],
-            metronomeEnabled: typed.metronomeEnabled ?? false,
-            metronomeBpm: clamp(typed.metronomeBpm ?? 72, MIN_METRONOME_BPM, MAX_METRONOME_BPM),
-            metronomeVolumeDb: clamp(
-              typed.metronomeVolumeDb ?? DEFAULT_METRONOME_VOLUME_DB,
-              MIN_METRONOME_VOLUME_DB,
-              MAX_METRONOME_VOLUME_DB,
-            ),
-            metronomeMuted: typed.metronomeMuted ?? false,
-            metronomeSyncEnabled: typed.metronomeSyncEnabled ?? false,
-            loopSlots: normalizeLoopSlots(typed.loopSlots, typed.loopFileName),
-            activeLoopSlot: normalizeLoopSlot(typed.activeLoopSlot) ?? 1,
-            loopVolumeDb: clamp(
-              typed.loopVolumeDb ?? DEFAULT_METRONOME_VOLUME_DB,
-              MIN_METRONOME_VOLUME_DB,
-              MAX_METRONOME_VOLUME_DB,
-            ),
-            loopMuted: typed.loopMuted ?? false,
-            loopEnabled: false,
-            loopSyncEnabled: typed.loopSyncEnabled ?? false,
-            loopFeaturesEnabled: typed.loopFeaturesEnabled ?? true,
-            micFeaturesEnabled: typed.micFeaturesEnabled ?? true,
-            harmonicTimbreEnabled: typed.harmonicTimbreEnabled ?? true,
-            entryGlideEnabled: typed.entryGlideEnabled ?? true,
-            entryGlideLowestCents: clamp(
-              -(typed.entryGlideLowestCents ?? DEFAULT_ENTRY_GLIDE_LOWEST_CENTS),
-              -50,
-              50,
-            ),
-            entryGlideLowestSeconds: clamp(
-              typed.entryGlideLowestSeconds ?? DEFAULT_ENTRY_GLIDE_LOWEST_SECONDS,
-              0,
-              4,
-            ),
-            entryGlideHighestCents: clamp(
-              -(typed.entryGlideHighestCents ?? DEFAULT_ENTRY_GLIDE_HIGHEST_CENTS),
-              -50,
-              50,
-            ),
-            entryGlideHighestSeconds: clamp(
-              typed.entryGlideHighestSeconds ?? DEFAULT_ENTRY_GLIDE_HIGHEST_SECONDS,
-              0,
-              4,
-            ),
-            playbackFadeInSeconds: clamp(
-              typed.playbackFadeInSeconds ?? DEFAULT_PLAYBACK_FADE_IN_SECONDS,
-              0,
-              2,
-            ),
-            playbackFadeOutSeconds: clamp(
-              typed.playbackFadeOutSeconds ?? DEFAULT_PLAYBACK_FADE_OUT_SECONDS,
-              0,
-              2,
-            ),
-            playbackFadeEnabled: typed.playbackFadeEnabled ?? false,
-            presetCrossfadeSeconds: clamp(
-              typed.presetCrossfadeSeconds ?? DEFAULT_PRESET_CROSSFADE_SECONDS,
-              0,
-              2,
-            ),
-            globalOvertoneEditEnabled: typed.globalOvertoneEditEnabled ?? false,
-            controlsLocked: typed.controlsLocked ?? false,
-            btControlMode: typed.btControlMode === 'speaker' ? 'speaker' : 'pedal',
-          }
-        } catch {
-          return persistedState
-        }
-      },
+      version: DRONE_STORE_PERSIST_VERSION,
+      migrate: migratePersistedDroneState,
       partialize: (state) => ({
         presets: state.presets,
         songName: state.songName,

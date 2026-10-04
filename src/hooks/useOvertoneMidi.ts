@@ -253,6 +253,8 @@ export function useOvertoneMidi({ partials, setPartialGain, setPartialEnabled }:
 
   useEffect(() => {
     if (!settings.enabled) {
+      // Releases the browser MIDI handle acquired asynchronously below.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMidiAccess(null)
       return
     }

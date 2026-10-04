@@ -67,7 +67,8 @@ import { ClickSyncButton } from './components/ClickSyncButton'
 import { LoopSyncButton } from './components/LoopSyncButton'
 import { NoteSelector } from './components/NoteSelector'
 import { OvertoneBars } from './components/OvertoneBars'
-import { OvertoneAllSoloButton, OvertoneToneNavControls, HarmonicTimbreToggleButton, overtoneControlButtonSizeClass, overtoneIconButtonClass } from './components/OvertoneToneNavControls'
+import { OvertoneAllSoloButton, OvertoneToneNavControls, HarmonicTimbreToggleButton } from './components/OvertoneToneNavControls'
+import { overtoneControlButtonSizeClass, overtoneIconButtonClass } from './components/overtoneControlStyles'
 import { OvertoneMidiPanel } from './components/OvertoneMidiPanel'
 import { PartialEditor } from './components/PartialEditor'
 import { TimbreMorphSlider } from './components/TimbreMorphSlider'
@@ -77,7 +78,8 @@ import { SongList } from './components/SongList'
 import { ResettableRangeInput } from './components/ResettableRangeInput'
 import { SectionCard } from './components/SectionCard'
 import { LibraryPickerMenu } from './components/LibraryPickerMenu'
-import { ToneMixer, TONE_MIXER_SECTION_ID, toneMixerCardElementId } from './components/ToneMixer'
+import { ToneMixer } from './components/ToneMixer'
+import { TONE_MIXER_SECTION_ID, toneMixerCardElementId } from './components/toneMixerIds'
 import { TopControls } from './components/TopControls'
 import { ShineControls } from './components/ShineControls'
 import { EntryGlideControls } from './components/EntryGlideControls'
@@ -2168,13 +2170,14 @@ function App() {
   useAudioEngine(runtimeConfig, playing, activePresetId)
 
   const addFollower = useAddFollower()
+  const stopAddFollowerListening = addFollower.stopListening
   useEffect(() => {
     if (micFeaturesEnabled) {
       return
     }
-    addFollower.stopListening()
+    stopAddFollowerListening()
     setActiveTab((tab) => (tab === 'add' ? 'tone' : tab))
-  }, [addFollower.stopListening, micFeaturesEnabled])
+  }, [stopAddFollowerListening, micFeaturesEnabled])
   useEffect(() => {
     if (loopFeaturesEnabled) {
       return

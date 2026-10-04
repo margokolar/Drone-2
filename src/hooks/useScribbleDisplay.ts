@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Midi, type MidiEndpoint } from '../native/midi'
 import { applyScribbleSlot } from '../scribble/applyScribbleSlot'
 import {
@@ -108,7 +108,9 @@ export function useScribbleDisplay({
     return buildScribbleSlotMap(songs)
   }, [presetNavigation, presets, songLibrary, songName])
 
-  slotMapRef.current = slotMap
+  useLayoutEffect(() => {
+    slotMapRef.current = slotMap
+  }, [slotMap])
 
   const currentSlot = useMemo(
     () =>
@@ -213,6 +215,8 @@ export function useScribbleDisplay({
     if (!isIosApp()) {
       return
     }
+    // Queries the native MIDI layer; state is only set once that async call resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshDestinations()
   }, [refreshDestinations])
 

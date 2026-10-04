@@ -137,6 +137,8 @@ export function LibraryPickerMenu({
     if (!menuOpen) {
       return
     }
+    // Position depends on measuring the trigger's DOM rect, which only exists after layout.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     updateDropdownPosition()
     window.addEventListener('resize', updateDropdownPosition)
     window.addEventListener('scroll', updateDropdownPosition, true)
