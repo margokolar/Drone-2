@@ -121,10 +121,14 @@ export async function startNativeAudioSessionGuard(): Promise<() => void> {
 
   reclaimWebAudio()
 
+  const loopIsSounding = (state: ReturnType<typeof useDroneStore.getState>) =>
+    state.loopFeaturesEnabled && state.loopEnabled
+
   const syncKeepAwake = () => {
     const state = useDroneStore.getState()
     const on =
-      isOnScreen() && (state.playing || state.controlsLocked || state.metronomeEnabled)
+      isOnScreen() &&
+      (state.playing || state.controlsLocked || state.metronomeEnabled || loopIsSounding(state))
     void AudioSession.setKeepAwake({ on }).catch(() => {})
   }
   syncKeepAwake()
@@ -135,7 +139,7 @@ export async function startNativeAudioSessionGuard(): Promise<() => void> {
   let releaseTimer = 0
   const syncAudioFocus = () => {
     const state = useDroneStore.getState()
-    const own = state.playing || state.metronomeEnabled
+    const own = state.playing || state.metronomeEnabled || loopIsSounding(state)
     if (state.playing) {
       yieldedToOtherAudio = false
     }

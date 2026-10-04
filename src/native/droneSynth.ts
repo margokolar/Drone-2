@@ -42,6 +42,9 @@ export type NativeDroneSynthPlugin = {
   setShine(options: { packed: string }): Promise<void>
   clearShine(): Promise<void>
   setLoopAudio(options: { data: string }): Promise<{ duration?: number }>
+  beginLoopAudio(options?: { bytes?: number }): Promise<void>
+  appendLoopAudio(options: { data: string }): Promise<void>
+  finishLoopAudio(): Promise<{ duration?: number; bytes?: number }>
   setLoopPlayback(options: {
     on?: number
     enabled?: boolean
@@ -51,6 +54,7 @@ export type NativeDroneSynthPlugin = {
     restart?: number
     stopAtEnd?: number
   }): Promise<void>
+  getLoopPlayback(): Promise<{ playing?: boolean; duration?: number; position?: number }>
   clearLoop(): Promise<void>
 }
 

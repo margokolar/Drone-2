@@ -4,6 +4,7 @@ import { loopSlotKey, type LoopSlot } from './loopSlots'
 
 let loadedKey: string | null = null
 let loadGeneration = 0
+let inFlight: { key: string; promise: Promise<boolean> } | null = null
 
 export function loadedPlaybackSlot(): LoopSlot | null {
   if (!loadedKey) {
@@ -23,14 +24,16 @@ export function markLoopSlotLoaded(songId: string, slot: LoopSlot): void {
 export function invalidateLoadedLoopSlot(): void {
   loadGeneration += 1
   loadedKey = null
+  inFlight = null
 }
 
 export async function ensureLoopSlotLoaded(
   songId: string | undefined,
   slot: LoopSlot,
 ): Promise<boolean> {
-  const gen = ++loadGeneration
   if (!songId) {
+    loadGeneration += 1
+    inFlight = null
     loadedKey = null
     loopEngine.clear()
     return false
@@ -39,19 +42,33 @@ export async function ensureLoopSlotLoaded(
   if (loadedKey === key && loopEngine.hasAudio()) {
     return true
   }
-  const stored = await getLoopAudio(songId, slot)
-  if (gen !== loadGeneration) {
-    return false
+  if (inFlight && inFlight.key === key) {
+    return inFlight.promise
   }
-  if (!stored) {
-    loadedKey = null
-    loopEngine.clear()
-    return false
+  const gen = ++loadGeneration
+  const promise = (async () => {
+    const stored = await getLoopAudio(songId, slot)
+    if (gen !== loadGeneration) {
+      return false
+    }
+    if (!stored) {
+      loadedKey = null
+      loopEngine.clear()
+      return false
+    }
+    await loopEngine.loadBlob(stored.blob)
+    if (gen !== loadGeneration) {
+      return false
+    }
+    loadedKey = key
+    return true
+  })()
+  inFlight = { key, promise }
+  try {
+    return await promise
+  } finally {
+    if (inFlight?.promise === promise) {
+      inFlight = null
+    }
   }
-  await loopEngine.loadBlob(stored.blob)
-  if (gen !== loadGeneration) {
-    return false
-  }
-  loadedKey = key
-  return true
 }

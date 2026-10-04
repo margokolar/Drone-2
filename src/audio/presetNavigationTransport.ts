@@ -94,9 +94,11 @@ function applyClickSyncForTransport(playing: boolean, markerId?: string): void {
 /** True after the loop was started because a play/pause marker coupled it to playback. */
 let loopFollowsTransport = false
 let pendingLoopQuantize: { presetId: string; startPlayback: boolean } | null = null
+let loopStartGeneration = 0
 
 export function cancelPendingLoopQuantize(): void {
   pendingLoopQuantize = null
+  loopStartGeneration += 1
   loopEngine.cancelScheduledCycleStart()
 }
 
@@ -136,6 +138,10 @@ export function shouldStartLoopWithCurrentItem(): boolean {
   return shouldLoopSyncForPreset(state.activePresetId)
 }
 
+function sameLoopIsCycling(slot: LoopSlot): boolean {
+  return loadedPlaybackSlot() === slot && loopEngine.isCycling()
+}
+
 function startSyncedLoop(restart: boolean, onStarted?: () => void, presetId?: string): void {
   const state = useDroneStore.getState()
   const slot = resolvePlaybackLoopSlot(presetId)
@@ -151,14 +157,25 @@ function startSyncedLoop(restart: boolean, onStarted?: () => void, presetId?: st
   if (state.activeLoopSlot !== slot) {
     state.setActiveLoopSlot(slot)
   }
-  const shouldRestart =
-    restart || loadedPlaybackSlot() !== slot || !loopEngine.isPlaying() || loopEngine.isFinishing()
+  const shouldRestart = restart || !sameLoopIsCycling(slot)
+  const startGen = ++loopStartGeneration
   void ensureLoopSlotLoaded(currentSongId(), slot).then((ok) => {
+    if (startGen !== loopStartGeneration) {
+      return
+    }
+    if (resolvePlaybackLoopSlot(presetId) !== slot) {
+      return
+    }
     if (!ok) {
+      if (sameLoopIsCycling(slot) || (loadedPlaybackSlot() === slot && loopEngine.hasAudio())) {
+        onStarted?.()
+        useDroneStore.getState().setLoopEnabled(true)
+        return
+      }
       onStarted?.()
       return
     }
-    if (shouldRestart) {
+    if (shouldRestart && !sameLoopIsCycling(slot)) {
       loopEngine.playFromStart(onStarted)
     } else {
       onStarted?.()
@@ -212,7 +229,9 @@ function startPresetPlayback(config: DroneRuntimeConfig): void {
 function startLoopThenDrone(config: DroneRuntimeConfig, presetId: string): void {
   droneEngine.prepareContextForGesture()
   loopEngine.prepareContext()
-  startSyncedLoop(true, () => {
+  const slot = resolvePlaybackLoopSlot(presetId)
+  const restart = slot == null || !sameLoopIsCycling(slot)
+  startSyncedLoop(restart, () => {
     startPresetPlayback(config)
     syncClickWithTransportPlayState(true)
     applyClickSyncForPreset(presetId)
@@ -224,13 +243,14 @@ export function playLoopSyncedTransport(config: DroneRuntimeConfig): void {
   cancelPendingLoopQuantize()
   droneEngine.prepareContextForGesture()
   loopEngine.prepareContext()
+  const loopAlreadyCycling = loopEngine.isCycling()
   const startNow = () => {
-    startSyncedLoop(true, () => {
+    startSyncedLoop(!loopAlreadyCycling, () => {
       startPresetPlayback(config)
       syncClickWithTransportPlayState(true)
     })
   }
-  if (loopEngine.isPlaying()) {
+  if (loopAlreadyCycling) {
     loopEngine.scheduleAtNextCycleStart(startNow)
     return
   }
@@ -287,7 +307,7 @@ export function applyLoopSyncForPreset(presetId: string): void {
   const wantsLoop = shouldLoopSyncForPreset(presetId)
   if (wantsLoop && state.playing) {
     const slot = resolvePlaybackLoopSlot(presetId)
-    startSyncedLoop(loadedPlaybackSlot() !== slot, undefined, presetId)
+    startSyncedLoop(slot == null || !sameLoopIsCycling(slot), undefined, presetId)
     return
   }
   if (state.playing || loopFollowsTransport) {
@@ -320,7 +340,7 @@ function applyPresetFromNavigationNow(presetId: string, startPlayback: boolean):
 function applyPresetFromNavigation(presetId: string, startPlayback = false): void {
   cancelPendingLoopQuantize()
   const willPlay = startPlayback || useDroneStore.getState().playing
-  if (shouldLoopSyncForPreset(presetId) && willPlay && loopEngine.isPlaying()) {
+  if (shouldLoopSyncForPreset(presetId) && willPlay && loopEngine.isCycling()) {
     pendingLoopQuantize = { presetId, startPlayback }
     useDroneStore.setState({ activeNavigationKey: presetId })
     droneEngine.prepareContextForGesture()

@@ -17,7 +17,11 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setShine", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearShine", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setLoopAudio", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "beginLoopAudio", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "appendLoopAudio", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "finishLoopAudio", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setLoopPlayback", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getLoopPlayback", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearLoop", returnType: CAPPluginReturnPromise),
     ]
 
@@ -94,12 +98,36 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func setLoopAudio(_ call: CAPPluginCall) {
         let encoded = call.getString("data") ?? ""
-        guard let data = Data(base64Encoded: encoded) else {
+        guard let data = Self.decodeBase64(encoded) else {
             call.reject("Invalid loop audio data")
             return
         }
         DroneSynthEngine.shared.setLoopAudio(data: data) { duration in
             call.resolve(["duration": duration])
+        }
+    }
+
+    @objc func beginLoopAudio(_ call: CAPPluginCall) {
+        let expected = Int(Self.number(call, "bytes", 0))
+        DroneSynthEngine.shared.beginLoopAudio(expectedBytes: expected) {
+            call.resolve()
+        }
+    }
+
+    @objc func appendLoopAudio(_ call: CAPPluginCall) {
+        let encoded = call.getString("data") ?? ""
+        guard let data = Self.decodeBase64(encoded) else {
+            call.reject("Invalid loop audio chunk")
+            return
+        }
+        DroneSynthEngine.shared.appendLoopAudio(data) {
+            call.resolve()
+        }
+    }
+
+    @objc func finishLoopAudio(_ call: CAPPluginCall) {
+        DroneSynthEngine.shared.finishLoopAudio { duration, bytes in
+            call.resolve(["duration": duration, "bytes": bytes])
         }
     }
 
@@ -118,9 +146,31 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve()
     }
 
+    @objc func getLoopPlayback(_ call: CAPPluginCall) {
+        let snapshot = DroneSynthEngine.shared.loopPlaybackSnapshot()
+        call.resolve([
+            "playing": snapshot.playing,
+            "duration": snapshot.duration,
+            "position": snapshot.position,
+        ])
+    }
+
     @objc func clearLoop(_ call: CAPPluginCall) {
         DroneSynthEngine.shared.clearLoopAudio()
         call.resolve()
+    }
+
+    private static func decodeBase64(_ encoded: String) -> Data? {
+        let trimmed = encoded.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let data = Data(base64Encoded: trimmed, options: [.ignoreUnknownCharacters]) {
+            return data
+        }
+        var padded = trimmed
+        let remainder = padded.count % 4
+        if remainder > 0 {
+            padded.append(String(repeating: "=", count: 4 - remainder))
+        }
+        return Data(base64Encoded: padded, options: [.ignoreUnknownCharacters])
     }
 
     private static func flag(_ call: CAPPluginCall, _ key: String) -> Bool {

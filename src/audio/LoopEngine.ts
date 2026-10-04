@@ -28,16 +28,66 @@ function audioContextConstructor(): WebAudioContextCtor | null {
   return window.AudioContext ?? fromWindow.webkitAudioContext ?? null
 }
 
-async function blobToBase64(blob: Blob): Promise<string> {
-  const buffer = await blob.arrayBuffer()
-  const bytes = new Uint8Array(buffer)
-  const chunk = 8192
-  const parts: string[] = []
-  for (let index = 0; index < bytes.length; index += chunk) {
-    const slice = Array.from(bytes.subarray(index, index + chunk))
-    parts.push(String.fromCharCode(...slice))
+function blobSliceToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const buffer = reader.result
+      if (!(buffer instanceof ArrayBuffer)) {
+        reject(new Error('Could not read loop audio'))
+        return
+      }
+      const bytes = new Uint8Array(buffer)
+      let binary = ''
+      const step = 0x8000
+      for (let offset = 0; offset < bytes.length; offset += step) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + step))
+      }
+      resolve(btoa(binary))
+    }
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read loop audio'))
+    reader.readAsArrayBuffer(blob)
+  })
+}
+
+const NATIVE_LOOP_CHUNK_SIZES = [32 * 1024, 8 * 1024, 4 * 1024]
+
+let nativeSendQueue: Promise<unknown> = Promise.resolve()
+
+function enqueueNativeSend<T>(work: () => Promise<T>): Promise<T> {
+  const run = nativeSendQueue.then(work, work)
+  nativeSendQueue = run.then(
+    () => undefined,
+    () => undefined,
+  )
+  return run
+}
+
+async function sendNativeLoopAudioOnce(
+  blob: Blob,
+  chunkBytes: number,
+): Promise<{ duration: number; bytes: number }> {
+  await DroneSynth.beginLoopAudio({ bytes: blob.size })
+  for (let offset = 0; offset < blob.size; offset += chunkBytes) {
+    const slice = blob.slice(offset, Math.min(offset + chunkBytes, blob.size))
+    const data = await blobSliceToBase64(slice)
+    await DroneSynth.appendLoopAudio({ data })
   }
-  return btoa(parts.join(''))
+  const result = await DroneSynth.finishLoopAudio()
+  return {
+    duration: typeof result?.duration === 'number' ? result.duration : 0,
+    bytes: typeof result?.bytes === 'number' ? result.bytes : 0,
+  }
+}
+
+async function sendNativeLoopAudio(blob: Blob): Promise<number> {
+  for (const chunkBytes of NATIVE_LOOP_CHUNK_SIZES) {
+    const result = await sendNativeLoopAudioOnce(blob, chunkBytes)
+    if (blob.size <= 0 || result.bytes >= blob.size * 0.98) {
+      return result.duration
+    }
+  }
+  return 0
 }
 
 export class LoopEngine {
@@ -54,8 +104,12 @@ export class LoopEngine {
   private nativeDuration = 0
   private startedAt = 0
   private startedAtMs = 0
+  private nativePosition = -1
+  private nativePositionAtMs = 0
+  private nativePlayheadKnown = false
   private finishing = false
   private cycleStartTimer: number | null = null
+  private cycleStartGeneration = 0
 
   private linearGain(): number {
     if (this.config.muted) {
@@ -192,11 +246,43 @@ export class LoopEngine {
       const elapsed = Math.max(0, this.context.currentTime - this.startedAt)
       return elapsed % duration
     }
+    if (this.nativePosition >= 0) {
+      const elapsed = Math.max(0, (performance.now() - this.nativePositionAtMs) / 1000)
+      return (this.nativePosition + elapsed) % duration
+    }
     if (this.startedAtMs <= 0) {
       return 0
     }
     const elapsed = Math.max(0, (performance.now() - this.startedAtMs) / 1000)
     return elapsed % duration
+  }
+
+  private async refreshNativePosition(): Promise<void> {
+    this.nativePlayheadKnown = false
+    if (!isNativeSynth() || !this.hasNativeAudio || !this.config.enabled) {
+      this.nativePosition = -1
+      return
+    }
+    try {
+      const snapshot = await DroneSynth.getLoopPlayback()
+      const duration = typeof snapshot?.duration === 'number' ? snapshot.duration : 0
+      const position = typeof snapshot?.position === 'number' ? snapshot.position : -1
+      if (duration > 0.02) {
+        this.nativeDuration = duration
+      }
+      this.nativePlayheadKnown = true
+      if (snapshot?.playing) {
+        if (position >= 0) {
+          this.nativePosition = position
+          this.nativePositionAtMs = performance.now()
+          return
+        }
+        this.nativePlayheadKnown = false
+      }
+    } catch {
+      this.nativePlayheadKnown = false
+    }
+    this.nativePosition = -1
   }
 
   cycleDurationSeconds(): number {
@@ -230,6 +316,7 @@ export class LoopEngine {
   }
 
   cancelScheduledCycleStart(): void {
+    this.cycleStartGeneration += 1
     if (this.cycleStartTimer === null) {
       return
     }
@@ -237,17 +324,35 @@ export class LoopEngine {
     this.cycleStartTimer = null
   }
 
+  isCycling(): boolean {
+    return this.isPlaying() && !this.finishing && this.cycleDurationSeconds() > 0.02
+  }
+
   scheduleAtNextCycleStart(callback: () => void): void {
+    const generation = this.cycleStartGeneration + 1
     this.cancelScheduledCycleStart()
-    const remaining = this.secondsUntilCycleStart()
-    if (remaining <= 0.02) {
-      callback()
-      return
-    }
-    this.cycleStartTimer = window.setTimeout(() => {
-      this.cycleStartTimer = null
-      callback()
-    }, remaining * 1000)
+    this.cycleStartGeneration = generation
+    void this.refreshNativePosition().then(() => {
+      if (generation !== this.cycleStartGeneration) {
+        return
+      }
+      if (this.nativePlayheadKnown && this.nativePosition < 0) {
+        callback()
+        return
+      }
+      const remaining = this.secondsUntilCycleStart()
+      if (remaining <= 0.02) {
+        callback()
+        return
+      }
+      this.cycleStartTimer = window.setTimeout(() => {
+        this.cycleStartTimer = null
+        if (generation !== this.cycleStartGeneration) {
+          return
+        }
+        callback()
+      }, remaining * 1000)
+    })
   }
 
   hasAudio(): boolean {
@@ -267,11 +372,8 @@ export class LoopEngine {
   async loadBlob(blob: Blob): Promise<void> {
     const shouldPlay = this.config.enabled
     if (isNativeSynth()) {
-      const data = await blobToBase64(blob)
-      await DroneSynth.setLoopAudio({ data }).then((result) => {
-        this.nativeDuration = typeof result?.duration === 'number' ? result.duration : 0
-      })
-      this.hasNativeAudio = true
+      this.nativeDuration = await enqueueNativeSend(() => sendNativeLoopAudio(blob))
+      this.hasNativeAudio = this.nativeDuration > 0
       this.buffer = null
       if (shouldPlay) {
         this.playFromStart()
@@ -298,6 +400,9 @@ export class LoopEngine {
     this.nativeDuration = 0
     this.startedAt = 0
     this.startedAtMs = 0
+    this.nativePosition = -1
+    this.nativePositionAtMs = 0
+    this.nativePlayheadKnown = false
     if (isNativeSynth()) {
       void DroneSynth.clearLoop().catch(() => {})
     }
@@ -316,31 +421,42 @@ export class LoopEngine {
     this.cancelScheduledCycleStart()
     this.config = { ...this.config, enabled: true }
     this.startedAtMs = performance.now()
+    this.nativePosition = 0
+    this.nativePositionAtMs = this.startedAtMs
+    this.nativePlayheadKnown = true
     if (isNativeSynth()) {
       if (!this.hasNativeAudio) {
         onStarted?.()
         return
       }
-      void DroneSynth.reclaim().catch(() => {})
-      void DroneSynth.setLoopPlayback({
-        on: 1,
-        enabled: true,
-        volumeDb: this.config.volumeDb,
-        mute: this.config.muted ? 1 : 0,
-        muted: this.config.muted,
-        restart: 1,
-        stopAtEnd: 0,
-      })
-        .then(() => {
+      void (async () => {
+        await DroneSynth.reclaim().catch(() => {})
+        if (!this.config.enabled) {
+          onStarted?.()
+          return
+        }
+        try {
+          await DroneSynth.setLoopPlayback({
+            on: 1,
+            enabled: true,
+            volumeDb: this.config.volumeDb,
+            mute: this.config.muted ? 1 : 0,
+            muted: this.config.muted,
+            restart: 1,
+            stopAtEnd: 0,
+          })
           if (!this.config.enabled) {
             return
           }
           this.startedAtMs = performance.now()
+          this.nativePosition = 0
+          this.nativePositionAtMs = this.startedAtMs
+          this.nativePlayheadKnown = true
           onStarted?.()
-        })
-        .catch(() => {
+        } catch {
           onStarted?.()
-        })
+        }
+      })()
       return
     }
     if (!this.buffer) {
@@ -382,6 +498,9 @@ export class LoopEngine {
     this.finishing = false
     this.cancelScheduledCycleStart()
     this.stopWebSource()
+    this.startedAtMs = 0
+    this.nativePosition = -1
+    this.nativePlayheadKnown = false
     if (!isNativeSynth() || !this.hasNativeAudio) {
       return
     }

@@ -1,3 +1,4 @@
+import AudioToolbox
 import AVFoundation
 import Foundation
 import MediaPlayer
@@ -92,11 +93,17 @@ final class DroneSynthEngine {
     private var metroLoopBuffer: AVAudioPCMBuffer?
     private var metroLoopBpm = 0.0
     private var fileLoopPlayer: AVAudioPlayerNode?
-    private var fileLoopData: Data?
+    private var fileLoopFormat: AVAudioFormat?
     private var fileLoopBuffer: AVAudioPCMBuffer?
+    private var fileLoopSeconds = 0.0
     private var fileLoopGain: Float = 0.5
     private var fileLoopEnabled = false
+    private var fileLoopPlaying = false
     private var fileLoopStopAtEnd = false
+    private var fileLoopWriter: FileHandle?
+    private var fileLoopBytes = 0
+    private var fileLoopExpectedBytes = 0
+    private let fileLoopQueue = DispatchQueue(label: "com.margokolar.bourdon.fileloop")
     private let twoPi = 2.0 * Double.pi
 
     /// Prefer ~23 ms I/O. Never bounce the session while playing.
@@ -279,9 +286,10 @@ final class DroneSynthEngine {
         mixGain = 0
         metroEnabled = false
         limiterEnv = 0
+        fileLoopPlaying = false
+        fileLoopStopAtEnd = false
         lock.unlock()
         clickPlayer?.stop()
-        fileLoopStopAtEnd = false
         fileLoopPlayer?.stop()
         Self.publishNowPlaying(playing: false)
     }
@@ -306,6 +314,9 @@ final class DroneSynthEngine {
     var isAudible: Bool {
         lock.lock()
         defer { lock.unlock() }
+        if fileLoopPlaying && fileLoopSeconds > 0.01 && fileLoopGain > 0.0001 {
+            return true
+        }
         let live = (0..<min(liveOsc, oscs.count)).contains { oscs[$0].active && oscs[$0].gain > 0.00005 }
         let shimmer = shine.contains { $0.active && $0.gain > 0.0002 }
         return mixGain > 0.5 && ((master > 0.01 && live) || shimmer)
@@ -630,42 +641,109 @@ final class DroneSynthEngine {
     }
 
     func loopDurationSeconds() -> Double {
-        guard let buffer = fileLoopBuffer ?? decodedFileLoopBuffer() else { return 0 }
-        let sampleRate = buffer.format.sampleRate
-        guard sampleRate > 1 else { return 0 }
-        return Double(buffer.frameLength) / sampleRate
+        fileLoopSeconds
+    }
+
+    func loopPlaybackSnapshot() -> (playing: Bool, duration: Double, position: Double) {
+        let duration = fileLoopSeconds
+        let playing = fileLoopPlaying && (fileLoopPlayer?.isPlaying ?? false) && duration > 0.02
+        guard playing, let player = fileLoopPlayer else {
+            return (playing, duration, 0)
+        }
+        guard
+            let nodeTime = player.lastRenderTime,
+            let playerTime = player.playerTime(forNodeTime: nodeTime),
+            playerTime.sampleRate > 1
+        else {
+            return (true, duration, -1)
+        }
+        let elapsed = Double(playerTime.sampleTime) / playerTime.sampleRate
+        guard elapsed.isFinite, elapsed >= 0 else {
+            return (true, duration, -1)
+        }
+        return (true, duration, elapsed.truncatingRemainder(dividingBy: duration))
+    }
+
+    func beginLoopAudio(expectedBytes: Int = 0, completion: (() -> Void)? = nil) {
+        fileLoopQueue.async {
+            self.resetLoopFileWriter()
+            self.fileLoopExpectedBytes = max(0, expectedBytes)
+            DispatchQueue.main.async {
+                self.fileLoopPlayer?.stop()
+                self.fileLoopBuffer = nil
+                self.fileLoopSeconds = 0
+                self.lock.lock()
+                self.fileLoopPlaying = false
+                self.fileLoopStopAtEnd = false
+                self.lock.unlock()
+                completion?()
+            }
+        }
+    }
+
+    func appendLoopAudio(_ data: Data, completion: (() -> Void)? = nil) {
+        fileLoopQueue.async {
+            do {
+                if self.fileLoopWriter == nil {
+                    self.resetLoopFileWriter()
+                }
+                try self.fileLoopWriter?.write(contentsOf: data)
+                self.fileLoopBytes += data.count
+            } catch {
+                NSLog("DroneSynth loop append: \(error.localizedDescription)")
+            }
+            DispatchQueue.main.async { completion?() }
+        }
+    }
+
+    func finishLoopAudio(completion: ((Double, Int) -> Void)? = nil) {
+        fileLoopQueue.async {
+            self.closeLoopFileWriter()
+            let bytes = self.fileLoopBytes
+            NSLog(
+                "DroneSynth loop received bytes=%d expected=%d",
+                bytes,
+                self.fileLoopExpectedBytes
+            )
+            self.decodeInstalledLoop { duration in
+                completion?(duration, bytes)
+            }
+        }
     }
 
     func setLoopAudio(data: Data, completion: ((Double) -> Void)? = nil) {
-        let apply = {
-            self.fileLoopData = data
-            self.fileLoopBuffer = nil
-            _ = self.decodedFileLoopBuffer()
-            if self.fileLoopEnabled {
-                self.startFileLoop(restart: true)
+        fileLoopQueue.async {
+            self.closeLoopFileWriter()
+            do {
+                try data.write(to: self.loopFileURL(), options: .atomic)
+                self.fileLoopBytes = data.count
+                self.fileLoopExpectedBytes = data.count
+            } catch {
+                NSLog("DroneSynth loop write: \(error.localizedDescription)")
+                DispatchQueue.main.async { completion?(0) }
+                return
             }
-            completion?(self.loopDurationSeconds())
-        }
-        if Thread.isMainThread {
-            apply()
-        } else {
-            DispatchQueue.main.async(execute: apply)
+            self.decodeInstalledLoop(completion: completion)
         }
     }
 
     func setLoopPlayback(enabled: Bool, volumeDb: Double, muted: Bool, restart: Bool, stopAtEnd: Bool = false) {
         let gain = muted ? 0 : Float(min(1, max(0, pow(10.0, volumeDb / 20.0))))
         let apply = {
+            self.lock.lock()
             self.fileLoopGain = gain
+            self.lock.unlock()
             self.fileLoopPlayer?.volume = gain
             if !enabled {
                 self.fileLoopEnabled = false
-                if stopAtEnd {
+                if stopAtEnd && self.fileLoopPlaying {
                     self.stopFileLoopAtCycleEnd()
                 } else {
                     self.fileLoopStopAtEnd = false
+                    self.fileLoopPlaying = false
                     self.fileLoopPlayer?.stop()
                 }
+                Self.publishNowPlaying(playing: self.isAudible)
                 return
             }
             let wasStopping = self.fileLoopStopAtEnd
@@ -679,6 +757,7 @@ final class DroneSynthEngine {
                 return
             }
             self.startFileLoop(restart: restart || wasStopping || !(self.fileLoopPlayer?.isPlaying ?? false))
+            Self.publishNowPlaying(playing: self.isAudible)
         }
         if Thread.isMainThread {
             apply()
@@ -690,15 +769,22 @@ final class DroneSynthEngine {
     func clearLoopAudio() {
         let apply = {
             self.fileLoopEnabled = false
+            self.fileLoopPlaying = false
             self.fileLoopStopAtEnd = false
             self.fileLoopPlayer?.stop()
-            self.fileLoopData = nil
             self.fileLoopBuffer = nil
+            self.fileLoopSeconds = 0
         }
         if Thread.isMainThread {
             apply()
         } else {
             DispatchQueue.main.async(execute: apply)
+        }
+        fileLoopQueue.async {
+            self.closeLoopFileWriter()
+            self.fileLoopBytes = 0
+            self.fileLoopExpectedBytes = 0
+            try? FileManager.default.removeItem(at: self.loopFileURL())
         }
     }
 
@@ -777,6 +863,16 @@ final class DroneSynthEngine {
         }
         engine.attach(node)
         engine.connect(node, to: engine.mainMixerNode, format: format)
+        let loopPlayer = AVAudioPlayerNode()
+        engine.attach(loopPlayer)
+        engine.connect(loopPlayer, to: engine.mainMixerNode, format: format)
+        fileLoopPlayer = loopPlayer
+        let metroPlayer = AVAudioPlayerNode()
+        engine.attach(metroPlayer)
+        engine.connect(metroPlayer, to: engine.mainMixerNode, format: format)
+        clickPlayer = metroPlayer
+        clickFormat = format
+        fileLoopFormat = format
         engine.mainMixerNode.outputVolume = 1
         source = node
         prepared = true
@@ -798,135 +894,305 @@ final class DroneSynthEngine {
         try? engine.start()
     }
 
-    private func ensureFileLoopPlayer() {
-        if fileLoopPlayer != nil { return }
-        let running = engine.isRunning
-        if running {
-            engine.pause()
+    private func loopFileURL() -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("drone-file-loop.wav")
+    }
+
+    private func closeLoopFileWriter() {
+        do {
+            try fileLoopWriter?.synchronize()
+            try fileLoopWriter?.close()
+        } catch {
+            NSLog("DroneSynth loop close: \(error.localizedDescription)")
         }
-        let sr = max(1000, sampleRate)
-        guard let format = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 2) else { return }
-        let player = AVAudioPlayerNode()
-        engine.attach(player)
-        engine.connect(player, to: engine.mainMixerNode, format: format)
-        fileLoopPlayer = player
-        try? engine.start()
+        fileLoopWriter = nil
+    }
+
+    private func resetLoopFileWriter() {
+        closeLoopFileWriter()
+        fileLoopBytes = 0
+        let url = loopFileURL()
+        try? FileManager.default.removeItem(at: url)
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        do {
+            fileLoopWriter = try FileHandle(forWritingTo: url)
+        } catch {
+            NSLog("DroneSynth loop create: \(error.localizedDescription)")
+            fileLoopWriter = nil
+        }
+    }
+
+    private func decodeInstalledLoop(completion: ((Double) -> Void)?) {
+        DispatchQueue.main.async {
+            self.wantsPlaybackSession = true
+            do {
+                try self.startIfNeeded()
+            } catch {
+                NSLog("DroneSynth loop prepare: \(error.localizedDescription)")
+            }
+            guard let destFormat = self.fileLoopFormat ?? self.clickFormat ?? AVAudioFormat(
+                standardFormatWithSampleRate: max(1000, self.sampleRate),
+                channels: 2
+            ) else {
+                completion?(0)
+                return
+            }
+            self.fileLoopQueue.async {
+                let buffer = self.makeLoopBuffer(url: self.loopFileURL(), format: destFormat)
+                let duration: Double
+                if let buffer, buffer.format.sampleRate > 1, buffer.frameLength > 1 {
+                    duration = Double(buffer.frameLength) / buffer.format.sampleRate
+                } else {
+                    duration = 0
+                }
+                DispatchQueue.main.async {
+                    self.fileLoopBuffer = buffer
+                    self.fileLoopSeconds = duration
+                    NSLog(
+                        "DroneSynth loop buffer frames=%u duration=%.3f bytes=%d",
+                        buffer?.frameLength ?? 0,
+                        duration,
+                        self.fileLoopBytes
+                    )
+                    if self.fileLoopEnabled {
+                        self.startFileLoop(restart: true)
+                    }
+                    completion?(duration)
+                }
+            }
+        }
+    }
+
+    private func makeLoopBuffer(url: URL, format: AVAudioFormat) -> AVAudioPCMBuffer? {
+        let (left, right, srcRate) = readLoopPCM(url)
+        guard left.count > 1, srcRate > 1 else { return nil }
+        let (outL, outR) = Self.resampleArrays(
+            left: left,
+            right: right,
+            srcRate: srcRate,
+            destRate: format.sampleRate
+        )
+        guard outL.count > 1,
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(outL.count))
+        else { return nil }
+        buffer.frameLength = AVAudioFrameCount(outL.count)
+        let count = outL.count
+        guard let dst = buffer.floatChannelData else { return nil }
+        if format.isInterleaved {
+            for i in 0..<count {
+                dst[0][i * 2] = outL[i]
+                dst[0][i * 2 + 1] = outR[i]
+            }
+        } else {
+            outL.withUnsafeBufferPointer { src in
+                if let base = src.baseAddress {
+                    dst[0].update(from: base, count: count)
+                }
+            }
+            outR.withUnsafeBufferPointer { src in
+                if let base = src.baseAddress {
+                    dst[Int(format.channelCount > 1 ? 1 : 0)].update(from: base, count: count)
+                }
+            }
+        }
+        return buffer
+    }
+
+    private func readLoopPCM(_ url: URL) -> (left: [Float], right: [Float], srcRate: Double) {
+        if let loaded = readLoopPCMWithAVAudioFile(url), loaded.left.count > 64 {
+            return loaded
+        }
+        return readLoopPCMWithExtAudioFile(url)
+    }
+
+    private func readLoopPCMWithAVAudioFile(_ url: URL) -> (left: [Float], right: [Float], srcRate: Double)? {
+        do {
+            let file = try AVAudioFile(forReading: url)
+            let format = file.processingFormat
+            let total = AVAudioFrameCount(file.length)
+            guard total > 1, let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: total) else {
+                return nil
+            }
+            file.framePosition = 0
+            try file.read(into: buffer, frameCount: total)
+            NSLog(
+                "DroneSynth loop avread frames=%u of %u sr=%.0f",
+                buffer.frameLength,
+                total,
+                format.sampleRate
+            )
+            guard buffer.frameLength > 64 else { return nil }
+            return floats(from: buffer, srcRate: format.sampleRate)
+        } catch {
+            NSLog("DroneSynth loop avread: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private func readLoopPCMWithExtAudioFile(_ url: URL) -> (left: [Float], right: [Float], srcRate: Double) {
+        var ext: ExtAudioFileRef?
+        var status = ExtAudioFileOpenURL(url as CFURL, &ext)
+        guard status == noErr, let extFile = ext else {
+            NSLog("DroneSynth loop open %d", status)
+            return ([], [], 0)
+        }
+        defer { ExtAudioFileDispose(extFile) }
+
+        var fileFormat = AudioStreamBasicDescription()
+        var propSize = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+        status = ExtAudioFileGetProperty(extFile, kExtAudioFileProperty_FileDataFormat, &propSize, &fileFormat)
+        guard status == noErr else { return ([], [], 0) }
+
+        var headerFrames: Int64 = 0
+        propSize = UInt32(MemoryLayout<Int64>.size)
+        ExtAudioFileGetProperty(extFile, kExtAudioFileProperty_FileLengthFrames, &propSize, &headerFrames)
+
+        let srcRate = fileFormat.mSampleRate > 1 ? fileFormat.mSampleRate : 44_100
+        guard let client = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: srcRate,
+            channels: 2,
+            interleaved: false
+        ) else { return ([], [], 0) }
+
+        var asbd = client.streamDescription.pointee
+        propSize = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+        status = ExtAudioFileSetProperty(extFile, kExtAudioFileProperty_ClientDataFormat, propSize, &asbd)
+        guard status == noErr else {
+            NSLog("DroneSynth loop client %d", status)
+            return ([], [], 0)
+        }
+
+        let chunkFrames: AVAudioFrameCount = 16_384
+        guard let chunk = AVAudioPCMBuffer(pcmFormat: client, frameCapacity: chunkFrames) else {
+            return ([], [], 0)
+        }
+        var left: [Float] = []
+        var right: [Float] = []
+        left.reserveCapacity(max(16_384, Int(headerFrames)))
+        right.reserveCapacity(max(16_384, Int(headerFrames)))
+
+        while true {
+            var frames = UInt32(chunkFrames)
+            chunk.frameLength = chunkFrames
+            status = ExtAudioFileRead(extFile, &frames, chunk.mutableAudioBufferList)
+            if status != noErr {
+                NSLog("DroneSynth loop read %d after %d", status, left.count)
+                break
+            }
+            if frames == 0 { break }
+            chunk.frameLength = frames
+            guard let channels = chunk.floatChannelData else { break }
+            let count = Int(frames)
+            left.append(contentsOf: UnsafeBufferPointer(start: channels[0], count: count))
+            right.append(contentsOf: UnsafeBufferPointer(start: channels[1], count: count))
+        }
+        NSLog("DroneSynth loop ext frames=%d header=%lld sr=%.0f", left.count, headerFrames, srcRate)
+        return (left, right, srcRate)
+    }
+
+    private func floats(from buffer: AVAudioPCMBuffer, srcRate: Double) -> (left: [Float], right: [Float], srcRate: Double) {
+        let frames = Int(buffer.frameLength)
+        let channels = Int(buffer.format.channelCount)
+        guard frames > 1, channels >= 1 else { return ([], [], 0) }
+        var left = [Float](repeating: 0, count: frames)
+        var right = [Float](repeating: 0, count: frames)
+        if let data = buffer.floatChannelData {
+            if buffer.format.isInterleaved {
+                for i in 0..<frames {
+                    left[i] = data[0][i * channels]
+                    right[i] = channels > 1 ? data[0][i * channels + 1] : left[i]
+                }
+            } else {
+                left = Array(UnsafeBufferPointer(start: data[0], count: frames))
+                right = channels > 1
+                    ? Array(UnsafeBufferPointer(start: data[1], count: frames))
+                    : left
+            }
+            return (left, right, srcRate)
+        }
+        if let data = buffer.int16ChannelData {
+            let scale: Float = 1.0 / 32768.0
+            if buffer.format.isInterleaved {
+                for i in 0..<frames {
+                    left[i] = Float(data[0][i * channels]) * scale
+                    right[i] = channels > 1 ? Float(data[0][i * channels + 1]) * scale : left[i]
+                }
+            } else {
+                for i in 0..<frames {
+                    left[i] = Float(data[0][i]) * scale
+                    right[i] = channels > 1 ? Float(data[1][i]) * scale : left[i]
+                }
+            }
+            return (left, right, srcRate)
+        }
+        return ([], [], 0)
+    }
+
+    private static func resampleArrays(
+        left: [Float],
+        right: [Float],
+        srcRate: Double,
+        destRate: Double
+    ) -> ([Float], [Float]) {
+        let srcFrames = min(left.count, right.count)
+        guard srcFrames > 1, srcRate > 1, destRate > 1 else { return ([], []) }
+        if abs(srcRate - destRate) < 0.5 {
+            return (Array(left.prefix(srcFrames)), Array(right.prefix(srcFrames)))
+        }
+        let destFrames = max(1, Int((Double(srcFrames) * destRate / srcRate).rounded()))
+        var outL = [Float](repeating: 0, count: destFrames)
+        var outR = [Float](repeating: 0, count: destFrames)
+        let ratio = srcRate / destRate
+        let last = srcFrames - 1
+        for i in 0..<destFrames {
+            let pos = Double(i) * ratio
+            let i0 = min(Int(pos), last)
+            let i1 = min(i0 + 1, last)
+            let frac = Float(pos - Double(i0))
+            outL[i] = left[i0] + (left[i1] - left[i0]) * frac
+            outR[i] = right[i0] + (right[i1] - right[i0]) * frac
+        }
+        return (outL, outR)
     }
 
     private func startFileLoop(restart: Bool) {
-        ensureFileLoopPlayer()
-        guard let player = fileLoopPlayer else { return }
+        guard let player = fileLoopPlayer, let buffer = fileLoopBuffer, buffer.frameLength > 1 else { return }
         player.volume = fileLoopGain
         if !restart && player.isPlaying && !fileLoopStopAtEnd {
             return
         }
         fileLoopStopAtEnd = false
-        guard let buffer = decodedFileLoopBuffer() else { return }
+        fileLoopPlaying = true
         player.stop()
         player.scheduleBuffer(buffer, at: nil, options: .loops)
         player.play()
     }
 
     private func stopFileLoopAtCycleEnd() {
-        if fileLoopStopAtEnd {
-            return
-        }
         guard let player = fileLoopPlayer, player.isPlaying else {
-            fileLoopPlayer?.stop()
+            fileLoopPlaying = false
+            fileLoopStopAtEnd = false
             return
         }
-        let format = fileLoopBuffer?.format ?? player.outputFormat(forBus: 0)
-        guard let silent = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 64) else {
+        guard
+            let format = fileLoopBuffer?.format,
+            let silent = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 64)
+        else {
             player.stop()
+            fileLoopPlaying = false
             return
         }
         silent.frameLength = 64
-        if let channels = silent.floatChannelData {
-            let channelCount = Int(format.channelCount)
-            for channel in 0..<channelCount {
-                for frame in 0..<64 {
-                    channels[channel][frame] = 0
-                }
-            }
-        }
         fileLoopStopAtEnd = true
         player.scheduleBuffer(silent, at: nil, options: [.interruptsAtLoop]) { [weak self] in
             DispatchQueue.main.async {
                 guard let self, self.fileLoopStopAtEnd else { return }
                 self.fileLoopPlayer?.stop()
+                self.fileLoopPlaying = false
                 self.fileLoopStopAtEnd = false
+                Self.publishNowPlaying(playing: self.isAudible)
             }
-        }
-    }
-
-    private func decodedFileLoopBuffer() -> AVAudioPCMBuffer? {
-        let sr = max(1000, sampleRate)
-        if let existing = fileLoopBuffer, abs(existing.format.sampleRate - sr) < 0.5 {
-            return existing
-        }
-        guard let data = fileLoopData, let decoded = pcmBufferFromLoopData(data, sampleRate: sr) else {
-            return nil
-        }
-        fileLoopBuffer = decoded
-        return decoded
-    }
-
-    private func pcmBufferFromLoopData(_ data: Data, sampleRate: Double) -> AVAudioPCMBuffer? {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("drone-file-loop.audio")
-        do {
-            try data.write(to: url, options: .atomic)
-            let file = try AVAudioFile(forReading: url)
-            let srcFormat = file.processingFormat
-            let frameCount = AVAudioFrameCount(file.length)
-            guard frameCount > 0,
-                  let srcBuffer = AVAudioPCMBuffer(pcmFormat: srcFormat, frameCapacity: frameCount)
-            else {
-                return nil
-            }
-            try file.read(into: srcBuffer)
-            guard let dstFormat = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2) else {
-                return srcBuffer
-            }
-            if abs(srcFormat.sampleRate - dstFormat.sampleRate) < 0.5,
-               srcFormat.channelCount == dstFormat.channelCount,
-               srcFormat.commonFormat == dstFormat.commonFormat
-            {
-                return srcBuffer
-            }
-            guard let converter = AVAudioConverter(from: srcFormat, to: dstFormat) else {
-                return srcBuffer
-            }
-            let destCapacity = AVAudioFrameCount(
-                Double(frameCount) * dstFormat.sampleRate / max(1, srcFormat.sampleRate) + 32
-            )
-            guard let dstBuffer = AVAudioPCMBuffer(pcmFormat: dstFormat, frameCapacity: destCapacity) else {
-                return srcBuffer
-            }
-            var error: NSError?
-            var provided = false
-            converter.convert(to: dstBuffer, error: &error) { _, status in
-                if provided {
-                    status.pointee = .endOfStream
-                    return nil
-                }
-                provided = true
-                status.pointee = .haveData
-                return srcBuffer
-            }
-            if let error {
-                NSLog("DroneSynth loop convert: \(error.localizedDescription)")
-                return srcBuffer
-            }
-            let exactFrames = AVAudioFrameCount(
-                (Double(frameCount) * dstFormat.sampleRate / max(1, srcFormat.sampleRate)).rounded()
-            )
-            if exactFrames > 0, dstBuffer.frameLength > exactFrames {
-                dstBuffer.frameLength = exactFrames
-            }
-            return dstBuffer
-        } catch {
-            NSLog("DroneSynth loop decode: \(error.localizedDescription)")
-            return nil
         }
     }
 
