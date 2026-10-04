@@ -472,6 +472,31 @@ export class LoopEngine {
     })
   }
 
+  /** Keep a running loop untouched, but restart it if the native player silently stopped. */
+  ensurePlaying(): void {
+    if (!this.config.enabled || this.finishing) {
+      return
+    }
+    if (isNativeSynth()) {
+      if (!this.hasNativeAudio) {
+        return
+      }
+      void DroneSynth.setLoopPlayback({
+        on: 1,
+        enabled: true,
+        volumeDb: this.config.volumeDb,
+        mute: this.config.muted ? 1 : 0,
+        muted: this.config.muted,
+        restart: 0,
+        stopAtEnd: 0,
+      }).catch(() => {})
+      return
+    }
+    if (!this.source && this.buffer) {
+      this.playFromStart()
+    }
+  }
+
   stopFromGesture(): void {
     this.config = { ...this.config, enabled: false }
     if (isNativeSynth()) {

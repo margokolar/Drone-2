@@ -168,6 +168,7 @@ function startSyncedLoop(restart: boolean, onStarted?: () => void, presetId?: st
     }
     if (!ok) {
       if (sameLoopIsCycling(slot) || (loadedPlaybackSlot() === slot && loopEngine.hasAudio())) {
+        loopEngine.ensurePlaying()
         onStarted?.()
         useDroneStore.getState().setLoopEnabled(true)
         return
@@ -178,6 +179,7 @@ function startSyncedLoop(restart: boolean, onStarted?: () => void, presetId?: st
     if (shouldRestart && !sameLoopIsCycling(slot)) {
       loopEngine.playFromStart(onStarted)
     } else {
+      loopEngine.ensurePlaying()
       onStarted?.()
     }
     useDroneStore.getState().setLoopEnabled(true)

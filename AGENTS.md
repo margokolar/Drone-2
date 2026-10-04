@@ -26,7 +26,7 @@ reason above it, as in `src/hooks/useShine.ts`).
 | Area | Where | Notes |
 |---|---|---|
 | Entry / platform classes | `src/main.tsx`, `src/utils/platform.ts` | Adds `ios-app` / `capacitor-native` classes to `<html>`/`<body>` |
-| Main screen | `src/App.tsx` | ~4000 lines, one big `App()` component holding all tabs and menus. Prefer extracting new UI into `src/components/` instead of growing it |
+| Main screen | `src/App.tsx` | ~2650 lines, `App()` still owns cross-tab state and audio-engine wiring. Split out: `TitleBar`, `PresetSongPickers`, `SideMenu`, `TransportBar`, `TonePanel`, `OvertonesPanel`, `OvertoneEditButtons`, `ToneSettingsSections`, `PresetsPanel`, `ClickPanel`, `LoopPanel`, `OvertoneAnalysisDialogs`, `src/toneSets/*`. Panels read their own store values; `App` passes only handlers that touch engines or other tabs. Put new UI in `src/components/`, not in `App.tsx` |
 | App state + persistence | `src/store/useDroneStore.ts` | One Zustand store, persisted to `localStorage` key `bourdon-store-v1` |
 | Saved-data upgrades | `migratePersistedDroneState` in the store | See "Persisted data" below |
 | Music math | `src/music/` | `notes.ts` (note ids), `tuning.ts` (all tuning systems), `harmonicSeries.ts`, `pitchMatch.ts` |

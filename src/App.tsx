@@ -1,31 +1,4 @@
-import {
-  AudioWaveform,
-  BatteryMedium,
-  ChevronDown,
-  ClipboardPaste,
-  Copy,
-  Download,
-  Globe,
-  Home,
-  Info,
-  Lock,
-  LockOpen,
-  Menu,
-  Pause,
-  Pencil,
-  Play,
-  PowerOff,
-  Redo2,
-  RotateCcw,
-  Save,
-  SkipBack,
-  SkipForward,
-  StepBack,
-  StepForward,
-  Undo2,
-  Upload,
-  X,
-} from 'lucide-react'
+import { X } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -39,7 +12,7 @@ import {
 import { metronomeEngine } from './audio/MetronomeEngine'
 import { loopEngine } from './audio/LoopEngine'
 import { deleteLoopSlotAudio, putLoopAudio } from './audio/loopAudioStore'
-import { loadedLoopSlots, loopSlotFileName, loopSlotLabel, nextLoopSyncSlot, presetLoopSyncSlot } from './audio/loopSlots'
+import { loadedLoopSlots, loopSlotFileName, nextLoopSyncSlot, presetLoopSyncSlot } from './audio/loopSlots'
 import { invalidateLoadedLoopSlot, markLoopSlotLoaded } from './audio/loopSlotPlayback'
 import { claimMixableAudioSession } from './audio/iosAudioSession'
 import {
@@ -59,31 +32,11 @@ import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig, Waveta
 import { cloneWavetable, sameWavetable } from './audio/wavetable'
 import { blendFromMorph } from './audio/audioMath'
 import { AddFollowerControls, AddMicToolbarButton } from './components/AddFollowerControls'
-import { MicMenuSection } from './components/MicMenuSection'
-import { MetronomeControls } from './components/MetronomeControls'
-import { LoopControls } from './components/LoopControls'
-import { LoopMenuSection } from './components/LoopMenuSection'
-import { ClickSyncButton } from './components/ClickSyncButton'
-import { LoopSyncButton } from './components/LoopSyncButton'
-import { NoteSelector } from './components/NoteSelector'
-import { OvertoneBars } from './components/OvertoneBars'
-import { OvertoneAllSoloButton, OvertoneToneNavControls, HarmonicTimbreToggleButton } from './components/OvertoneToneNavControls'
-import { overtoneControlButtonSizeClass, overtoneIconButtonClass } from './components/overtoneControlStyles'
+import { TonePanel } from './components/TonePanel'
+import { OvertonesLandscapeToolbar, OvertonesPanel } from './components/OvertonesPanel'
 import { OvertoneMidiPanel } from './components/OvertoneMidiPanel'
-import { PartialEditor } from './components/PartialEditor'
-import { TimbreMorphSlider } from './components/TimbreMorphSlider'
-import { ImportPresetsFromSong } from './components/ImportPresetsFromSong'
-import { PresetList } from './components/PresetList'
-import { SongList } from './components/SongList'
-import { ResettableRangeInput } from './components/ResettableRangeInput'
-import { SectionCard } from './components/SectionCard'
-import { LibraryPickerMenu } from './components/LibraryPickerMenu'
-import { ToneMixer } from './components/ToneMixer'
 import { TONE_MIXER_SECTION_ID, toneMixerCardElementId } from './components/toneMixerIds'
-import { TopControls } from './components/TopControls'
 import { ShineControls } from './components/ShineControls'
-import { EntryGlideControls } from './components/EntryGlideControls'
-import { FadeControls } from './components/FadeControls'
 import { HomeScreenOverlay, type HomeScreenItem } from './components/HomeScreenOverlay'
 import { useAddFollower } from './hooks/useAddFollower'
 import { useAudioEngine } from './hooks/useAudioEngine'
@@ -93,18 +46,15 @@ import { useOvertoneMidi } from './hooks/useOvertoneMidi'
 import { useShine } from './hooks/useShine'
 import {
   getTonePageLabel,
-  NOTE_IDS,
   SEMITONES_FROM_C,
   type NoteId,
 } from './music/notes'
 import { getFrequency, findLowestEnabledToneNoteId, findHighestEnabledToneNoteId } from './music/tuning'
-import { createDefaultPartials, DEFAULT_MASTER_GAIN_DB, type Preset } from './presets/defaultPresets'
+import { createDefaultPartials, type Preset } from './presets/defaultPresets'
 import { useDroneStore } from './store/useDroneStore'
 import { startNativeAudioSessionGuard } from './native/startNativeAudioSessionGuard'
-import { BtControlMenuSection } from './bluetooth/BtControlMenuSection'
 import { useBtControl } from './bluetooth/useBtControl'
 import { useScribbleDisplay } from './hooks/useScribbleDisplay'
-import { ScribbleMenuSection } from './scribble/ScribbleMenuSection'
 import { BLE_KEYBOARD_FOCUS_ROOT_ID } from './utils/restoreBleKeyboardFocus'
 import { BleDebugOverlay } from './components/BleDebugOverlay'
 import { bleDebugEnabled, recordBleDebug } from './utils/bleDebug'
@@ -115,8 +65,40 @@ import {
   scrollToneMixerCardIntoView,
   syncStickyChromeLayoutOffsets,
 } from './utils/scrollBelowStickyChrome'
-import { triggerSaveFlash } from './utils/saveFlash'
 import { isIosApp } from './utils/platform'
+import { TitleBar } from './components/TitleBar'
+import { PresetsPanel } from './components/PresetsPanel'
+import { ClickPanel } from './components/ClickPanel'
+import { LoopPanel } from './components/LoopPanel'
+import { PresetSongPickers } from './components/PresetSongPickers'
+import { SideMenu } from './components/SideMenu'
+import { TransportBar } from './components/TransportBar'
+import {
+  OvertoneAnalysisApplyDialog,
+  OvertoneAnalysisErrorDialog,
+  type OvertoneAnalysisApplyMode,
+} from './components/OvertoneAnalysisDialogs'
+import { ToneSetEditorDialog } from './toneSets/ToneSetEditorDialog'
+import { ToneSetOptionsDialog } from './toneSets/ToneSetOptionsDialog'
+import { type OvertoneEditActions } from './components/OvertoneEditButtons'
+import { suppressTrailingClickAfterLongPress } from './utils/suppressTrailingClick'
+import {
+  getLastActiveToneNoteId,
+  getOvertoneNavigationTones,
+  isToneStrictSolo,
+} from './music/toneSelection'
+import {
+  STORE_STORAGE_KEY,
+  TONE_SET_COLLECTION_STORAGE_KEY,
+  TONE_SET_STORAGE_KEY,
+  buildDefaultToneSetLayout,
+  isValidToneSetLayout,
+  loadToneSetCollection,
+  loadToneSetLayout,
+  parseToneIdList,
+  parseToneSetLayout,
+  type ToneSetLayout,
+} from './toneSets/toneSetLayout'
 
 type TabId = 'tone' | 'overtones' | 'presets' | 'metronome' | 'loop' | 'add' | 'midi' | 'shine'
 
@@ -129,32 +111,11 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'shine', label: 'Shine' },
   { id: 'add', label: 'Mic' },
 ]
-const APP_VERSION = '3.0'
-const DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS = 800
-const TOUCH_LOCK_LONG_PRESS_MS = 800
 
-function suppressTrailingClickAfterLongPress() {
-  const swallow = (event: Event) => {
-    event.preventDefault()
-    event.stopPropagation()
-  }
-  const options: AddEventListenerOptions = { capture: true }
-  window.addEventListener('click', swallow, options)
-  window.addEventListener('pointerup', swallow, options)
-  window.addEventListener('mouseup', swallow, options)
-  window.setTimeout(() => {
-    window.removeEventListener('click', swallow, options)
-    window.removeEventListener('pointerup', swallow, options)
-    window.removeEventListener('mouseup', swallow, options)
-  }, 500)
-}
 /** ~Safari viewport, loogilised CSS px (mitte dünaamiline Dynamic Island / toolbar). */
 const IPHONE_16_PRO_MAX_CSS_W = 440
 const IPHONE_16_PRO_MAX_CSS_H = 956
 const MAX_OVERTONE_HISTORY = 60
-const STORE_STORAGE_KEY = 'bourdon-store-v1'
-const TONE_SET_STORAGE_KEY = 'drone-tone-set-v1'
-const TONE_SET_COLLECTION_STORAGE_KEY = 'drone-tone-sets-v1'
 type OvertoneSnapshot = {
   partials: PartialConfig[]
   timbreBlend: TimbreBlend
@@ -164,260 +125,6 @@ type OvertoneSnapshot = {
 type PendingOvertoneAnalysis = {
   fileName: string
   analysis: OvertoneAnalysisResult
-}
-
-type OvertoneAnalysisApplyMode = 'gain-ratios' | 'gain-integer-ratios'
-
-type ToneSetLayout = {
-  name: string
-  subOctaveIds: NoteId[]
-  gridIds: NoteId[]
-  toneLabelOverrides?: Partial<Record<NoteId, string>>
-}
-
-type ToneSetCollection = {
-  customSets: ToneSetLayout[]
-}
-
-function buildDefaultToneSetLayout(): ToneSetLayout {
-  return {
-    name: 'Eesti Torupill',
-    subOctaveIds: ['g0', 'a0'],
-    gridIds: [
-      'c',
-      'd',
-      'e',
-      'f',
-      'fis',
-      'g',
-      'a',
-      'h',
-      'c1',
-      'd1',
-      'e1',
-      'f1',
-      'fis1',
-      'g1',
-      'a1',
-      'h1',
-    ],
-  }
-}
-
-function isUniqueNoteIdList(values: NoteId[]): boolean {
-  return new Set(values).size === values.length
-}
-
-function parseToneIdList(values: unknown): {
-  ids: NoteId[]
-  labelOverrides: Partial<Record<NoteId, string>>
-} {
-  if (!Array.isArray(values)) {
-    return { ids: [], labelOverrides: {} }
-  }
-  const NOTE_ID_ALIAS: Record<string, NoteId> = {
-    'ab0': 'gis0',
-    'a#0': 'b0',
-    'bb0': 'b0',
-    'cb1': 'h0',
-    'b#0': 'c',
-    'db': 'cis',
-    'c#': 'cis',
-    'eb': 'dis',
-    'd#': 'dis',
-    'gb': 'fis',
-    'f#': 'fis',
-    'ab': 'gis',
-    'g#': 'gis',
-    'a#': 'b',
-    'bb': 'b',
-    'cb2': 'h1',
-    'b#1': 'c1',
-    'db1': 'cis1',
-    'c#1': 'cis1',
-    'eb1': 'dis1',
-    'd#1': 'dis1',
-    'gb1': 'fis1',
-    'f#1': 'fis1',
-    'ab1': 'gis1',
-    'g#1': 'gis1',
-    'a#1': 'b1',
-    'bb1': 'b1',
-    'b#2': 'c2',
-    'db2': 'cis2',
-    'c#2': 'cis2',
-  }
-  const normalized: NoteId[] = []
-  const labelOverrides: Partial<Record<NoteId, string>> = {}
-  const formatAccidentalLabel = (token: string): string => {
-    if (token.includes('b')) {
-      return token.replace(/([a-z])b([0-9]?)/g, '$1♭$2')
-    }
-    if (token.includes('#')) {
-      return token.replace(/([a-z])#([0-9]?)/g, '$1♯$2')
-    }
-    return token
-  }
-  for (const value of values) {
-    if (typeof value !== 'string') {
-      continue
-    }
-    const token = value.trim().toLowerCase().replace('♯', '#').replace('♭', 'b')
-    const aliasResolved = NOTE_ID_ALIAS[token]
-    const next = (aliasResolved ?? token) as NoteId
-    if (NOTE_IDS.includes(next)) {
-      normalized.push(next)
-      if (token.includes('b') || token.includes('#')) {
-        labelOverrides[next] = formatAccidentalLabel(token)
-      }
-    }
-  }
-  return { ids: normalized, labelOverrides }
-}
-
-function isValidToneSetLayout(layout: ToneSetLayout): boolean {
-  if (layout.subOctaveIds.length > 8 || layout.gridIds.length < 1 || layout.gridIds.length > NOTE_IDS.length) {
-    return false
-  }
-  const merged = [...layout.subOctaveIds, ...layout.gridIds]
-  if (merged.length < 1 || merged.length > NOTE_IDS.length) {
-    return false
-  }
-  if (!isUniqueNoteIdList(merged) || merged.some((noteId) => !NOTE_IDS.includes(noteId))) {
-    return false
-  }
-  return true
-}
-
-function loadToneSetLayout(): ToneSetLayout {
-  if (typeof window === 'undefined') {
-    return buildDefaultToneSetLayout()
-  }
-  try {
-    const raw = window.localStorage.getItem(TONE_SET_STORAGE_KEY)
-    if (!raw) {
-      return buildDefaultToneSetLayout()
-    }
-    const parsed = JSON.parse(raw) as Partial<ToneSetLayout>
-    const parsedSubOctaves = parseToneIdList(parsed.subOctaveIds)
-    const parsedGrid = parseToneIdList(parsed.gridIds)
-    const parsedOverrides =
-      parsed.toneLabelOverrides && typeof parsed.toneLabelOverrides === 'object'
-        ? (parsed.toneLabelOverrides as Partial<Record<NoteId, string>>)
-        : {}
-    const candidate: ToneSetLayout = {
-      name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : 'Custom',
-      subOctaveIds: parsedSubOctaves.ids,
-      gridIds: parsedGrid.ids,
-      toneLabelOverrides: {
-        ...parsedOverrides,
-        ...parsedSubOctaves.labelOverrides,
-        ...parsedGrid.labelOverrides,
-      },
-    }
-    if (!isValidToneSetLayout(candidate)) {
-      return buildDefaultToneSetLayout()
-    }
-    return candidate
-  } catch {
-    return buildDefaultToneSetLayout()
-  }
-}
-
-function parseToneSetLayout(raw: unknown): ToneSetLayout | null {
-  if (!raw || typeof raw !== 'object') {
-    return null
-  }
-  const parsed = raw as Partial<ToneSetLayout>
-  const parsedSubOctaves = parseToneIdList(parsed.subOctaveIds)
-  const parsedGrid = parseToneIdList(parsed.gridIds)
-  const parsedOverrides =
-    parsed.toneLabelOverrides && typeof parsed.toneLabelOverrides === 'object'
-      ? (parsed.toneLabelOverrides as Partial<Record<NoteId, string>>)
-      : {}
-  const candidate: ToneSetLayout = {
-    name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : 'Custom',
-    subOctaveIds: parsedSubOctaves.ids,
-    gridIds: parsedGrid.ids,
-    toneLabelOverrides: {
-      ...parsedOverrides,
-      ...parsedSubOctaves.labelOverrides,
-      ...parsedGrid.labelOverrides,
-    },
-  }
-  return isValidToneSetLayout(candidate) ? candidate : null
-}
-
-function loadToneSetCollection(): ToneSetCollection {
-  if (typeof window === 'undefined') {
-    return { customSets: [] }
-  }
-  try {
-    const rawCollection = window.localStorage.getItem(TONE_SET_COLLECTION_STORAGE_KEY)
-    if (rawCollection) {
-      const parsed = JSON.parse(rawCollection) as Partial<ToneSetCollection>
-      const customSets = Array.isArray(parsed.customSets)
-        ? parsed.customSets
-            .map((entry) => parseToneSetLayout(entry))
-            .filter((entry): entry is ToneSetLayout => Boolean(entry))
-        : []
-      return { customSets }
-    }
-    const legacyRaw = window.localStorage.getItem(TONE_SET_STORAGE_KEY)
-    if (!legacyRaw) {
-      return { customSets: [] }
-    }
-    const legacyParsed = JSON.parse(legacyRaw) as Partial<ToneSetLayout>
-    const migrated = parseToneSetLayout(legacyParsed)
-    if (!migrated) {
-      return { customSets: [] }
-    }
-    if (migrated.name === buildDefaultToneSetLayout().name) {
-      return { customSets: [] }
-    }
-    return { customSets: [migrated] }
-  } catch {
-    return { customSets: [] }
-  }
-}
-
-function isToneStrictSolo(tones: ToneConfig[], noteId: NoteId): boolean {
-  const selected = tones.find((tone) => tone.noteId === noteId)
-  if (!selected?.enabled) {
-    return false
-  }
-  return tones.every((tone) => (tone.noteId === noteId ? tone.enabled : !tone.enabled))
-}
-
-function sortTonesByNoteId(source: ToneConfig[]): ToneConfig[] {
-  return [...source].sort(
-    (left, right) => NOTE_IDS.indexOf(left.noteId) - NOTE_IDS.indexOf(right.noteId),
-  )
-}
-
-function getLastActiveToneNoteId(source: ToneConfig[]): NoteId | undefined {
-  const sortedActive = sortTonesByNoteId(source.filter((tone) => tone.enabled))
-  if (sortedActive.length > 0) {
-    return sortedActive[sortedActive.length - 1]?.noteId
-  }
-  const sortedAll = sortTonesByNoteId(source)
-  return sortedAll[sortedAll.length - 1]?.noteId
-}
-
-function getOvertoneNavigationTones(
-  tonesInToneSet: ToneConfig[],
-  overtoneToneOptions: ToneConfig[],
-  toneSoloRestore: Map<NoteId, boolean> | null,
-  allCompareActive: boolean,
-): ToneConfig[] {
-  if (allCompareActive) {
-    return sortTonesByNoteId(tonesInToneSet)
-  }
-  if (toneSoloRestore !== null) {
-    const preSoloActive = tonesInToneSet.filter((tone) => toneSoloRestore.get(tone.noteId) === true)
-    return sortTonesByNoteId(preSoloActive)
-  }
-  return sortTonesByNoteId(overtoneToneOptions)
 }
 
 function App() {
@@ -432,20 +139,12 @@ function App() {
     initialToneSetCollection.customSets[0]?.name ?? '',
   )
   const [selectedOvertoneNoteId, setSelectedOvertoneNoteId] = useState<NoteId>('d')
-  const [currentTime, setCurrentTime] = useState(() =>
-    new Date().toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit' }),
-  )
   const upPressTimeoutRef = useRef<number | null>(null)
-  const droneTitleLongPressTimerRef = useRef<number | null>(null)
-  const droneTitleLongPressFiredRef = useRef(false)
-  const touchLockLongPressTimerRef = useRef<number | null>(null)
-  const touchLockLongPressFiredRef = useRef(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const toneSetImportInputRef = useRef<HTMLInputElement | null>(null)
   const toneSetEditorImportInputRef = useRef<HTMLInputElement | null>(null)
   const globalImportInputRef = useRef<HTMLInputElement | null>(null)
   const overtoneAnalyzeInputRef = useRef<HTMLInputElement | null>(null)
-  const sideMenuRef = useRef<HTMLElement | null>(null)
   const previewScrollRef = useRef<HTMLDivElement | null>(null)
   const overtoneSelectionPinnedRef = useRef(false)
   const toneMixerScrollTargetRef = useRef<NoteId | null>(null)
@@ -472,7 +171,6 @@ function App() {
   const [toneSetQuickGrid, setToneSetQuickGrid] = useState('')
   const [toneSetJsonCollapsed, setToneSetJsonCollapsed] = useState(true)
   const [toneSetEditorError, setToneSetEditorError] = useState<string | null>(null)
-  const [toneMixerSpatialExpanded, setToneMixerSpatialExpanded] = useState(false)
   const playing = useDroneStore((state) => state.playing)
   const activePresetId = useDroneStore((state) => state.activePresetId)
   const songName = useDroneStore((state) => state.songName)
@@ -511,27 +209,18 @@ function App() {
   const metronomeBpm = useDroneStore((state) => state.metronomeBpm)
   const metronomeVolumeDb = useDroneStore((state) => state.metronomeVolumeDb)
   const metronomeMuted = useDroneStore((state) => state.metronomeMuted)
-  const metronomeSyncEnabled = useDroneStore((state) => state.metronomeSyncEnabled)
   const loopSlots = useDroneStore((state) => state.loopSlots)
   const activeLoopSlot = useDroneStore((state) => state.activeLoopSlot)
   const loopVolumeDb = useDroneStore((state) => state.loopVolumeDb)
   const loopMuted = useDroneStore((state) => state.loopMuted)
   const loopEnabled = useDroneStore((state) => state.loopEnabled)
-  const loopSyncEnabled = useDroneStore((state) => state.loopSyncEnabled)
   const loopFeaturesEnabled = useDroneStore((state) => state.loopFeaturesEnabled)
   const liveShineEnabled = useDroneStore((state) => state.shine.enabled)
   const micFeaturesEnabled = useDroneStore((state) => state.micFeaturesEnabled)
   const controlsLocked = useDroneStore((state) => state.controlsLocked)
 
-  const nudgeReferenceA4Hz = useDroneStore((state) => state.nudgeReferenceA4Hz)
-  const nudgeBaseOctave = useDroneStore((state) => state.nudgeBaseOctave)
-  const setTuningSystemId = useDroneStore((state) => state.setTuningSystemId)
   const setTonalCenter = useDroneStore((state) => state.setTonalCenter)
-  const setMasterGainDb = useDroneStore((state) => state.setMasterGainDb)
   const toggleToneEnabled = useDroneStore((state) => state.toggleToneEnabled)
-  const setToneGain = useDroneStore((state) => state.setToneGain)
-  const setTonePan = useDroneStore((state) => state.setTonePan)
-  const setToneDetune = useDroneStore((state) => state.setToneDetune)
   const setTonePartials = useDroneStore((state) => state.setTonePartials)
   const setToneWavetable = useDroneStore((state) => state.setToneWavetable)
   const applyWavetableGlobally = useDroneStore((state) => state.applyWavetableGlobally)
@@ -544,16 +233,7 @@ function App() {
   const setToneTimbreValue = useDroneStore((state) => state.setToneTimbreValue)
   const setToneTimbreBlend = useDroneStore((state) => state.setToneTimbreBlend)
   const toggleHarmonicTimbreEnabled = useDroneStore((state) => state.toggleHarmonicTimbreEnabled)
-  const toggleEntryGlideEnabled = useDroneStore((state) => state.toggleEntryGlideEnabled)
   const toggleControlsLocked = useDroneStore((state) => state.toggleControlsLocked)
-  const setEntryGlideLowestCents = useDroneStore((state) => state.setEntryGlideLowestCents)
-  const setEntryGlideLowestSeconds = useDroneStore((state) => state.setEntryGlideLowestSeconds)
-  const setEntryGlideHighestCents = useDroneStore((state) => state.setEntryGlideHighestCents)
-  const setEntryGlideHighestSeconds = useDroneStore((state) => state.setEntryGlideHighestSeconds)
-  const setPlaybackFadeInSeconds = useDroneStore((state) => state.setPlaybackFadeInSeconds)
-  const setPlaybackFadeOutSeconds = useDroneStore((state) => state.setPlaybackFadeOutSeconds)
-  const togglePlaybackFadeEnabled = useDroneStore((state) => state.togglePlaybackFadeEnabled)
-  const setPresetCrossfadeSeconds = useDroneStore((state) => state.setPresetCrossfadeSeconds)
   const setGlobalOvertoneEditEnabled = useDroneStore((state) => state.setGlobalOvertoneEditEnabled)
   const enableGlobalOvertoneEditFromTone = useDroneStore((state) => state.enableGlobalOvertoneEditFromTone)
   const applyPartialsGlobally = useDroneStore((state) => state.applyPartialsGlobally)
@@ -563,13 +243,10 @@ function App() {
   const addPartialGlobally = useDroneStore((state) => state.addPartialGlobally)
   const removePartialGlobally = useDroneStore((state) => state.removePartialGlobally)
   const setMetronomeEnabled = useDroneStore((state) => state.setMetronomeEnabled)
-  const setMetronomeBpm = useDroneStore((state) => state.setMetronomeBpm)
-  const setMetronomeVolumeDb = useDroneStore((state) => state.setMetronomeVolumeDb)
   const setMetronomeMuted = useDroneStore((state) => state.setMetronomeMuted)
   const setMetronomeSyncEnabled = useDroneStore((state) => state.setMetronomeSyncEnabled)
   const setLoopSlotFileName = useDroneStore((state) => state.setLoopSlotFileName)
   const setActiveLoopSlot = useDroneStore((state) => state.setActiveLoopSlot)
-  const setLoopVolumeDb = useDroneStore((state) => state.setLoopVolumeDb)
   const setLoopMuted = useDroneStore((state) => state.setLoopMuted)
   const setLoopEnabled = useDroneStore((state) => state.setLoopEnabled)
   const setLoopSyncEnabled = useDroneStore((state) => state.setLoopSyncEnabled)
@@ -577,16 +254,6 @@ function App() {
   const saveDroneState = useDroneStore((state) => state.saveDroneState)
   const saveAsPreset = useDroneStore((state) => state.saveAsPreset)
   const loadPreset = useDroneStore((state) => state.loadPreset)
-  const renamePreset = useDroneStore((state) => state.renamePreset)
-  const duplicatePreset = useDroneStore((state) => state.duplicatePreset)
-  const importPresetsFromSong = useDroneStore((state) => state.importPresetsFromSong)
-  const deletePreset = useDroneStore((state) => state.deletePreset)
-  const insertTransportMarkerAfter = useDroneStore((state) => state.insertTransportMarkerAfter)
-  const deleteTransportMarker = useDroneStore((state) => state.deleteTransportMarker)
-  const moveNavigationEntry = useDroneStore((state) => state.moveNavigationEntry)
-  const toggleTransportMarkerNavigationEnabled = useDroneStore(
-    (state) => state.toggleTransportMarkerNavigationEnabled,
-  )
   const setTransportMarkerMetronomeSync = useDroneStore(
     (state) => state.setTransportMarkerMetronomeSync,
   )
@@ -594,14 +261,8 @@ function App() {
   const importSong = useDroneStore((state) => state.importSong)
   const importSongLibrary = useDroneStore((state) => state.importSongLibrary)
   const loadSongFromLibrary = useDroneStore((state) => state.loadSongFromLibrary)
-  const deleteSongFromLibrary = useDroneStore((state) => state.deleteSongFromLibrary)
-  const moveSongInLibrary = useDroneStore((state) => state.moveSongInLibrary)
-  const renameSongInLibrary = useDroneStore((state) => state.renameSongInLibrary)
-  const duplicateSongInLibrary = useDroneStore((state) => state.duplicateSongInLibrary)
   const selectNextSong = useDroneStore((state) => state.selectNextSong)
   const selectPreviousSong = useDroneStore((state) => state.selectPreviousSong)
-  const togglePresetNavigationEnabled = useDroneStore((state) => state.togglePresetNavigationEnabled)
-  const toggleSongNavigationEnabled = useDroneStore((state) => state.toggleSongNavigationEnabled)
   const canNavigatePresets =
     getEnabledNavigationEntries(presetNavigation, presets).length > 1
   const presetPickerItems = useMemo(
@@ -1349,10 +1010,6 @@ function App() {
     ],
   )
 
-  const openJblPortableApp = useCallback(() => {
-    // Best effort deep-link. Works only if JBL registers this URL scheme.
-    window.location.href = 'jblportable://'
-  }, [])
   const saveToneSetLayout = useCallback((layout: ToneSetLayout) => {
     setToneSetLayout(layout)
     try {
@@ -2239,13 +1896,6 @@ function App() {
     }
   }, [])
 
-  useEffect(() => {
-    const timerId = window.setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit' }))
-    }, 1000)
-    return () => window.clearInterval(timerId)
-  }, [])
-
   const scrollToPageTop = useCallback((behavior: ScrollBehavior = 'auto') => {
     window.scrollTo({ top: 0, left: 0, behavior })
     if (behavior === 'auto') {
@@ -2412,63 +2062,61 @@ function App() {
     setMenuImportOpen(false)
   }, [controlsLocked])
 
-  useEffect(() => {
-    if (!menuOpen) {
+  const openMenu = useCallback(() => setMenuOpen(true), [])
+  const closeMenu = useCallback(() => setMenuOpen(false), [])
+  const openToneFromTitle = useCallback(() => {
+    setActiveTab('tone')
+    setHomeScreenOpen(false)
+  }, [])
+  const openOvertonesFromTitle = useCallback(() => {
+    setActiveTab('overtones')
+    setHomeScreenOpen(false)
+  }, [])
+  const handleHomeButton = useCallback(() => {
+    if (homeScreenOpen) {
+      setActiveTab('presets')
+      setHomeScreenOpen(false)
       return
     }
-    const closeMenuOnOutsidePointer = (event: PointerEvent) => {
-      const menuElement = sideMenuRef.current
-      if (!menuElement) {
-        return
-      }
-      const target = event.target
-      if (target instanceof Node && !menuElement.contains(target)) {
-        setMenuOpen(false)
-      }
+    setHomeScreenOpen(true)
+  }, [homeScreenOpen])
+  const toggleTouchLockFromTitleBar = useCallback(() => {
+    const locking = !useDroneStore.getState().controlsLocked
+    if (locking) {
+      setHomeScreenOpen(true)
     }
-    window.addEventListener('pointerdown', closeMenuOnOutsidePointer)
-    return () => {
-      window.removeEventListener('pointerdown', closeMenuOnOutsidePointer)
-    }
-  }, [menuOpen])
-
-  const menuLabel = menuOpen ? 'Close menu' : 'Open menu'
-  const clearDroneTitleLongPressTimer = useCallback(() => {
-    if (droneTitleLongPressTimerRef.current !== null) {
-      window.clearTimeout(droneTitleLongPressTimerRef.current)
-      droneTitleLongPressTimerRef.current = null
-    }
-  }, [])
-  const clearTouchLockLongPressTimer = useCallback(() => {
-    if (touchLockLongPressTimerRef.current !== null) {
-      window.clearTimeout(touchLockLongPressTimerRef.current)
-      touchLockLongPressTimerRef.current = null
-    }
-  }, [])
-  const handleTouchLockPointerDown = useCallback(() => {
-    touchLockLongPressFiredRef.current = false
-    clearTouchLockLongPressTimer()
-    touchLockLongPressTimerRef.current = window.setTimeout(() => {
-      touchLockLongPressTimerRef.current = null
-      touchLockLongPressFiredRef.current = true
-      const locking = !useDroneStore.getState().controlsLocked
-      if (locking) {
-        setHomeScreenOpen(true)
-      }
-      toggleControlsLocked()
-    }, TOUCH_LOCK_LONG_PRESS_MS)
-  }, [clearTouchLockLongPressTimer, toggleControlsLocked])
-  const handleTouchLockClick = useCallback(() => {
-    if (touchLockLongPressFiredRef.current) {
-      touchLockLongPressFiredRef.current = false
-    }
-  }, [])
+    toggleControlsLocked()
+  }, [toggleControlsLocked])
   const iphone16ProMaxPreview = useMemo(
     () =>
       typeof window !== 'undefined' &&
       new URLSearchParams(window.location.search).get('device') === 'iphone16pm',
     [],
   )
+  const overtoneEditActions: OvertoneEditActions = {
+    onReset: resetOvertoneBalance,
+    canReset: canResetOvertones,
+    onUndo: undoOvertoneChange,
+    canUndo: canUndoOvertones,
+    onRedo: redoOvertoneChange,
+    canRedo: canRedoOvertones,
+    onCopy: copySelectedOvertones,
+    onPaste: pasteSelectedOvertones,
+    canPaste: canPasteOvertones,
+    onDeactivateAll: deactivateAllPartials,
+    canDeactivateAll: canDeactivateAllPartials,
+    harmonicTimbreEnabled,
+    onToggleHarmonicTimbre: toggleHarmonicTimbreEnabled,
+  }
+  const overtoneToneNav = {
+    selectedNoteId: selectedOvertoneNoteId,
+    isSolo: isSelectedOvertoneToneSolo,
+    canNavigate: canNavigateOvertoneTone,
+    soloAriaLabel: selectedOvertoneToneSoloAriaLabel,
+    onToggleSolo: toggleSelectedOvertoneToneSolo,
+    onPrevious: () => selectAdjacentOvertoneTone('previous'),
+    onNext: () => selectAdjacentOvertoneTone('next'),
+  }
   const homeScreen = (
     <HomeScreenOverlay
       presetTitle={lockScreenLabels.title}
@@ -2582,172 +2230,27 @@ function App() {
             activeTab === 'tone' || controlsLocked || homeScreenOpen ? '' : 'landscape:hidden max-h-[500px]:hidden'
           }`}
         >
-          <header className={`title-bar mx-auto flex max-w-[26.5rem] min-w-0 flex-nowrap items-center gap-3 rounded-xl border border-white/10 bg-[#111019] px-3 py-2 max-[480px]:px-2 max-[480px]:py-1.5 md:max-w-[62.5rem] ios-app:gap-0.5 ios-app:px-2 ios-app:py-2 ${
-            controlsLocked ? 'pointer-events-none' : ''
-          } ${
-            controlsLocked || homeScreenOpen ? '' : 'landscape:hidden max-h-[500px]:hidden'
-          }`}>
-            <button
-              type="button"
-              aria-label={controlsLocked ? 'Menu locked while touch lock is on' : menuLabel}
-              aria-disabled={controlsLocked}
-              disabled={controlsLocked}
-              className={`title-bar-icon flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/80 ${
-                controlsLocked ? 'cursor-not-allowed opacity-40' : ''
-              }`}
-              onClick={() => {
-                if (controlsLocked) {
-                  return
-                }
-                setMenuOpen(true)
-              }}
-            >
-              <Menu size={20} className="ios-app:hidden" />
-              <span className="title-bar-menu-icon hidden ios-app:flex" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </span>
-            </button>
-            <button
-              type="button"
-              className="shrink-0 select-none rounded-lg px-0 py-1 text-xl font-semibold tracking-wide text-white transition hover:bg-white/10"
-              onPointerDown={() => {
-                droneTitleLongPressFiredRef.current = false
-                clearDroneTitleLongPressTimer()
-                droneTitleLongPressTimerRef.current = window.setTimeout(() => {
-                  droneTitleLongPressTimerRef.current = null
-                  droneTitleLongPressFiredRef.current = true
-                  suppressTrailingClickAfterLongPress()
-                  setActiveTab('overtones')
-                  setHomeScreenOpen(false)
-                }, DRONE_TITLE_LONG_PRESS_TO_OVERTONES_MS)
-              }}
-              onPointerUp={clearDroneTitleLongPressTimer}
-              onPointerLeave={clearDroneTitleLongPressTimer}
-              onPointerCancel={clearDroneTitleLongPressTimer}
-              onClick={() => {
-                if (droneTitleLongPressFiredRef.current) {
-                  droneTitleLongPressFiredRef.current = false
-                  return
-                }
-                setActiveTab('tone')
-                setHomeScreenOpen(false)
-              }}
-              aria-label="Open Tone. Long-press to open Timbre."
-            >
-              Drone
-            </button>
-            <button
-              type="button"
-              className={`title-bar-icon relative z-50 flex items-center justify-center rounded-xl border transition ${
-                controlsLocked
-                  ? 'cursor-not-allowed border-white/10 bg-white/5 text-white/40 opacity-40'
-                  : homeScreenOpen
-                    ? 'pointer-events-auto border-amber-300/50 bg-amber-300/15 text-amber-100'
-                    : 'pointer-events-auto border-cyan-300/50 bg-cyan-300/15 text-cyan-100 hover:bg-cyan-300/25'
-              }`}
-              onClick={() => {
-                if (controlsLocked) {
-                  return
-                }
-                if (homeScreenOpen) {
-                  setActiveTab('presets')
-                  setHomeScreenOpen(false)
-                  return
-                }
-                setHomeScreenOpen(true)
-              }}
-              aria-label={homeScreenOpen ? 'Edit drone' : 'Open home screen'}
-              aria-pressed={homeScreenOpen}
-              aria-disabled={controlsLocked}
-            >
-              {homeScreenOpen ? <Pencil size={20} /> : <Home size={20} />}
-            </button>
-            <div className="title-bar-end ml-auto flex shrink-0 items-center gap-3 ios-app:gap-1">
-            <button
-              type="button"
-              className="title-bar-icon button-safe flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition hover:bg-white/10"
-              onClick={(event) => {
-                triggerSaveFlash(event.currentTarget)
-                saveDroneState()
-              }}
-              aria-label="Save drone state"
-              title="Save drone state"
-            >
-              <Save size={20} />
-            </button>
-            <button
-              type="button"
-              className={`title-bar-icon relative z-50 flex items-center justify-center rounded-xl border transition ${
-                controlsLocked
-                  ? 'pointer-events-auto border-amber-300/50 bg-amber-300/15 text-amber-100'
-                  : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
-              }`}
-              onPointerDown={handleTouchLockPointerDown}
-              onPointerUp={clearTouchLockLongPressTimer}
-              onPointerLeave={clearTouchLockLongPressTimer}
-              onPointerCancel={clearTouchLockLongPressTimer}
-              onClick={handleTouchLockClick}
-              aria-label={
-                controlsLocked
-                  ? 'Long-press to unlock screen touches. BlueTurn and media remote keep working.'
-                  : 'Long-press to lock screen touches for pocket use. BlueTurn and media remote keep working.'
-              }
-              aria-pressed={controlsLocked}
-            >
-              {controlsLocked ? <Lock size={20} /> : <LockOpen size={20} />}
-            </button>
-            <div className="shrink-0 whitespace-nowrap tabular-nums text-4xl font-extrabold leading-none text-fuchsia-100">{currentTime}</div>
-          </div>
-        </header>
+          <TitleBar
+            controlsLocked={controlsLocked}
+            homeScreenOpen={homeScreenOpen}
+            menuOpen={menuOpen}
+            onOpenMenu={openMenu}
+            onOpenTone={openToneFromTitle}
+            onOpenOvertones={openOvertonesFromTitle}
+            onHomeButton={handleHomeButton}
+            onSave={saveDroneState}
+            onToggleTouchLock={toggleTouchLockFromTitleBar}
+          />
           {activeTab === 'tone' && !controlsLocked && !homeScreenOpen && (
-            <div
-              className={`mx-auto mt-3 grid max-w-[26.5rem] grid-cols-2 gap-3 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem] ${
-                controlsLocked ? 'pointer-events-none' : ''
-              }`}
-            >
-              <article className="relative min-w-0 overflow-hidden rounded-xl border border-fuchsia-300/45 bg-[#211a2d] p-3">
-                <div className="mb-2 flex min-h-8 items-center gap-2">
-                  <h2 className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
-                    Preset
-                  </h2>
-                  <button
-                    type="button"
-                    className="button-safe flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-[#2a2238] text-white/80 transition hover:bg-[#352a48]"
-                    onClick={(event) => {
-                      triggerSaveFlash(event.currentTarget)
-                      saveAsPreset()
-                    }}
-                    aria-label="Save as new preset"
-                  >
-                    <Copy size={15} />
-                  </button>
-                </div>
-                <LibraryPickerMenu
-                  selectedId={activeNavigationKey}
-                  items={presetPickerItems}
-                  onSelect={handlePresetPickerSelect}
-                  appearance="select"
-                  openAriaLabel="Open preset list"
-                />
-              </article>
-              <article className="relative min-w-0 overflow-hidden rounded-xl border border-white/10 bg-[#1a1825] p-3">
-                <div className="mb-2 flex min-h-8 items-center gap-2">
-                  <h2 className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
-                    Song
-                  </h2>
-                </div>
-                <LibraryPickerMenu
-                  selectedId={songLibrary.find((song) => song.name === songName)?.id ?? ''}
-                  items={songLibrary}
-                  onSelect={loadSongFromLibrary}
-                  appearance="select"
-                  dropdownAlign="end"
-                  openAriaLabel="Open song list"
-                />
-              </article>
-            </div>
+            <PresetSongPickers
+              selectedPresetKey={activeNavigationKey}
+              presetItems={presetPickerItems}
+              onSelectPreset={handlePresetPickerSelect}
+              onSaveAsNewPreset={saveAsPreset}
+              selectedSongId={songLibrary.find((song) => song.name === songName)?.id ?? ''}
+              songItems={songLibrary}
+              onSelectSong={loadSongFromLibrary}
+            />
           )}
         </div>
         {iosHomeOpen && (
@@ -2774,128 +2277,29 @@ function App() {
           onTouchEnd={handleSwipeTouchEnd}
         >
           <div className="space-y-3" role="tabpanel" id="panel-tone" aria-labelledby="tab-tone" hidden={activeTab !== 'tone' || homeScreenOpen}>
-            <SectionCard title="Global controls" className="[&>header]:hidden">
-              <div className="space-y-3">
-                <TopControls
-                  referenceA4Hz={referenceA4Hz}
-                  baseOctave={baseOctave}
-                  tuningSystemId={tuningSystemId}
-                  tonalCenter={tonalCenter}
-                  onReferenceNudge={nudgeReferenceA4Hz}
-                  onBaseOctaveNudge={nudgeBaseOctave}
-                  onTuningSystemChange={setTuningSystemId}
-                  onTonalCenterChange={setTonalCenter}
-                />
-                <NoteSelector
-                  tones={tones}
-                  toneSetName={toneSetLayout.name}
-                  subOctaveIds={toneSetLayout.subOctaveIds}
-                  gridIds={toneSetLayout.gridIds}
-                  toneLabelOverrides={toneSetLayout.toneLabelOverrides}
-                  soloModeActive={toneSelectionSoloMode}
-                  onTonePress={handleToneSelectionPress}
-                  onToneLongPress={handleToneSelectionLongPress}
-                  shineActive={shine.enabled}
-                  onShineToggle={shine.toggleRunning}
-                  onShineLongPress={() => setActiveTab('shine')}
-                />
-                <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className="text-xs uppercase tracking-[0.16em] text-white/60">Master gain</span>
-                    <span className="text-xs tabular-nums text-white/70">{masterGainDb.toFixed(1)} dB</span>
-                  </div>
-                  <ResettableRangeInput
-                    min={-30}
-                    max={0}
-                    step={0.1}
-                    value={masterGainDb}
-                    onChange={(event) => setMasterGainDb(Number(event.target.value))}
-                    onReset={() => setMasterGainDb(DEFAULT_MASTER_GAIN_DB)}
-                    aria-label="Master gain. Double-click or double-tap to reset to default."
-                    className="h-1.5 w-full accent-fuchsia-300"
-                  />
-                </div>
-              </div>
-            </SectionCard>
-            <SectionCard
-              id={TONE_MIXER_SECTION_ID}
-              title="Tone mixer"
-              titleAddon={
-                <button
-                  type="button"
-                  className={`button-safe flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition ${
-                    toneMixerSpatialExpanded
-                      ? 'border-fuchsia-300/50 bg-fuchsia-300/15 text-fuchsia-100 hover:bg-fuchsia-300/25'
-                      : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
-                  }`}
-                  onClick={() => setToneMixerSpatialExpanded((current) => !current)}
-                  aria-expanded={toneMixerSpatialExpanded}
-                  aria-controls={TONE_MIXER_SECTION_ID}
-                  aria-label={
-                    toneMixerSpatialExpanded
-                      ? 'Peida detune ja pan kõigil toonidel'
-                      : 'Näita detune ja pan kõigil toonidel'
-                  }
-                  title="Detune & Pan"
-                >
-                  <ChevronDown
-                    size={14}
-                    className={`transition-transform${toneMixerSpatialExpanded ? ' rotate-180' : ''}`}
-                    aria-hidden
-                  />
-                </button>
-              }
-            >
-              <ToneMixer
-                tones={toneMixerTones}
-                allTones={tonesInToneSet}
-                spatialExpanded={toneMixerSpatialExpanded}
-                referenceA4Hz={referenceA4Hz}
-                baseOctave={baseOctave}
-                tuningSystemId={tuningSystemId}
-                tonalCenter={tonalCenter}
-                fallbackTimbreBlend={timbreBlend}
-                shineEnabled={shine.enabled}
-                shineVolume={shine.volume}
-                shineMotion={shine.motion}
-                shineOctaveIndex={shine.octaveIndex}
-                onShineToggle={shine.toggleRunning}
-                onShineVolume={shine.setVolume}
-                onShineMotion={shine.setMotion}
-                onShineOctaveIndex={shine.setOctaveIndex}
-                onToneGain={setToneGain}
-                onTonePan={setTonePan}
-                onToneDetune={setToneDetune}
-                onToneTimbreValue={setToneTimbreValue}
-                onToggleToneSolo={toggleToneSoloForNote}
-                onEditOvertones={(noteId) => {
-                  overtoneSelectionPinnedRef.current = true
-                  setSelectedOvertoneNoteId(noteId)
-                  setActiveTab('overtones')
-                }}
-              />
-            </SectionCard>
-            <FadeControls
-              enabled={playbackFadeEnabled}
-              fadeInSeconds={playbackFadeInSeconds}
-              fadeOutSeconds={playbackFadeOutSeconds}
-              presetCrossfadeSeconds={presetCrossfadeSeconds}
-              onToggleEnabled={togglePlaybackFadeEnabled}
-              onFadeInSecondsChange={setPlaybackFadeInSeconds}
-              onFadeOutSecondsChange={setPlaybackFadeOutSeconds}
-              onPresetCrossfadeSecondsChange={setPresetCrossfadeSeconds}
-            />
-            <EntryGlideControls
-              enabled={entryGlideEnabled}
-              lowestCents={entryGlideLowestCents}
-              lowestSeconds={entryGlideLowestSeconds}
-              highestCents={entryGlideHighestCents}
-              highestSeconds={entryGlideHighestSeconds}
-              onToggleEnabled={toggleEntryGlideEnabled}
-              onLowestCentsChange={setEntryGlideLowestCents}
-              onLowestSecondsChange={setEntryGlideLowestSeconds}
-              onHighestCentsChange={setEntryGlideHighestCents}
-              onHighestSecondsChange={setEntryGlideHighestSeconds}
+            <TonePanel
+              toneSetLayout={toneSetLayout}
+              tones={tones}
+              tonesInToneSet={tonesInToneSet}
+              toneMixerTones={toneMixerTones}
+              toneSelectionSoloMode={toneSelectionSoloMode}
+              shineEnabled={shine.enabled}
+              shineVolume={shine.volume}
+              shineMotion={shine.motion}
+              shineOctaveIndex={shine.octaveIndex}
+              onTonePress={handleToneSelectionPress}
+              onToneLongPress={handleToneSelectionLongPress}
+              onShineToggle={shine.toggleRunning}
+              onShineLongPress={() => setActiveTab('shine')}
+              onShineVolume={shine.setVolume}
+              onShineMotion={shine.setMotion}
+              onShineOctaveIndex={shine.setOctaveIndex}
+              onToggleToneSolo={toggleToneSoloForNote}
+              onEditOvertones={(noteId) => {
+                overtoneSelectionPinnedRef.current = true
+                setSelectedOvertoneNoteId(noteId)
+                setActiveTab('overtones')
+              }}
             />
           </div>
           <div
@@ -2905,169 +2309,33 @@ function App() {
             aria-labelledby="tab-overtones"
             hidden={activeTab !== 'overtones'}
           >
-            <div className="landscape:flex landscape:items-end landscape:gap-2 max-h-[500px]:flex max-h-[500px]:items-end max-h-[500px]:gap-2">
-            <SectionCard
-              title="Overtones"
-              titleAddon={
-                <button
-                  type="button"
-                  className={`button-safe flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition ${
-                    globalOvertoneEditEnabled
-                      ? 'border-cyan-300/60 bg-cyan-400/15 text-cyan-200 hover:bg-cyan-400/25'
-                      : 'border-white/15 bg-white/5 text-white/80 opacity-40 hover:bg-white/10'
-                  }`}
-                  onClick={toggleGlobalOvertoneEdit}
-                  title="Global overtone edit"
-                  aria-label="Toggle global overtone edit"
-                  aria-pressed={globalOvertoneEditEnabled}
-                >
-                  <Globe size={14} aria-hidden />
-                </button>
-              }
-              className="landscape:min-w-0 landscape:flex-1 landscape:p-2 landscape:[&>header]:hidden max-h-[500px]:min-w-0 max-h-[500px]:flex-1 max-h-[500px]:p-2 max-h-[500px]:[&>header]:hidden [&>header]:mb-2"
-              rightSlot={
-                <div className="flex w-full min-w-0 flex-col items-end gap-1.5 landscape:hidden max-h-[500px]:hidden">
-                  <div className="flex items-center gap-2">
-                    <OvertoneAllSoloButton
-                      variant="portrait-solo"
-                      isActive={isAllTonesCompareActive}
-                      onClick={toggleAllTonesCompare}
-                    />
-                    <OvertoneToneNavControls
-                      variant="portrait-solo"
-                      toneNoteId={selectedOvertoneNoteId}
-                      isSolo={isSelectedOvertoneToneSolo}
-                      canNavigate={canNavigateOvertoneTone}
-                      soloAriaLabel={selectedOvertoneToneSoloAriaLabel}
-                      onToggleSolo={toggleSelectedOvertoneToneSolo}
-                      onPrevious={() => selectAdjacentOvertoneTone('previous')}
-                      onNext={() => selectAdjacentOvertoneTone('next')}
-                      onGoToToneMixer={goToToneMixerCard}
-                    />
-                  </div>
-                  <div className="hide-scrollbar -mx-0.5 flex overflow-x-auto">
-                    <div className="flex min-w-full items-center justify-between gap-9 px-0.5">
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          type="button"
-                          className={overtoneIconButtonClass('portrait-solo')}
-                          onClick={resetOvertoneBalance}
-                          aria-label="Reset overtone balance"
-                          disabled={!canResetOvertones}
-                        >
-                          <RotateCcw size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          className={overtoneIconButtonClass('portrait-solo')}
-                          onClick={undoOvertoneChange}
-                          aria-label="Undo overtone change"
-                          disabled={!canUndoOvertones}
-                        >
-                          <Undo2 size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          className={overtoneIconButtonClass('portrait-solo')}
-                          onClick={redoOvertoneChange}
-                          aria-label="Redo overtone change"
-                          disabled={!canRedoOvertones}
-                        >
-                          <Redo2 size={16} />
-                        </button>
-                      </div>
-                      <OvertoneToneNavControls
-                        variant="portrait-steps"
-                        toneNoteId={selectedOvertoneNoteId}
-                        isSolo={isSelectedOvertoneToneSolo}
-                        canNavigate={canNavigateOvertoneTone}
-                        soloAriaLabel={selectedOvertoneToneSoloAriaLabel}
-                        onToggleSolo={toggleSelectedOvertoneToneSolo}
-                        onPrevious={() => selectAdjacentOvertoneTone('previous')}
-                        onNext={() => selectAdjacentOvertoneTone('next')}
-                      />
-                    </div>
-                  </div>
-                </div>
-              }
-            >
-              <OvertoneBars
-                partials={selectedOvertonePartials}
-                timbreBlend={selectedOvertoneTimbreBlend}
-                harmonicTimbreEnabled={harmonicTimbreEnabled}
-                onGainChange={overtoneMidi.onPartialGainFromUi}
-                onGainDragStart={rememberOvertoneState}
-                onToggleEnabled={(partialId, enabled) => {
-                  rememberOvertoneState()
-                  overtoneMidi.onPartialEnabledFromUi(partialId, enabled)
-                }}
-              />
-              <div className="mt-2 flex items-center gap-1 landscape:hidden max-h-[500px]:hidden">
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
-                    className={overtoneIconButtonClass('portrait-solo')}
-                    onClick={copySelectedOvertones}
-                    aria-label="Copy tone overtones"
-                  >
-                    <Copy size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className={overtoneIconButtonClass('portrait-solo')}
-                    onClick={pasteSelectedOvertones}
-                    aria-label="Paste tone overtones"
-                    disabled={!canPasteOvertones}
-                  >
-                    <ClipboardPaste size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className={overtoneIconButtonClass('portrait-solo')}
-                    onClick={deactivateAllPartials}
-                    aria-label="Deactivate all partials"
-                    disabled={!canDeactivateAllPartials}
-                  >
-                    <PowerOff size={16} />
-                  </button>
-                  <HarmonicTimbreToggleButton
-                    variant="portrait-solo"
-                    enabled={harmonicTimbreEnabled}
-                    onClick={toggleHarmonicTimbreEnabled}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className={`button-safe ml-auto flex shrink-0 touch-manipulation items-center gap-1 rounded-lg border border-white/15 bg-white/5 text-xs font-semibold text-white/85 transition hover:bg-white/10 ${overtoneControlButtonSizeClass('portrait-solo')}`}
-                  onClick={() => overtoneAnalyzeInputRef.current?.click()}
-                  aria-label="Choose audio file for overtone analysis"
-                >
-                  <AudioWaveform size={16} />
-                  Analyse audio
-                </button>
-              </div>
-              <div className="mt-3">
-                <TimbreMorphSlider
-                  variant="mixer"
-                  timbreBlend={selectedOvertoneTimbreBlend}
-                  onSetTimbreValue={setSelectedOvertoneTimbreValue}
-                  onTimbreChangeStart={beginTimbreMorphChange}
-                  onTimbreChangeEnd={endTimbreMorphChange}
-                />
-              </div>
-            </SectionCard>
-            </div>
-            <SectionCard title="Partials">
-              <PartialEditor
-                partials={selectedOvertonePartials}
-                referenceFrequencyHz={partialReferenceFrequencyHz}
-                onSetPartialEnabled={overtoneMidi.onPartialEnabledFromUi}
-                onSetPartialRatio={setSelectedOvertoneRatio}
-                onSetPartialGain={overtoneMidi.onPartialGainFromUi}
-                onAddPartial={addSelectedOvertonePartial}
-                onRemovePartial={removeSelectedOvertonePartial}
-              />
-            </SectionCard>
+            <OvertonesPanel
+              globalEditEnabled={globalOvertoneEditEnabled}
+              onToggleGlobalEdit={toggleGlobalOvertoneEdit}
+              isAllTonesCompareActive={isAllTonesCompareActive}
+              onToggleAllTonesCompare={toggleAllTonesCompare}
+              toneNav={overtoneToneNav}
+              onGoToToneMixer={goToToneMixerCard}
+              editActions={overtoneEditActions}
+              partials={selectedOvertonePartials}
+              timbreBlend={selectedOvertoneTimbreBlend}
+              harmonicTimbreEnabled={harmonicTimbreEnabled}
+              onPartialGainChange={overtoneMidi.onPartialGainFromUi}
+              onBarEnabledChange={(partialId, enabled) => {
+                rememberOvertoneState()
+                overtoneMidi.onPartialEnabledFromUi(partialId, enabled)
+              }}
+              onPartialEnabledChange={overtoneMidi.onPartialEnabledFromUi}
+              onPartialGainDragStart={rememberOvertoneState}
+              onAnalyzeAudio={() => overtoneAnalyzeInputRef.current?.click()}
+              onSetTimbreValue={setSelectedOvertoneTimbreValue}
+              onTimbreChangeStart={beginTimbreMorphChange}
+              onTimbreChangeEnd={endTimbreMorphChange}
+              referenceFrequencyHz={partialReferenceFrequencyHz}
+              onSetPartialRatio={setSelectedOvertoneRatio}
+              onAddPartial={addSelectedOvertonePartial}
+              onRemovePartial={removeSelectedOvertonePartial}
+            />
           </div>
           <div
             className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
@@ -3076,33 +2344,10 @@ function App() {
             aria-labelledby="tab-metronome"
             hidden={activeTab !== 'metronome'}
           >
-            <SectionCard
-              title="Click"
-              className="[&>header]:mb-0"
-              rightSlot={
-                <ClickSyncButton
-                    enabled={metronomeSyncEnabled}
-                    onClick={() => handleMetronomeSyncChange(!metronomeSyncEnabled)}
-                    inactiveClassName="border-white/15 bg-white/5 text-white/55 hover:bg-white/10"
-                    ariaLabel={
-                      metronomeSyncEnabled
-                        ? 'Disable click sync with drone transport play and pause'
-                        : 'Sync click start and stop with drone transport play and pause'
-                    }
-                  />
-              }
-            >
-              <MetronomeControls
-                enabled={metronomeEnabled}
-                bpm={metronomeBpm}
-                volumeDb={metronomeVolumeDb}
-                muted={metronomeMuted}
-                onEnabledChange={handleMetronomeEnabledChange}
-                onBpmChange={setMetronomeBpm}
-                onVolumeChange={setMetronomeVolumeDb}
-                onMutedChange={setMetronomeMuted}
-              />
-            </SectionCard>
+            <ClickPanel
+              onEnabledChange={handleMetronomeEnabledChange}
+              onSyncChange={handleMetronomeSyncChange}
+            />
           </div>
           <div
             className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
@@ -3111,41 +2356,17 @@ function App() {
             aria-labelledby="tab-loop"
             hidden={activeTab !== 'loop'}
           >
-            <SectionCard
-              title="Loop"
-              className="[&>header]:mb-0"
-              rightSlot={
-                <LoopSyncButton
-                  enabled={loopSyncEnabled}
-                  slot={loopSyncEnabled ? activeLoopSlot : null}
-                  onClick={() => handleLoopSyncChange(!loopSyncEnabled)}
-                  inactiveClassName="border-white/15 bg-white/5 text-white/55 hover:bg-white/10"
-                  ariaLabel={
-                    loopSyncEnabled
-                      ? `Disable loop sync with drone transport play and pause (${loopSlotLabel(activeLoopSlot)})`
-                      : 'Sync loop start and stop with drone transport play and pause'
-                  }
-                />
-              }
-            >
-              <LoopControls
-                enabled={loopEnabled}
-                activeSlot={activeLoopSlot}
-                slots={loopSlots}
-                volumeDb={loopVolumeDb}
-                muted={loopMuted}
-                onEnabledChange={handleLoopEnabledChange}
-                onSelectSlot={handleSelectLoopSlot}
-                onPickFile={(file) => {
-                  void handleLoopFilePick(file)
-                }}
-                onClearFile={() => {
-                  void handleLoopFileClear()
-                }}
-                onVolumeChange={setLoopVolumeDb}
-                onMutedChange={setLoopMuted}
-              />
-            </SectionCard>
+            <LoopPanel
+              onEnabledChange={handleLoopEnabledChange}
+              onSyncChange={handleLoopSyncChange}
+              onSelectSlot={handleSelectLoopSlot}
+              onPickFile={(file) => {
+                void handleLoopFilePick(file)
+              }}
+              onClearFile={() => {
+                void handleLoopFileClear()
+              }}
+            />
           </div>
           <div
             className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
@@ -3163,65 +2384,12 @@ function App() {
             aria-labelledby="tab-presets"
             hidden={activeTab !== 'presets'}
           >
-            <SectionCard
-              id={PRESETS_SECTION_CARD_ID}
-              title="Presets"
-              className="flex min-h-0 flex-1 flex-col overflow-hidden [&>header]:mb-3 [&>header]:shrink-0"
-            >
-              <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
-                <section className="flex min-h-0 min-w-0 flex-col">
-                  <h3 className="mb-2 shrink-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
-                    Presets
-                  </h3>
-                  <div className="presets-column-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                    <ImportPresetsFromSong
-                      songName={songName}
-                      songLibrary={songLibrary}
-                      onImport={importPresetsFromSong}
-                    />
-                    <PresetList
-                      presets={presets}
-                      presetNavigation={presetNavigation}
-                      activeNavigationKey={activeNavigationKey}
-                      activePresetId={activePresetId}
-                      onLoadPreset={(presetId) => {
-                        loadPreset(presetId)
-                        applyClickSyncForPreset(presetId)
-                      }}
-                      onRenamePreset={renamePreset}
-                      onDuplicatePreset={duplicatePreset}
-                      onDeletePreset={deletePreset}
-                      onMoveNavigationEntry={moveNavigationEntry}
-                      onToggleNavigationEnabled={togglePresetNavigationEnabled}
-                      onInsertTransportAfter={insertTransportMarkerAfter}
-                      onDeleteTransportMarker={deleteTransportMarker}
-                      onToggleTransportNavigationEnabled={toggleTransportMarkerNavigationEnabled}
-                      onSetTransportMetronomeSync={handleTransportMarkerMetronomeSyncChange}
-                      onSetPresetMetronomeSync={handlePresetMetronomeSyncChange}
-                      onSetPresetLoopSync={handlePresetLoopSyncChange}
-                      onActivateTransport={activateTransportMarker}
-                    />
-                  </div>
-                </section>
-                <section className="flex min-h-0 min-w-0 flex-col">
-                  <h3 className="mb-2 shrink-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
-                    Songs
-                  </h3>
-                  <div className="presets-column-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                    <SongList
-                      songName={songName}
-                      songLibrary={songLibrary}
-                      onLoadSong={loadSongFromLibrary}
-                      onRenameSong={renameSongInLibrary}
-                      onDuplicateSong={duplicateSongInLibrary}
-                      onDeleteSong={deleteSongFromLibrary}
-                      onMoveSong={moveSongInLibrary}
-                      onToggleNavigationEnabled={toggleSongNavigationEnabled}
-                    />
-                  </div>
-                </section>
-              </div>
-            </SectionCard>
+            <PresetsPanel
+              onLoadSong={loadSongFromLibrary}
+              onSetTransportMetronomeSync={handleTransportMarkerMetronomeSyncChange}
+              onSetPresetMetronomeSync={handlePresetMetronomeSyncChange}
+              onSetPresetLoopSync={handlePresetLoopSyncChange}
+            />
           </div>
           <div
             className="space-y-4 landscape:space-y-2 max-h-[500px]:space-y-2"
@@ -3298,354 +2466,57 @@ function App() {
               ))}
               </div>
               {activeTab === 'overtones' && (
-                <div className="hidden w-full min-w-0 items-center gap-1.5 landscape:flex max-h-[500px]:flex">
-                  <div className="flex shrink-0 items-center gap-1.5">
-                  <button
-                    type="button"
-                    className={overtoneIconButtonClass('landscape-inline')}
-                    onClick={resetOvertoneBalance}
-                    aria-label="Reset overtone balance"
-                    disabled={!canResetOvertones}
-                  >
-                    <RotateCcw size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className={overtoneIconButtonClass('landscape-inline')}
-                    onClick={undoOvertoneChange}
-                    aria-label="Undo overtone change"
-                    disabled={!canUndoOvertones}
-                  >
-                    <Undo2 size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className={overtoneIconButtonClass('landscape-inline')}
-                    onClick={redoOvertoneChange}
-                    aria-label="Redo overtone change"
-                    disabled={!canRedoOvertones}
-                  >
-                    <Redo2 size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className={overtoneIconButtonClass('landscape-inline')}
-                    onClick={copySelectedOvertones}
-                    aria-label="Copy tone overtones"
-                  >
-                    <Copy size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className={overtoneIconButtonClass('landscape-inline')}
-                    onClick={pasteSelectedOvertones}
-                    aria-label="Paste tone overtones"
-                    disabled={!canPasteOvertones}
-                  >
-                    <ClipboardPaste size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className={overtoneIconButtonClass('landscape-inline')}
-                    onClick={deactivateAllPartials}
-                    aria-label="Deactivate all partials"
-                    disabled={!canDeactivateAllPartials}
-                  >
-                    <PowerOff size={16} />
-                  </button>
-                  <HarmonicTimbreToggleButton
-                    variant="landscape-inline"
-                    enabled={harmonicTimbreEnabled}
-                    onClick={toggleHarmonicTimbreEnabled}
-                  />
-                  </div>
-                  <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                  <OvertoneAllSoloButton
-                    variant="landscape-inline"
-                    isActive={isAllTonesCompareActive}
-                    onClick={toggleAllTonesCompare}
-                  />
-                  <OvertoneToneNavControls
-                    variant="landscape-inline"
-                    toneNoteId={selectedOvertoneNoteId}
-                    isSolo={isSelectedOvertoneToneSolo}
-                    canNavigate={canNavigateOvertoneTone}
-                    soloAriaLabel={selectedOvertoneToneSoloAriaLabel}
-                    onToggleSolo={toggleSelectedOvertoneToneSolo}
-                    onPrevious={() => selectAdjacentOvertoneTone('previous')}
-                    onNext={() => selectAdjacentOvertoneTone('next')}
-                  />
-                  </div>
-                </div>
+                <OvertonesLandscapeToolbar
+                  editActions={overtoneEditActions}
+                  isAllTonesCompareActive={isAllTonesCompareActive}
+                  onToggleAllTonesCompare={toggleAllTonesCompare}
+                  toneNav={overtoneToneNav}
+                />
               )}
             </div>
           </nav>
-          <div
-            className={`rounded-xl border border-white/10 p-2 ${
-              controlsLocked ? 'bg-[#111019]' : 'bg-[#111019]/95 backdrop-blur-sm'
-            }`}
-          >
-              <div
-                className={`grid gap-1.5 ${
-                  micFeaturesEnabled ? 'grid-cols-6' : 'grid-cols-5'
-                }`}
-              >
-                <button
-                  type="button"
-                  data-transport="song-prev"
-                  className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
-                  onClick={selectPreviousSong}
-                  disabled={!canNavigateSongs}
-                  aria-label="Previous song"
-                >
-                  <SkipBack size={22} />
-                </button>
-                <button
-                  type="button"
-                  data-transport="preset-prev"
-                  className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
-                  onClick={handlePreviousPreset}
-                  disabled={!canNavigatePresets}
-                  aria-label="Previous preset"
-                >
-                  <StepBack size={22} />
-                </button>
-                <button
-                  type="button"
-                  data-transport="play"
-                  className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-fuchsia-300/60 bg-fuchsia-400/15 text-white transition hover:bg-fuchsia-300/25"
-                  onClick={handleTogglePlay}
-                  aria-label={playing ? 'Pause' : 'Play'}
-                >
-                  {playing ? <Pause size={22} /> : <Play size={22} />}
-                </button>
-                <button
-                  type="button"
-                  data-transport="preset-next"
-                  className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
-                  onClick={handleNextPreset}
-                  disabled={!canNavigatePresets}
-                  aria-label="Next preset"
-                >
-                  <StepForward size={22} />
-                </button>
-                <button
-                  type="button"
-                  data-transport="song-next"
-                  className="button-safe flex h-11 w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
-                  onClick={selectNextSong}
-                  disabled={!canNavigateSongs}
-                  aria-label="Next song"
-                >
-                  <SkipForward size={22} />
-                </button>
-                {micFeaturesEnabled ? (
-                  <AddMicToolbarButton
-                    listening={addFollower.listening}
-                    micError={addFollower.micError}
-                    startListening={addFollower.startListening}
-                    stopListening={addFollower.stopListening}
-                  />
-                ) : null}
-              </div>
-            </div>
+          <TransportBar
+            controlsLocked={controlsLocked}
+            playing={playing}
+            canNavigateSongs={canNavigateSongs}
+            canNavigatePresets={canNavigatePresets}
+            onPreviousSong={selectPreviousSong}
+            onPreviousPreset={handlePreviousPreset}
+            onTogglePlay={handleTogglePlay}
+            onNextPreset={handleNextPreset}
+            onNextSong={selectNextSong}
+            extraButton={
+              micFeaturesEnabled ? (
+                <AddMicToolbarButton
+                  listening={addFollower.listening}
+                  micError={addFollower.micError}
+                  startListening={addFollower.startListening}
+                  stopListening={addFollower.stopListening}
+                />
+              ) : null
+            }
+          />
         </div>
       </div>
-      {(menuOpen) && (
-        <>
-          <button
-            type="button"
-            aria-label="Close menu overlay"
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px]"
-            onClick={() => setMenuOpen(false)}
-          />
-          <aside
-            ref={sideMenuRef}
-            className="fixed left-0 top-0 z-50 flex h-full w-[280px] flex-col border-r border-white/10 bg-[#1a1825] p-4 shadow-2xl"
-            onClick={(event) => {
-              const target = event.target as HTMLElement | null
-              const interactiveAncestor = target?.closest(
-                'button, a, input, select, textarea, [role="button"], [data-keep-menu-open]',
-              )
-              if (!interactiveAncestor) {
-                setMenuOpen(false)
-              }
-            }}
-          >
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-white/70">Menu</h2>
-              <button
-                type="button"
-                aria-label="Close menu"
-                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 p-2 text-white/80"
-                onClick={() => setMenuOpen(false)}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain">
-              <div data-keep-menu-open>
-                <BtControlMenuSection />
-              </div>
-              <div data-keep-menu-open>
-                <ScribbleMenuSection scribble={scribble} />
-              </div>
-              <button
-                type="button"
-                className="button-safe flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
-                onClick={() => setMenuExportOpen((current) => !current)}
-                aria-expanded={menuExportOpen}
-                aria-controls="menu-export-actions"
-              >
-                <span className="flex items-center gap-2">
-                  <Upload size={20} />
-                  Export
-                </span>
-                <ChevronDown size={16} className={menuExportOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
-              </button>
-              {menuExportOpen ? (
-                <div id="menu-export-actions" className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-2">
-                  <button
-                    type="button"
-                    className="button-safe flex min-h-[40px] w-full items-center gap-2 rounded-lg border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-sm text-white/90 transition hover:bg-[#252332]"
-                    onClick={() => {
-                      exportCurrentSong()
-                      setMenuOpen(false)
-                    }}
-                  >
-                    <Upload size={16} />
-                    Export song JSON
-                  </button>
-                  <button
-                    type="button"
-                    className="button-safe flex min-h-[40px] w-full items-center gap-2 rounded-lg border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-sm text-white/90 transition hover:bg-[#252332]"
-                    onClick={() => {
-                      exportSongLibrary()
-                      setMenuOpen(false)
-                    }}
-                  >
-                    <Upload size={16} />
-                    Export song library JSON
-                  </button>
-                  <button
-                    type="button"
-                    className="button-safe flex min-h-[40px] w-full items-center gap-2 rounded-lg border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-sm text-white/90 transition hover:bg-[#252332]"
-                    onClick={() => {
-                      exportCurrentToneSet()
-                      setMenuOpen(false)
-                    }}
-                  >
-                    <Upload size={16} />
-                    Export tone set JSON
-                  </button>
-                  <button
-                    type="button"
-                    className="button-safe flex min-h-[40px] w-full items-center gap-2 rounded-lg border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-sm text-white/90 transition hover:bg-[#252332]"
-                    onClick={() => {
-                      exportGlobalData()
-                      setMenuOpen(false)
-                    }}
-                  >
-                    <Upload size={16} />
-                    Global export (all data)
-                  </button>
-                </div>
-              ) : null}
-              <button
-                type="button"
-                className="button-safe flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
-                onClick={() => setMenuImportOpen((current) => !current)}
-                aria-expanded={menuImportOpen}
-                aria-controls="menu-import-actions"
-              >
-                <span className="flex items-center gap-2">
-                  <Download size={20} />
-                  Import
-                </span>
-                <ChevronDown size={16} className={menuImportOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
-              </button>
-              {menuImportOpen ? (
-                <div id="menu-import-actions" className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-2">
-                  <button
-                    type="button"
-                    className="button-safe flex min-h-[40px] w-full items-center gap-2 rounded-lg border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-sm text-white/90 transition hover:bg-[#252332]"
-                    onClick={() => {
-                      importInputRef.current?.click()
-                      setMenuOpen(false)
-                    }}
-                  >
-                    <Download size={16} />
-                    Import song / library JSON
-                  </button>
-                  <button
-                    type="button"
-                    className="button-safe flex min-h-[40px] w-full items-center gap-2 rounded-lg border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-sm text-white/90 transition hover:bg-[#252332]"
-                    onClick={() => {
-                      toneSetImportInputRef.current?.click()
-                      setMenuOpen(false)
-                    }}
-                  >
-                    <Download size={16} />
-                    Import tone set JSON
-                  </button>
-                  <button
-                    type="button"
-                    className="button-safe flex min-h-[40px] w-full items-center gap-2 rounded-lg border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-sm text-white/90 transition hover:bg-[#252332]"
-                    onClick={() => {
-                      globalImportInputRef.current?.click()
-                      setMenuOpen(false)
-                    }}
-                  >
-                    <Download size={16} />
-                    Global import (all data)
-                  </button>
-                </div>
-              ) : null}
-              <button
-                type="button"
-                className="button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
-                onClick={openJblPortableApp}
-              >
-                <BatteryMedium size={20} />
-                Open JBL Portable
-              </button>
-              <button
-                type="button"
-                className="button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
-                onClick={openToneSetOptions}
-              >
-                <Menu size={20} />
-                Tone set: {toneSetLayout.name}
-              </button>
-              <button
-                type="button"
-                className="button-safe flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
-                onClick={() => {
-                  setActiveTab('midi')
-                  setMenuOpen(false)
-                }}
-              >
-                <Menu size={20} />
-                MIDI
-              </button>
-              <div data-keep-menu-open>
-                <LoopMenuSection />
-              </div>
-              <div data-keep-menu-open>
-                <MicMenuSection />
-              </div>
-              <div className="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/70">
-                <div className="mb-1 flex items-center gap-2 text-white/80">
-                  <Info size={14} />
-                  Drone 3 v{APP_VERSION}
-                </div>
-                <p>Professional drone reference for tuning and intonation practice.</p>
-                <p className="mt-2 text-xs text-white/55">© Margo Kõlar</p>
-                <p className="mt-1 text-[11px] text-white/40">Apache License 2.0</p>
-              </div>
-            </div>
-          </aside>
-        </>
+      {menuOpen && (
+        <SideMenu
+          onClose={closeMenu}
+          scribble={scribble}
+          exportOpen={menuExportOpen}
+          onToggleExport={() => setMenuExportOpen((current) => !current)}
+          importOpen={menuImportOpen}
+          onToggleImport={() => setMenuImportOpen((current) => !current)}
+          onExportSong={exportCurrentSong}
+          onExportSongLibrary={exportSongLibrary}
+          onExportToneSet={exportCurrentToneSet}
+          onExportGlobal={exportGlobalData}
+          onImportSongs={() => importInputRef.current?.click()}
+          onImportToneSet={() => toneSetImportInputRef.current?.click()}
+          onImportGlobal={() => globalImportInputRef.current?.click()}
+          toneSetName={toneSetLayout.name}
+          onOpenToneSetOptions={openToneSetOptions}
+          onOpenMidi={() => setActiveTab('midi')}
+        />
       )}
       <input
         ref={importInputRef}
@@ -3694,285 +2565,56 @@ function App() {
         }}
       />
       {toneSetEditorOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="tone-set-editor-title"
-            className="w-full max-w-lg rounded-xl border border-white/15 bg-[#252332] p-4 shadow-2xl"
-          >
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <h2 id="tone-set-editor-title" className="text-sm font-semibold text-white">
-                  Tone set custom JSON
-                </h2>
-                <p className="mt-1 text-sm text-white/70">
-                  Edit or paste tone set: 2 subOctaveIds and 16 gridIds.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="flex size-8 shrink-0 items-center justify-center rounded-md border border-white/10 text-white/70 transition hover:bg-white/10"
-                onClick={() => setToneSetEditorOpen(false)}
-                aria-label="Close tone set editor"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-3">
-              <div className="mb-2 text-xs uppercase tracking-[0.14em] text-white/60">Simple editor</div>
-              <div className="grid gap-2">
-                <input
-                  type="text"
-                  value={toneSetQuickName}
-                  onChange={(event) => {
-                    const next = event.target.value
-                    setToneSetQuickName(next)
-                    syncDraftFromQuickEditor(next, toneSetQuickGrid)
-                  }}
-                  placeholder="Tone set name"
-                  className="w-full rounded-md border border-white/15 bg-[#1b1827] px-3 py-2 text-sm text-white outline-none focus:border-fuchsia-300/50"
-                />
-                <textarea
-                  value={toneSetQuickGrid}
-                  onChange={(event) => {
-                    const next = event.target.value
-                    setToneSetQuickGrid(next)
-                    syncDraftFromQuickEditor(toneSetQuickName, next)
-                  }}
-                  placeholder="All tones (e.g. g0, a0, c, d, e, f, fis...)"
-                  rows={3}
-                  className="w-full resize-y rounded-md border border-white/15 bg-[#1b1827] px-3 py-2 text-sm text-white outline-none focus:border-fuchsia-300/50"
-                />
-              </div>
-            </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <button
-                type="button"
-                className="button-safe flex min-h-[34px] w-full items-center justify-between rounded-md border border-white/10 bg-[#1b1827] px-3 py-2 text-left text-xs uppercase tracking-[0.14em] text-white/70 transition hover:bg-[#252332]"
-                onClick={() => setToneSetJsonCollapsed((current) => !current)}
-                aria-expanded={!toneSetJsonCollapsed}
-                aria-controls="tone-set-json-editor"
-              >
-                <span>JSON editor</span>
-                <ChevronDown
-                  size={16}
-                  className={`transition-transform ${toneSetJsonCollapsed ? '' : 'rotate-180'}`}
-                />
-              </button>
-              {!toneSetJsonCollapsed ? (
-                <div id="tone-set-json-editor" className="mt-3">
-                  <textarea
-                    value={toneSetEditorDraft}
-                    onChange={(event) => {
-                      setToneSetEditorDraft(event.target.value)
-                      if (toneSetEditorError) {
-                        setToneSetEditorError(null)
-                      }
-                    }}
-                    className="min-h-[220px] w-full rounded-lg border border-white/15 bg-[#1b1827] p-3 font-mono text-xs text-white/90 outline-none focus:border-fuchsia-300/50"
-                    spellCheck={false}
-                    aria-label="Tone set JSON"
-                  />
-                  <p className="mt-2 text-[11px] leading-relaxed text-white/55">
-                    Allowed tone symbols: G0..D2 chromatic range. Accepted forms include plain names
-                    (<code className="rounded bg-white/10 px-1">g0</code>, <code className="rounded bg-white/10 px-1">a1</code>,
-                    <code className="rounded bg-white/10 px-1">d2</code>) and accidentals with sharps/flats
-                    (<code className="rounded bg-white/10 px-1">g#1</code>, <code className="rounded bg-white/10 px-1">ab1</code>,
-                    <code className="rounded bg-white/10 px-1">db2</code>, also <code className="rounded bg-white/10 px-1">♯</code>/<code className="rounded bg-white/10 px-1">♭</code>).
-                  </p>
-                </div>
-              ) : null}
-            </div>
-            {toneSetEditorError ? (
-              <p className="mt-2 text-xs text-red-200">{toneSetEditorError}</p>
-            ) : null}
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                className="button-safe min-h-[44px] flex-1 rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
-                onClick={() => setToneSetEditorOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="button-safe min-h-[44px] flex flex-1 items-center justify-center rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
-                onClick={(event) => {
-                  triggerSaveFlash(event.currentTarget)
-                  saveAndApplyCustomToneSet()
-                }}
-                aria-label="Save custom tone set"
-                title="Save"
-              >
-                <Save size={18} />
-              </button>
-              <button
-                type="button"
-                className="button-safe min-h-[44px] flex flex-1 items-center justify-center rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
-                onClick={() => toneSetEditorImportInputRef.current?.click()}
-                aria-label="Import tone set JSON into editor"
-                title="Import JSON"
-              >
-                <Download size={18} />
-              </button>
-              <button
-                type="button"
-                className="button-safe min-h-[44px] flex flex-1 items-center justify-center rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
-                onClick={saveCustomToneSetFile}
-                aria-label="Export custom tone set JSON"
-                title="Export JSON"
-              >
-                <Upload size={18} />
-              </button>
-            </div>
-          </div>
-        </div>
+        <ToneSetEditorDialog
+          quickName={toneSetQuickName}
+          onQuickNameChange={(next) => {
+            setToneSetQuickName(next)
+            syncDraftFromQuickEditor(next, toneSetQuickGrid)
+          }}
+          quickGrid={toneSetQuickGrid}
+          onQuickGridChange={(next) => {
+            setToneSetQuickGrid(next)
+            syncDraftFromQuickEditor(toneSetQuickName, next)
+          }}
+          jsonCollapsed={toneSetJsonCollapsed}
+          onToggleJsonCollapsed={() => setToneSetJsonCollapsed((current) => !current)}
+          draft={toneSetEditorDraft}
+          onDraftChange={(next) => {
+            setToneSetEditorDraft(next)
+            if (toneSetEditorError) {
+              setToneSetEditorError(null)
+            }
+          }}
+          error={toneSetEditorError}
+          onClose={() => setToneSetEditorOpen(false)}
+          onSave={saveAndApplyCustomToneSet}
+          onImportJson={() => toneSetEditorImportInputRef.current?.click()}
+          onExportJson={saveCustomToneSetFile}
+        />
       )}
       {toneSetOptionsOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="tone-set-options-title"
-            className="w-full max-w-sm rounded-xl border border-white/15 bg-[#252332] p-4 shadow-2xl"
-          >
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <h2 id="tone-set-options-title" className="text-sm font-semibold text-white">
-                  Tone set options
-                </h2>
-              </div>
-              <button
-                type="button"
-                className="flex size-8 shrink-0 items-center justify-center rounded-md border border-white/10 text-white/70 transition hover:bg-white/10"
-                onClick={() => setToneSetOptionsOpen(false)}
-                aria-label="Close tone set options"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="space-y-2">
-              <button
-                type="button"
-                className="button-safe min-h-[44px] w-full rounded-lg border border-fuchsia-300/50 bg-fuchsia-300/15 px-4 py-2 text-left text-sm font-semibold text-white transition hover:bg-fuchsia-300/25"
-                onClick={() => {
-                  setDefaultToneSet()
-                  setToneSetOptionsOpen(false)
-                }}
-              >
-                Default (Eesti Torupill)
-              </button>
-              <label className="block">
-                <span className="mb-1 block text-xs uppercase tracking-[0.14em] text-white/55">Custom set</span>
-                <select
-                  className="w-full rounded-lg border border-white/15 bg-[#1b1827] px-3 py-2 text-sm text-white outline-none focus:border-fuchsia-300/50"
-                  value={selectedCustomToneSetName}
-                  onChange={(event) => {
-                    const nextName = event.target.value
-                    setSelectedCustomToneSetName(nextName)
-                    if (!nextName) {
-                      return
-                    }
-                    loadSavedToneSetFromBrowser(nextName)
-                    setToneSetOptionsOpen(false)
-                  }}
-                >
-                  {customToneSets.length === 0 ? (
-                    <option value="">No custom sets saved</option>
-                  ) : (
-                    customToneSets.map((setEntry) => (
-                      <option key={setEntry.name} value={setEntry.name}>
-                        {setEntry.name}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </label>
-              <button
-                type="button"
-                className="button-safe min-h-[44px] w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-left text-sm font-semibold text-white/90 transition hover:bg-white/10"
-                onClick={loadCustomToneSet}
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                className="button-safe min-h-[44px] w-full rounded-lg border border-red-300/40 bg-red-300/10 px-4 py-2 text-left text-sm font-semibold text-red-100 transition hover:bg-red-300/20"
-                onClick={deleteSavedToneSetFromBrowser}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+        <ToneSetOptionsDialog
+          customSets={customToneSets}
+          selectedCustomSetName={selectedCustomToneSetName}
+          onSelectedCustomSetNameChange={setSelectedCustomToneSetName}
+          onSelectDefault={setDefaultToneSet}
+          onLoadCustomSet={loadSavedToneSetFromBrowser}
+          onEdit={loadCustomToneSet}
+          onDelete={deleteSavedToneSetFromBrowser}
+          onClose={() => setToneSetOptionsOpen(false)}
+        />
       )}
       {pendingOvertoneAnalysis && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="overtone-analysis-dialog-title"
-            className="w-full max-w-sm rounded-xl border border-white/15 bg-[#252332] p-4 shadow-2xl"
-          >
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <h2 id="overtone-analysis-dialog-title" className="text-sm font-semibold text-white">
-                  Apply analysis
-                </h2>
-                <p className="mt-1 text-sm text-white/70">
-                  Sample waveform is applied as a wavetable. Choose how overtone bars get ratios.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="flex size-8 shrink-0 items-center justify-center rounded-md border border-white/10 text-white/70 transition hover:bg-white/10"
-                onClick={() => setPendingOvertoneAnalysis(null)}
-                aria-label="Dismiss analysis"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                className="button-safe min-h-[44px] rounded-lg border border-fuchsia-300/50 bg-fuchsia-300/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-300/25"
-                onClick={() => applyPendingOvertoneAnalysis('gain-integer-ratios')}
-              >
-                Gain + integer ratios (1, 2, 3…)
-              </button>
-              <button
-                type="button"
-                className="button-safe min-h-[44px] rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
-                onClick={() => applyPendingOvertoneAnalysis('gain-ratios')}
-              >
-                Gain + measured ratios
-              </button>
-            </div>
-          </div>
-        </div>
+        <OvertoneAnalysisApplyDialog
+          onApply={applyPendingOvertoneAnalysis}
+          onDismiss={() => setPendingOvertoneAnalysis(null)}
+        />
       )}
       {overtoneAnalysisError && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4">
-          <div
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="overtone-analysis-error-title"
-            className="w-full max-w-sm rounded-xl border border-white/15 bg-[#252332] p-4 shadow-2xl"
-          >
-            <h2 id="overtone-analysis-error-title" className="text-sm font-semibold text-white">
-              Analysis failed
-            </h2>
-            <p className="mt-2 text-sm text-white/70">{overtoneAnalysisError}</p>
-            <button
-              type="button"
-              className="button-safe mt-4 min-h-[44px] w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/10"
-              onClick={() => setOvertoneAnalysisError(null)}
-            >
-              OK
-            </button>
-          </div>
-        </div>
+        <OvertoneAnalysisErrorDialog
+          message={overtoneAnalysisError}
+          onDismiss={() => setOvertoneAnalysisError(null)}
+        />
       )}
     </div>
   )
