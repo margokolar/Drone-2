@@ -163,7 +163,7 @@ export async function startNativeAudioSessionGuard(): Promise<() => void> {
       return
     }
     const delayMs = state.playbackFadeEnabled
-      ? Math.max(80, state.playbackFadeOutSeconds * 1000)
+      ? Math.max(80, state.playbackFadeOutSeconds * 1000 + 80)
       : 80
     if (releaseTimer) {
       window.clearTimeout(releaseTimer)

@@ -77,8 +77,14 @@ final class DroneSynthEngine {
     private var limiterEnv = 0.0
     private var heldMaster = 0.3
     private var mixGain = 1.0
+    /// Extra output scaler so pause fade covers drone + Shine (Shine is mixed after master).
+    private var outputFade = 1.0
+    private var outputFadeTarget = 1.0
+    private var outputFadeInc = 0.0
     private var storedFadeIn = 0.0
     private var storedFadeOut = 0.0
+    private var fadeHoldUntil: TimeInterval = 0
+    private var pendingReleaseWork: DispatchWorkItem?
     private(set) var wantsPlaybackSession = false
     private var nowPlayingTitle = "Drone"
     private var nowPlayingArtist = "Drone"
@@ -243,7 +249,7 @@ final class DroneSynthEngine {
 
     func applyPlaybackSession() throws {
         if Self.isCarAudioRoute {
-            releasePlaybackSession()
+            releasePlaybackSession(immediate: true)
             return
         }
         wantsPlaybackSession = true
@@ -259,8 +265,32 @@ final class DroneSynthEngine {
         onScreen = true
     }
 
-    func releasePlaybackSession() {
+    func releasePlaybackSession(immediate: Bool = false) {
         wantsPlaybackSession = false
+        if immediate {
+            fadeHoldUntil = 0
+            pendingReleaseWork?.cancel()
+            pendingReleaseWork = nil
+            finishReleasePlaybackSession()
+            return
+        }
+        let remaining = fadeHoldUntil - ProcessInfo.processInfo.systemUptime
+        if remaining > 0.02 {
+            pendingReleaseWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self, !self.wantsPlaybackSession else { return }
+                self.finishReleasePlaybackSession()
+            }
+            pendingReleaseWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + remaining, execute: work)
+            return
+        }
+        finishReleasePlaybackSession()
+    }
+
+    private func finishReleasePlaybackSession() {
+        pendingReleaseWork = nil
+        fadeHoldUntil = 0
         suspend()
         Self.publishNowPlaying(playing: false)
         do {
@@ -268,6 +298,22 @@ final class DroneSynthEngine {
         } catch {
             // Already inactive.
         }
+    }
+
+    private func noteFadeHold(seconds: Double) {
+        let hold = ProcessInfo.processInfo.systemUptime + max(0, seconds) + 0.06
+        fadeHoldUntil = max(fadeHoldUntil, hold)
+    }
+
+    private func rampOutputFadeLocked(to target: Double, seconds: Double, sampleRate sr: Double) {
+        let dest = max(0, min(1, target))
+        outputFadeTarget = dest
+        if seconds <= 0.001 {
+            outputFade = dest
+            outputFadeInc = 0
+            return
+        }
+        outputFadeInc = (dest - outputFade) / (seconds * sr)
     }
 
     func park() {
@@ -284,6 +330,12 @@ final class DroneSynthEngine {
         masterTarget = 0.0001
         masterInc = 0
         mixGain = 0
+        outputFade = 0
+        outputFadeTarget = 0
+        outputFadeInc = 0
+        fadeHoldUntil = 0
+        pendingReleaseWork?.cancel()
+        pendingReleaseWork = nil
         metroEnabled = false
         limiterEnv = 0
         fileLoopPlaying = false
@@ -319,13 +371,16 @@ final class DroneSynthEngine {
         }
         let live = (0..<min(liveOsc, oscs.count)).contains { oscs[$0].active && oscs[$0].gain > 0.00005 }
         let shimmer = shine.contains { $0.active && $0.gain > 0.0002 }
-        return mixGain > 0.5 && ((master > 0.01 && live) || shimmer)
+        return mixGain > 0.5 && outputFade > 0.01 && ((master > 0.01 && live) || shimmer)
     }
 
     func resumeAfterRemote() {
         onScreen = true
         wantsPlaybackSession = true
         mixGain = 1
+        fadeHoldUntil = 0
+        pendingReleaseWork?.cancel()
+        pendingReleaseWork = nil
         try? startIfNeeded()
         lock.lock()
         if master > 0.01 {
@@ -356,23 +411,40 @@ final class DroneSynthEngine {
     }
 
     func fadeMaster(to target: Double, seconds: Double) {
+        if seconds > 0.001 {
+            do {
+                try startIfNeeded()
+            } catch {
+                NSLog("DroneSynth fade start failed: \(error.localizedDescription)")
+            }
+        }
         let sr = sampleRate
         let dest = max(0.0001, target)
         lock.lock()
         if dest > 0.01 {
             heldMaster = dest
             mixGain = 1
+            rampOutputFadeLocked(to: 1, seconds: seconds, sampleRate: sr)
         }
         if seconds <= 0.001 {
             master = dest
             masterTarget = dest
             masterInc = 0
+            if dest <= 0.01 {
+                rampOutputFadeLocked(to: 0, seconds: 0, sampleRate: sr)
+            }
         } else {
             masterTarget = dest
             masterInc = (dest - master) / (seconds * sr)
+            if dest <= 0.01 {
+                rampOutputFadeLocked(to: 0, seconds: seconds, sampleRate: sr)
+            }
         }
         lock.unlock()
-        Self.publishNowPlaying(playing: dest > 0.01)
+        if dest <= 0.01 {
+            noteFadeHold(seconds)
+        }
+        Self.publishNowPlaying(playing: dest > 0.01 || seconds > 0.001)
     }
 
     func setGraph(
@@ -441,12 +513,15 @@ final class DroneSynthEngine {
                 self.master = 0.0001
                 masterTarget = 0.0001
                 masterInc = 0
+                rampOutputFadeLocked(to: 0, seconds: 0, sampleRate: sr)
             } else {
                 self.master = currentMaster
                 masterTarget = 0.0001
                 masterInc = (0.0001 - self.master) / (fadeSeconds * sr)
+                rampOutputFadeLocked(to: 0, seconds: fadeSeconds, sampleRate: sr)
             }
             lock.unlock()
+            noteFadeHold(fadeSeconds)
             Self.publishNowPlaying(playing: isAudible)
             return
         }
@@ -560,8 +635,12 @@ final class DroneSynthEngine {
         if masterTarget > 0.01 {
             heldMaster = masterTarget
             mixGain = 1
+            rampOutputFadeLocked(to: 1, seconds: fromSilence ? fadeSeconds : 0, sampleRate: sr)
         }
         lock.unlock()
+        fadeHoldUntil = 0
+        pendingReleaseWork?.cancel()
+        pendingReleaseWork = nil
         Self.publishNowPlaying(playing: isAudible)
     }
 
@@ -824,7 +903,7 @@ final class DroneSynthEngine {
     private func startIfNeeded() throws {
         guard onScreen, wantsPlaybackSession else { return }
         if Self.isCarAudioRoute {
-            releasePlaybackSession()
+            releasePlaybackSession(immediate: true)
             return
         }
         try prepare()
@@ -1271,6 +1350,14 @@ final class DroneSynthEngine {
                     masterInc = 0
                 }
             }
+            if outputFadeInc != 0 {
+                outputFade += outputFadeInc
+                if (outputFadeInc > 0 && outputFade >= outputFadeTarget)
+                    || (outputFadeInc < 0 && outputFade <= outputFadeTarget) {
+                    outputFade = outputFadeTarget
+                    outputFadeInc = 0
+                }
+            }
 
             var mixL = 0.0
             var mixR = 0.0
@@ -1351,8 +1438,8 @@ final class DroneSynthEngine {
                 }
             }
 
-            var leftSample = (mixL * master + shineL) * mixGain
-            var rightSample = (mixR * master + shineR) * mixGain
+            var leftSample = (mixL * master + shineL) * mixGain * outputFade
+            var rightSample = (mixR * master + shineR) * mixGain * outputFade
             let peak = max(abs(leftSample), abs(rightSample))
             if peak > limiterEnv {
                 limiterEnv += (peak - limiterEnv) * attackCoeff

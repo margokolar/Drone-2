@@ -1,16 +1,17 @@
 import { Capacitor } from '@capacitor/core'
+import { isIosDevice } from '../utils/platform'
 
 const MIN_AUDIBLE_GAIN = 0.0001
 const FADE_CURVE_STEPS = 64
 
 /**
- * WKWebView (Capacitor iOS) is unreliable with setValueCurveAtTime: it can throw
- * NotSupportedError or leave AudioParam.value stuck near 0, which makes preset
- * crossfades sound like a full stop. Prefer linear/exponential ramps there.
+ * iOS (Safari PWA and WKWebView) is unreliable with setValueCurveAtTime: it can
+ * throw NotSupportedError or leave AudioParam.value stuck near 0, which makes
+ * fades sound like a full stop. Prefer linear ramps there.
  */
 export function shouldAvoidValueCurves(): boolean {
   try {
-    return Capacitor.isNativePlatform()
+    return Capacitor.isNativePlatform() || isIosDevice()
   } catch {
     return false
   }

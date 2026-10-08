@@ -36,9 +36,19 @@ export function useAudioEngine(
     if (playing) {
       return
     }
+    droneEngine.setPlaybackFadeSettings(
+      config.playbackFadeInSeconds ?? 0,
+      config.playbackFadeOutSeconds ?? 0,
+      config.presetCrossfadeSeconds ?? 0,
+    )
     droneEngine.setPlaybackIntent(false)
     droneEngine.pause()
-  }, [playing])
+  }, [
+    playing,
+    config.playbackFadeInSeconds,
+    config.playbackFadeOutSeconds,
+    config.presetCrossfadeSeconds,
+  ])
 
   useEffect(() => {
     droneEngine.setPlaybackIntent(playing)

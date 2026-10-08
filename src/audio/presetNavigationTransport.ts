@@ -23,9 +23,16 @@ import type { DroneRuntimeConfig } from './types'
 
 /** Pause audio and sync store + iOS media session (same as transport pause button). */
 export function syncTransportPaused(): void {
+  const state = useDroneStore.getState()
+  const config = buildRuntimeConfigFromStore(state)
+  droneEngine.setPlaybackFadeSettings(
+    config.playbackFadeInSeconds ?? 0,
+    config.playbackFadeOutSeconds ?? 0,
+    config.presetCrossfadeSeconds ?? 0,
+  )
   droneEngine.setPlaybackIntent(false)
   droneEngine.pause()
-  useDroneStore.getState().setPlaying(false)
+  state.setPlaying(false)
   if (!needsIosMediaRemoteIntegration() || !('mediaSession' in navigator)) {
     return
   }

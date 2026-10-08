@@ -139,7 +139,6 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             activeIndex = -1
         }
         if call.getBool("playing") == false {
-            DroneSynthEngine.shared.releasePlaybackSession()
             call.resolve()
             return
         }
@@ -194,14 +193,12 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     private func handleRemote(_ action: String) {
         switch action {
         case "pause":
-            DroneSynthEngine.shared.releasePlaybackSession()
+            break
         case "play":
             try? applyExclusivePlayback(claim: true)
             DroneSynthEngine.shared.resumeAfterRemote()
         case "toggle":
-            if DroneSynthEngine.shared.isAudible {
-                DroneSynthEngine.shared.releasePlaybackSession()
-            } else {
+            if !DroneSynthEngine.shared.isAudible {
                 try? applyExclusivePlayback(claim: true)
                 DroneSynthEngine.shared.resumeAfterRemote()
             }
@@ -296,7 +293,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
         switch type {
         case .began:
-            DroneSynthEngine.shared.releasePlaybackSession()
+            DroneSynthEngine.shared.releasePlaybackSession(immediate: true)
             notifyListeners(
                 "interruption",
                 data: [
@@ -345,7 +342,7 @@ public class AudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     private func yieldIfCarAudio() {
         guard DroneSynthEngine.isCarAudioRoute else { return }
         reclaimInFlight = false
-        DroneSynthEngine.shared.releasePlaybackSession()
+        DroneSynthEngine.shared.releasePlaybackSession(immediate: true)
         notifyListeners(
             "interruption",
             data: [

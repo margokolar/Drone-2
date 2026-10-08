@@ -125,6 +125,8 @@ export class DroneEngine {
   private lastNativePacked = ''
   private lastNativeTables = ''
   private lastNativeMaster = -1
+  private nativeFadingOut = false
+  private pendingVoiceMuteTimer: number | null = null
 
   setPlaybackIntent(shouldPlay: boolean): void {
     this.shouldPlay = shouldPlay
@@ -357,6 +359,8 @@ export class DroneEngine {
       return
     }
     this.started = true
+    this.nativeFadingOut = false
+    this.clearPendingVoiceMute()
     if (isNativeSynth()) {
       const fadeSeconds =
         this.resumeFromSilence || !this.nativeGraphPushed ? this.playbackFadeInSeconds : 0
@@ -376,6 +380,7 @@ export class DroneEngine {
         return
       }
       this.started = true
+      this.nativeFadingOut = false
       const fadeSeconds =
         this.resumeFromSilence || !this.nativeGraphPushed ? this.playbackFadeInSeconds : 0
       this.pushNativeGraph(config, fadeSeconds, !options?.skipEntryGlide)
@@ -683,9 +688,23 @@ export class DroneEngine {
     }
     this.resumeFromSilence = true
     this.masterFade = null
+    this.clearPendingVoiceMute()
     this.masterGain.gain.cancelScheduledValues(now)
     this.masterGain.gain.setValueAtTime(0.0001, now)
     this.muteVoicesAt(now, 0.0001)
+  }
+
+  private isFadingOut(now: number): boolean {
+    const fade = this.masterFade
+    return Boolean(fade && fade.kind === 'out' && now < fade.startedAt + fade.duration)
+  }
+
+  private clearPendingVoiceMute(): void {
+    if (this.pendingVoiceMuteTimer === null) {
+      return
+    }
+    window.clearTimeout(this.pendingVoiceMuteTimer)
+    this.pendingVoiceMuteTimer = null
   }
 
   private muteVoicesAt(now: number, gain: number): void {
@@ -747,7 +766,14 @@ export class DroneEngine {
       to: MIN_AUDIBLE_GAIN,
     }
     scheduleSmoothMasterFadeOut(this.masterGain.gain, startGain, now, fadeOutSeconds)
-    this.muteVoicesAt(now + fadeOutSeconds, MIN_AUDIBLE_GAIN)
+    this.clearPendingVoiceMute()
+    this.pendingVoiceMuteTimer = window.setTimeout(() => {
+      this.pendingVoiceMuteTimer = null
+      if (this.shouldPlay || !this.context) {
+        return
+      }
+      this.muteVoicesAt(this.context.currentTime, MIN_AUDIBLE_GAIN)
+    }, fadeOutSeconds * 1000 + 20)
   }
 
   private updateFadeSettings(config: DroneRuntimeConfig): void {
@@ -766,6 +792,7 @@ export class DroneEngine {
     this.lastNativeMaster = -1
     if (isNativeSynth()) {
       this.resumeFromSilence = true
+      this.nativeFadingOut = true
       void DroneSynth.setGraph({
         master: MIN_AUDIBLE_GAIN,
         fadeSeconds: this.playbackFadeOutSeconds,
@@ -773,7 +800,6 @@ export class DroneEngine {
         fadeOutSeconds: this.playbackFadeOutSeconds,
         packed: '',
       }).catch(() => {})
-      void DroneSynth.mute().catch(() => {})
       return
     }
     if (!this.context || !this.masterGain) {
@@ -793,16 +819,15 @@ export class DroneEngine {
     this.nativeGlideNotes.clear()
     if (isNativeSynth()) {
       this.resumeFromSilence = true
+      this.nativeFadingOut = true
       this.nativeGraphPushed = false
       this.lastNativePacked = ''
       this.lastNativeTables = ''
       this.lastNativeMaster = -1
-      void DroneSynth.setGraph({
-        master: MIN_AUDIBLE_GAIN,
-        fadeSeconds: this.playbackFadeOutSeconds,
-        fadeInSeconds: this.playbackFadeInSeconds,
-        fadeOutSeconds: this.playbackFadeOutSeconds,
-        packed: '',
+      const fadeOut = this.playbackFadeOutSeconds
+      void DroneSynth.fadeMaster({
+        target: MIN_AUDIBLE_GAIN,
+        seconds: fadeOut,
       }).catch(() => {})
       return
     }
@@ -820,7 +845,13 @@ export class DroneEngine {
     }
     if (needsIosMediaRemoteIntegration()) {
       void this.pokeClock().then(() => {
-        if (!this.shouldPlay && this.context && this.masterGain && this.playbackFadeOutSeconds <= 0) {
+        if (
+          !this.shouldPlay &&
+          this.context &&
+          this.masterGain &&
+          this.playbackFadeOutSeconds <= 0 &&
+          !this.isFadingOut(this.context.currentTime)
+        ) {
           this.forceMute(this.context.currentTime)
         }
       })
@@ -841,7 +872,9 @@ export class DroneEngine {
       if (!this.started || !this.shouldPlay) {
         this.started = false
         this.resumeFromSilence = true
-        void DroneSynth.mute().catch(() => {})
+        if (!this.nativeFadingOut) {
+          void DroneSynth.mute().catch(() => {})
+        }
         return
       }
       const voiceTransition = this.resolveVoiceTransitionTiming()
@@ -861,7 +894,9 @@ export class DroneEngine {
     const now = this.context.currentTime
     if (!this.started || !this.shouldPlay) {
       this.started = false
-      this.forceMute(now)
+      if (!this.isFadingOut(now)) {
+        this.forceMute(now)
+      }
       return
     }
     const voiceTransition = this.resolveVoiceTransitionTiming()
