@@ -442,7 +442,7 @@ final class DroneSynthEngine {
         }
         lock.unlock()
         if dest <= 0.01 {
-            noteFadeHold(seconds)
+            noteFadeHold(seconds: seconds)
         }
         Self.publishNowPlaying(playing: dest > 0.01 || seconds > 0.001)
     }
@@ -521,7 +521,7 @@ final class DroneSynthEngine {
                 rampOutputFadeLocked(to: 0, seconds: fadeSeconds, sampleRate: sr)
             }
             lock.unlock()
-            noteFadeHold(fadeSeconds)
+            noteFadeHold(seconds: fadeSeconds)
             Self.publishNowPlaying(playing: isAudible)
             return
         }
