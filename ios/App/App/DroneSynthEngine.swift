@@ -94,10 +94,11 @@ final class DroneSynthEngine {
     private var metroMuted = false
     private var metroPeak = 0.5
     private var metroBpm = 72.0
+    /// Samples until the next metronome click. 0 = click on this sample.
+    private var metroCountdown = 0
+    var metroBeatHandler: (() -> Void)?
     private var clickPlayer: AVAudioPlayerNode?
     private var clickFormat: AVAudioFormat?
-    private var metroLoopBuffer: AVAudioPCMBuffer?
-    private var metroLoopBpm = 0.0
     private var fileLoopPlayer: AVAudioPlayerNode?
     private var fileLoopFormat: AVAudioFormat?
     private var fileLoopBuffer: AVAudioPCMBuffer?
@@ -685,18 +686,27 @@ final class DroneSynthEngine {
         let tempo = min(404, max(30, bpm))
         let peak = min(1, max(0.001, pow(10.0, volumeDb / 20.0) * 1.8))
         lock.lock()
-        let wasOn = metroEnabled && !metroMuted
-        let bpmChanged = abs(metroBpm - tempo) > 0.2
+        let wasOn = metroEnabled
+        let previousBpm = metroBpm
         metroEnabled = enabled
         metroMuted = muted
         metroPeak = peak
         metroBpm = tempo
+        if !enabled {
+            metroCountdown = 0
+        } else if !wasOn {
+            let sr = max(1000, sampleRate)
+            metroCountdown = max(1, Int(0.03 * sr))
+        } else if abs(previousBpm - tempo) > 0.2, metroCountdown > 0 {
+            let sr = max(1000, sampleRate)
+            let oldPeriod = max(1, sr * 60.0 / max(30, previousBpm))
+            let newPeriod = max(1, sr * 60.0 / tempo)
+            metroCountdown = max(0, Int(Double(metroCountdown) / oldPeriod * newPeriod))
+        }
         lock.unlock()
-        let nowOn = enabled && !muted
         let apply = {
-            self.clickPlayer?.volume = Float(peak)
-            if !nowOn {
-                self.clickPlayer?.stop()
+            self.clickPlayer?.stop()
+            if !enabled {
                 return
             }
             do {
@@ -704,12 +714,6 @@ final class DroneSynthEngine {
                 try self.startIfNeeded()
             } catch {
                 NSLog("DroneSynth metronome start failed: \(error.localizedDescription)")
-                return
-            }
-            self.ensureClickPlayer()
-            self.clickPlayer?.volume = Float(peak)
-            if !wasOn || bpmChanged || !(self.clickPlayer?.isPlaying ?? false) {
-                self.startLoopingMetro(bpm: tempo, rebuild: !wasOn || bpmChanged || self.metroLoopBuffer == nil)
             }
         }
         if Thread.isMainThread {
@@ -955,22 +959,6 @@ final class DroneSynthEngine {
         engine.mainMixerNode.outputVolume = 1
         source = node
         prepared = true
-    }
-
-    private func ensureClickPlayer() {
-        if clickPlayer != nil { return }
-        let running = engine.isRunning
-        if running {
-            engine.pause()
-        }
-        let sr = max(1000, sampleRate)
-        guard let format = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 2) else { return }
-        let player = AVAudioPlayerNode()
-        engine.attach(player)
-        engine.connect(player, to: engine.mainMixerNode, format: format)
-        clickPlayer = player
-        clickFormat = format
-        try? engine.start()
     }
 
     private func loopFileURL() -> URL {
@@ -1275,49 +1263,6 @@ final class DroneSynthEngine {
         }
     }
 
-    private func startLoopingMetro(bpm: Double, rebuild: Bool) {
-        guard let player = clickPlayer else { return }
-        if rebuild || metroLoopBuffer == nil || abs(metroLoopBpm - bpm) > 0.2 {
-            rebuildLoopBuffer(bpm: bpm)
-        }
-        guard let buffer = metroLoopBuffer else { return }
-        player.stop()
-        player.scheduleBuffer(buffer, at: nil, options: .loops)
-        player.play()
-    }
-
-    private func rebuildLoopBuffer(bpm: Double) {
-        let sr = max(1000, clickFormat?.sampleRate ?? sampleRate)
-        guard
-            let format = clickFormat ?? AVAudioFormat(standardFormatWithSampleRate: sr, channels: 2),
-            format.channelCount >= 1
-        else { return }
-        let channelCount = Int(format.channelCount)
-        let periodFrames = AVAudioFrameCount(max(256, Int(format.sampleRate * 60.0 / max(30, bpm))))
-        let clickFrames = min(Int(periodFrames), max(64, Int(0.05 * format.sampleRate)))
-        guard
-            let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: periodFrames),
-            let channels = buffer.floatChannelData
-        else {
-            NSLog("DroneSynth metro buffer failed sr=%.0f ch=%d", format.sampleRate, channelCount)
-            return
-        }
-        buffer.frameLength = periodFrames
-        let rate = Float(format.sampleRate)
-        for i in 0..<Int(periodFrames) {
-            var sample: Float = 0
-            if i < clickFrames {
-                let env = powf(1 - Float(i) / Float(max(1, clickFrames)), 1.8)
-                sample = sinf(2 * Float.pi * 1240 * Float(i) / rate) * env
-            }
-            for ch in 0..<channelCount {
-                channels[ch][i] = sample
-            }
-        }
-        metroLoopBuffer = buffer
-        metroLoopBpm = bpm
-    }
-
     private func render(frameCount: Int, audioBufferList: UnsafeMutablePointer<AudioBufferList>) {
         let buffers = UnsafeMutableAudioBufferListPointer(audioBufferList)
         guard frameCount > 0, let first = buffers.first, let data = first.mData else { return }
@@ -1341,8 +1286,19 @@ final class DroneSynthEngine {
         let floatsInFirst = Int(first.mDataByteSize) / MemoryLayout<Float>.stride
         let usePlanar = planarRight != nil
         let useInterleaved = !usePlanar && floatsInFirst >= frameCount * 2
+        var metroBeats = 0
 
         for frame in 0..<frameCount {
+            if metroEnabled {
+                if metroCountdown <= 0 {
+                    if !metroMuted {
+                        armClickLocked(frequency: 1240, peak: metroPeak)
+                    }
+                    metroCountdown = max(1, Int(sr * 60.0 / max(30, min(404, metroBpm))))
+                    metroBeats += 1
+                }
+                metroCountdown -= 1
+            }
             if masterInc != 0 {
                 master += masterInc
                 if (masterInc > 0 && master >= masterTarget) || (masterInc < 0 && master <= masterTarget) {
@@ -1463,6 +1419,14 @@ final class DroneSynthEngine {
                 left[frame * 2 + 1] = outR
             } else {
                 left[frame] = (outL + outR) * 0.5
+            }
+        }
+        if metroBeats > 0, let handler = metroBeatHandler {
+            let count = metroBeats
+            DispatchQueue.main.async {
+                for _ in 0..<count {
+                    handler()
+                }
             }
         }
     }

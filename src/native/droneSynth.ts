@@ -1,4 +1,4 @@
-import { registerPlugin } from '@capacitor/core'
+import { registerPlugin, type PluginListenerHandle } from '@capacitor/core'
 
 export type NativeDroneOsc = {
   id: string
@@ -56,6 +56,10 @@ export type NativeDroneSynthPlugin = {
   }): Promise<void>
   getLoopPlayback(): Promise<{ playing?: boolean; duration?: number; position?: number }>
   clearLoop(): Promise<void>
+  addListener(
+    eventName: 'metroBeat',
+    listenerFunc: () => void,
+  ): Promise<PluginListenerHandle>
 }
 
 export const DroneSynth = registerPlugin<NativeDroneSynthPlugin>('DroneSynth')

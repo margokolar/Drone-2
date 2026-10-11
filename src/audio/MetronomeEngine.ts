@@ -18,6 +18,8 @@ export class MetronomeEngine {
   private nextTickAt = 0
   private schedulerTimer: number | null = null
   private beatListeners = new Set<() => void>()
+  private nativeBeatUnsub: (() => void) | null = null
+  private nativeBeatListenInFlight: Promise<void> | null = null
   private config: MetronomeConfig = {
     enabled: false,
     bpm: 72,
@@ -47,6 +49,7 @@ export class MetronomeEngine {
   prepareContext(): void {
     if (isNativeSynth()) {
       this.config = { ...this.config, enabled: true, muted: false }
+      void this.ensureNativeBeatListener()
       void DroneSynth.reclaim().catch(() => {})
       this.pushNative(true)
       return
@@ -89,17 +92,9 @@ export class MetronomeEngine {
   async setConfig(config: MetronomeConfig): Promise<void> {
     this.config = config
     if (isNativeSynth()) {
+      await this.ensureNativeBeatListener()
       this.pushNative(config.enabled)
-      if (!config.enabled) {
-        this.stopScheduler()
-        return
-      }
-      if (this.schedulerTimer === null) {
-        this.nextTickAt = this.audioClock() + 0.03
-        this.schedulerTimer = window.setInterval(() => {
-          this.scheduleTicks()
-        }, LOOKAHEAD_MS)
-      }
+      this.stopScheduler()
       return
     }
     if (!config.enabled) {
@@ -110,20 +105,55 @@ export class MetronomeEngine {
     if (context.state !== 'running') {
       await context.resume()
     }
-    if (this.schedulerTimer === null) {
-      this.nextTickAt = context.currentTime + 0.03
-      this.schedulerTimer = window.setInterval(() => {
-        this.scheduleTicks()
-      }, LOOKAHEAD_MS)
-    }
+    this.startJsScheduler(context.currentTime)
   }
 
   destroy(): void {
     this.stopScheduler()
+    this.nativeBeatUnsub?.()
+    this.nativeBeatUnsub = null
     if (this.context) {
       void this.context.close()
     }
     this.context = null
+  }
+
+  private startJsScheduler(clockNow: number): void {
+    if (this.schedulerTimer !== null) {
+      return
+    }
+    this.nextTickAt = clockNow + 0.03
+    this.schedulerTimer = window.setInterval(() => {
+      this.scheduleTicks()
+    }, LOOKAHEAD_MS)
+  }
+
+  private async ensureNativeBeatListener(): Promise<void> {
+    if (!isNativeSynth() || this.nativeBeatUnsub) {
+      return
+    }
+    if (!this.nativeBeatListenInFlight) {
+      this.nativeBeatListenInFlight = (async () => {
+        const handle = await DroneSynth.addListener('metroBeat', () => {
+          this.fireBeatListeners()
+        })
+        this.nativeBeatUnsub = () => {
+          void handle.remove()
+        }
+      })()
+    }
+    try {
+      await this.nativeBeatListenInFlight
+    } finally {
+      this.nativeBeatListenInFlight = null
+    }
+  }
+
+  private fireBeatListeners(): void {
+    if (!this.config.enabled) {
+      return
+    }
+    this.beatListeners.forEach((listener) => listener())
   }
 
   private stopScheduler(): void {
@@ -175,13 +205,30 @@ export class MetronomeEngine {
     if (this.beatListeners.size === 0) {
       return
     }
-    const delayMs = Math.max(0, (when - this.audioClock()) * 1000)
-    window.setTimeout(() => {
-      if (!this.config.enabled) {
-        return
+    const fire = () => this.fireBeatListeners()
+    const context = this.context
+    if (!isNativeSynth() && context) {
+      const osc = context.createOscillator()
+      const gain = context.createGain()
+      gain.gain.value = 0
+      osc.connect(gain)
+      gain.connect(context.destination)
+      osc.onended = () => {
+        try {
+          osc.disconnect()
+          gain.disconnect()
+        } catch {
+          // Already disconnected.
+        }
+        fire()
       }
-      this.beatListeners.forEach((listener) => listener())
-    }, delayMs)
+      const startAt = Math.max(when, context.currentTime)
+      osc.start(startAt)
+      osc.stop(startAt + 0.008)
+      return
+    }
+    const delayMs = Math.max(0, (when - this.audioClock()) * 1000)
+    window.setTimeout(fire, delayMs)
   }
 }
 

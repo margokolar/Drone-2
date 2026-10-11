@@ -25,6 +25,12 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "clearLoop", returnType: CAPPluginReturnPromise),
     ]
 
+    override public func load() {
+        DroneSynthEngine.shared.metroBeatHandler = { [weak self] in
+            self?.notifyListeners("metroBeat", data: [:])
+        }
+    }
+
     @objc func reclaim(_ call: CAPPluginCall) {
         do {
             try DroneSynthEngine.shared.reclaim()
