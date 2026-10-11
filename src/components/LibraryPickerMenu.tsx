@@ -27,6 +27,8 @@ type PickerItem = {
   navigationEnabled?: boolean
 }
 
+type LibraryPickerAccent = 'fuchsia' | 'cyan' | 'amber'
+
 type LibraryPickerMenuProps = {
   selectedId: string
   items: PickerItem[]
@@ -37,13 +39,22 @@ type LibraryPickerMenuProps = {
   dropdownPlacement?: DropdownPlacement
   dropdownAlign?: DropdownAlign
   appearance?: 'compact' | 'select'
+  /** Color of the closed dropdown box (play/pause markers stay amber). */
+  accent?: LibraryPickerAccent
 }
 
 const COMPACT_TRIGGER_CLASS =
   'flex min-h-[40px] w-full min-w-0 items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 transition hover:bg-white/10'
 /** Same closed-control feel as TopControls; open menu uses larger native-select-like type. */
 const SELECT_TRIGGER_CLASS =
-  'flex min-h-[40px] w-full min-w-0 items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-2 py-2 text-base leading-none text-white outline-none transition hover:bg-white/10 focus:border-fuchsia-300/60'
+  'flex min-h-[40px] w-full min-w-0 items-center gap-1 rounded-xl border px-2 py-2 text-base leading-none outline-none transition'
+
+const SELECT_TRIGGER_BOX_CLASS: Record<LibraryPickerAccent, string> = {
+  fuchsia:
+    'border-fuchsia-300/70 bg-fuchsia-300/20 hover:bg-fuchsia-300/30 focus:border-fuchsia-300/80',
+  cyan: 'border-cyan-300/70 bg-cyan-300/15 hover:bg-cyan-300/25 focus:border-cyan-300/80',
+  amber: 'border-amber-300/70 bg-amber-300/15 hover:bg-amber-300/25 focus:border-amber-300/80',
+}
 const COMPACT_ITEM_CLASS = 'block w-full rounded-md px-2 py-1.5 text-left text-sm transition'
 const SELECT_ITEM_CLASS =
   'flex w-full min-h-[48px] items-center gap-3 whitespace-nowrap rounded-lg px-4 py-3 text-left text-xl leading-none transition'
@@ -58,6 +69,7 @@ export function LibraryPickerMenu({
   dropdownPlacement = 'anchor',
   dropdownAlign = 'start',
   appearance = 'compact',
+  accent = 'fuchsia',
 }: LibraryPickerMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownStyle, setDropdownStyle] = useState<CSSProperties>({})
@@ -68,8 +80,17 @@ export function LibraryPickerMenu({
   const selectedIsTransport = selectedItem?.kind === 'transport'
   const isSelectAppearance = appearance === 'select'
   const listItems = isSelectAppearance ? items : items.filter((item) => item.id !== selectedId)
+  const triggerAccent: LibraryPickerAccent = selectedIsTransport ? 'amber' : accent
+  const nameAccentClass =
+    triggerAccent === 'cyan'
+      ? 'text-cyan-100'
+      : triggerAccent === 'amber'
+        ? 'text-amber-100'
+        : 'text-fuchsia-100'
   const resolvedTriggerClass = clsx(
     isSelectAppearance ? SELECT_TRIGGER_CLASS : COMPACT_TRIGGER_CLASS,
+    isSelectAppearance && SELECT_TRIGGER_BOX_CLASS[triggerAccent],
+    isSelectAppearance && nameAccentClass,
     triggerClassName,
   )
   const resolvedItemClass = isSelectAppearance ? SELECT_ITEM_CLASS : COMPACT_ITEM_CLASS
@@ -208,7 +229,7 @@ export function LibraryPickerMenu({
         <span
           className={clsx(
             'flex min-w-0 flex-1 items-center gap-1.5 truncate text-left',
-            selectedIsTransport && 'text-amber-100',
+            selectedIsTransport ? 'text-amber-100' : nameAccentClass,
           )}
           title={selectedIsTransport ? 'Play / Pause' : selectedName}
         >
@@ -243,11 +264,13 @@ export function LibraryPickerMenu({
                   isSelectAppearance
                     ? isSelected
                       ? isTransport
-                        ? 'text-amber-100'
-                        : 'text-white'
+                        ? 'bg-amber-300/15 text-amber-100'
+                        : accent === 'cyan'
+                          ? 'bg-cyan-300/15 text-cyan-100'
+                          : 'bg-fuchsia-300/20 text-fuchsia-100'
                       : isTransport
                         ? 'text-amber-100 hover:bg-white/10'
-                        : 'text-white hover:bg-white/10'
+                        : 'text-white/90 hover:bg-white/10'
                     : inactiveItemClassName,
                 )}
                 onClick={() => {
@@ -266,7 +289,7 @@ export function LibraryPickerMenu({
                       isSelected
                         ? isTransport
                           ? 'text-amber-100'
-                          : 'text-white'
+                          : nameAccentClass
                         : 'text-transparent',
                     )}
                     aria-hidden={!isSelected}
