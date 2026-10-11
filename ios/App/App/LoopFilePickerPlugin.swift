@@ -21,12 +21,11 @@ public class LoopFilePickerPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPicker
         pendingCall = call
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            var types: [UTType] = [.wav, .mp3, .mpeg4Audio, .aiff, .flac, .audio]
-            if let ogg = UTType("org.xiph.ogg") {
-                types.append(ogg)
-            }
-            if let opus = UTType("org.xiph.opus") {
-                types.append(opus)
+            var types: [UTType] = [.wav, .mp3, .mpeg4Audio, .aiff, .audio]
+            for ext in ["flac", "ogg", "opus", "aac", "m4a", "caf"] {
+                if let type = UTType(filenameExtension: ext) {
+                    types.append(type)
+                }
             }
             let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
             documentPicker.allowsMultipleSelection = false
