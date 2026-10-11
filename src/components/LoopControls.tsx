@@ -1,7 +1,8 @@
 import { Pause, Play, Repeat, Volume2, VolumeX } from 'lucide-react'
 import { useRef, type ChangeEvent } from 'react'
+import { LOOP_AUDIO_FILE_ACCEPT } from '../audio/loopAudioFormats'
 import { LOOP_SLOTS, loopSlotLabel, type LoopSlot, type LoopSlotFiles } from '../audio/loopSlots'
-import { pickLoopWavFile } from '../native/loopFilePicker'
+import { pickLoopAudioFile } from '../native/loopFilePicker'
 import {
   DEFAULT_METRONOME_VOLUME_DB,
   MAX_METRONOME_VOLUME_DB,
@@ -53,12 +54,12 @@ export function LoopControls({
     event.target.value = ''
   }
 
-  const handleLoadWav = () => {
+  const handleLoadAudio = () => {
     if (!isIosApp()) {
       fileInputRef.current?.click()
       return
     }
-    void pickLoopWavFile()
+    void pickLoopAudioFile()
       .then((file) => {
         if (file) {
           onPickFile(file)
@@ -99,7 +100,7 @@ export function LoopControls({
           }`}
           onClick={() => onRepeatChange(!repeat)}
           aria-pressed={repeat}
-          aria-label={repeat ? 'Play WAV once instead of looping' : 'Loop this WAV'}
+          aria-label={repeat ? 'Play audio once instead of looping' : 'Loop this audio'}
         >
           <Repeat size={16} />
           {repeat ? 'Loop' : 'Once'}
@@ -137,15 +138,15 @@ export function LoopControls({
             })}
           </div>
           <p className="mb-3 min-h-6 truncate text-sm text-white/90">
-            {fileName ?? 'No WAV loaded'}
+            {fileName ?? 'No audio loaded'}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               className="button-safe min-h-11 rounded-md border border-white/15 bg-white/10 px-3 text-sm font-medium text-white/85 transition hover:bg-white/15"
-              onClick={handleLoadWav}
+              onClick={handleLoadAudio}
             >
-              {hasFile ? 'Replace WAV' : 'Load WAV'}
+              {hasFile ? 'Replace audio' : 'Load audio'}
             </button>
             {hasFile ? (
               <button
@@ -160,7 +161,7 @@ export function LoopControls({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".wav,audio/wav,audio/x-wav,audio/wave"
+            accept={LOOP_AUDIO_FILE_ACCEPT}
             className="hidden"
             onChange={handleFileChange}
           />

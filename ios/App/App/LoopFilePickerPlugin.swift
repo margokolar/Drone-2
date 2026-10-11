@@ -7,13 +7,13 @@ public class LoopFilePickerPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPicker
     public let identifier = "LoopFilePickerPlugin"
     public let jsName = "LoopFilePicker"
     public let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "pickWav", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "pickAudio", returnType: CAPPluginReturnPromise),
     ]
 
     private var pendingCall: CAPPluginCall?
     private var picker: UIDocumentPickerViewController?
 
-    @objc func pickWav(_ call: CAPPluginCall) {
+    @objc func pickAudio(_ call: CAPPluginCall) {
         if pendingCall != nil {
             call.reject("A file picker is already open")
             return
@@ -21,7 +21,14 @@ public class LoopFilePickerPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPicker
         pendingCall = call
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: [.wav], asCopy: true)
+            var types: [UTType] = [.wav, .mp3, .mpeg4Audio, .aiff, .flac, .audio]
+            if let ogg = UTType("org.xiph.ogg") {
+                types.append(ogg)
+            }
+            if let opus = UTType("org.xiph.opus") {
+                types.append(opus)
+            }
+            let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
             documentPicker.allowsMultipleSelection = false
             documentPicker.delegate = self
             guard let presenter = self.bridge?.viewController else {

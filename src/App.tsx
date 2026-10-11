@@ -11,7 +11,7 @@ import {
 } from 'react'
 import { metronomeEngine } from './audio/MetronomeEngine'
 import { loopEngine } from './audio/LoopEngine'
-import { deleteLoopSlotAudio, putLoopAudio } from './audio/loopAudioStore'
+import { deleteLoopSlotAudio, getLoopAudio, putLoopAudio } from './audio/loopAudioStore'
 import { loadedLoopSlots, loopSlotFileName, nextLoopSyncSlot, presetLoopSyncSlot } from './audio/loopSlots'
 import { invalidateLoadedLoopSlot, markLoopSlotLoaded } from './audio/loopSlotPlayback'
 import { claimMixableAudioSession } from './audio/iosAudioSession'
@@ -1365,8 +1365,15 @@ function App() {
         return
       }
       const slot = state.activeLoopSlot
-      await putLoopAudio(songId, slot, file.name, file)
+      const previous = await getLoopAudio(songId, slot)
       await loopEngine.loadBlob(file)
+      if (!loopEngine.hasAudio()) {
+        if (previous) {
+          await loopEngine.loadBlob(previous.blob)
+        }
+        return
+      }
+      await putLoopAudio(songId, slot, file.name, file)
       markLoopSlotLoaded(songId, slot)
       setLoopSlotFileName(slot, file.name)
     },

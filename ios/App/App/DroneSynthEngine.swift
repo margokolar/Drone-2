@@ -113,6 +113,7 @@ final class DroneSynthEngine {
     private var fileLoopWriter: FileHandle?
     private var fileLoopBytes = 0
     private var fileLoopExpectedBytes = 0
+    private var fileLoopPath: URL?
     private let fileLoopQueue = DispatchQueue(label: "com.margokolar.bourdon.fileloop")
     private let twoPi = 2.0 * Double.pi
 
@@ -791,6 +792,7 @@ final class DroneSynthEngine {
                 bytes,
                 self.fileLoopExpectedBytes
             )
+            self.prepareLoopFileExtension()
             self.decodeInstalledLoop { duration in
                 completion?(duration, bytes)
             }
@@ -801,9 +803,13 @@ final class DroneSynthEngine {
         fileLoopQueue.async {
             self.closeLoopFileWriter()
             do {
-                try data.write(to: self.loopFileURL(), options: .atomic)
+                self.clearLoopTempFiles()
+                let url = self.loopScratchURL(ext: "bin")
+                self.fileLoopPath = url
+                try data.write(to: url, options: .atomic)
                 self.fileLoopBytes = data.count
                 self.fileLoopExpectedBytes = data.count
+                self.prepareLoopFileExtension()
             } catch {
                 NSLog("DroneSynth loop write: \(error.localizedDescription)")
                 DispatchQueue.main.async { completion?(0) }
@@ -979,8 +985,80 @@ final class DroneSynthEngine {
         prepared = true
     }
 
+    private static let loopExtCandidates = ["m4a", "mp3", "wav", "flac", "aiff", "caf", "aac", "ogg"]
+
+    private func loopScratchURL(ext: String) -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("drone-file-loop.\(ext)")
+    }
+
     private func loopFileURL() -> URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent("drone-file-loop.wav")
+        fileLoopPath ?? loopScratchURL(ext: "bin")
+    }
+
+    private func clearLoopTempFiles() {
+        for ext in ["bin"] + Self.loopExtCandidates {
+            try? FileManager.default.removeItem(at: loopScratchURL(ext: ext))
+        }
+        fileLoopPath = nil
+    }
+
+    private static func loopExtension(for prefix: Data) -> String {
+        guard prefix.count >= 4 else { return "bin" }
+        func ascii(_ value: String) -> Data { Data(value.utf8) }
+        if prefix.starts(with: ascii("RIFF")) { return "wav" }
+        if prefix.starts(with: ascii("FORM")) { return "aiff" }
+        if prefix.starts(with: ascii("fLaC")) { return "flac" }
+        if prefix.starts(with: ascii("OggS")) { return "ogg" }
+        if prefix.starts(with: ascii("caff")) { return "caf" }
+        if prefix.starts(with: ascii("ID3")) { return "mp3" }
+        if prefix.count >= 8, prefix.subdata(in: 4..<8) == ascii("ftyp") { return "m4a" }
+        if prefix.count >= 2, prefix[0] == 0xFF, prefix[1] & 0xE0 == 0xE0 {
+            return (prefix[1] & 0x06) == 0 ? "aac" : "mp3"
+        }
+        return "bin"
+    }
+
+    private func prepareLoopFileExtension() {
+        let src = loopFileURL()
+        guard let handle = try? FileHandle(forReadingFrom: src) else { return }
+        let prefix = (try? handle.read(upToCount: 16)) ?? Data()
+        try? handle.close()
+        let ext = Self.loopExtension(for: prefix)
+        guard ext != "bin" else { return }
+        let dest = loopScratchURL(ext: ext)
+        if src.path == dest.path {
+            return
+        }
+        try? FileManager.default.removeItem(at: dest)
+        do {
+            try FileManager.default.moveItem(at: src, to: dest)
+            fileLoopPath = dest
+        } catch {
+            NSLog("DroneSynth loop rename: \(error.localizedDescription)")
+        }
+    }
+
+    private func makeLoopBufferTryingFormats(destFormat: AVAudioFormat) -> AVAudioPCMBuffer? {
+        let src = loopFileURL()
+        if let buffer = makeLoopBuffer(url: src, format: destFormat), buffer.frameLength > 1 {
+            return buffer
+        }
+        let current = src.pathExtension.lowercased()
+        for ext in Self.loopExtCandidates where ext != current {
+            let dest = loopScratchURL(ext: ext)
+            try? FileManager.default.removeItem(at: dest)
+            do {
+                try FileManager.default.copyItem(at: src, to: dest)
+            } catch {
+                continue
+            }
+            if let buffer = makeLoopBuffer(url: dest, format: destFormat), buffer.frameLength > 1 {
+                fileLoopPath = dest
+                return buffer
+            }
+            try? FileManager.default.removeItem(at: dest)
+        }
+        return nil
     }
 
     private func closeLoopFileWriter() {
@@ -996,8 +1074,9 @@ final class DroneSynthEngine {
     private func resetLoopFileWriter() {
         closeLoopFileWriter()
         fileLoopBytes = 0
-        let url = loopFileURL()
-        try? FileManager.default.removeItem(at: url)
+        clearLoopTempFiles()
+        let url = loopScratchURL(ext: "bin")
+        fileLoopPath = url
         FileManager.default.createFile(atPath: url.path, contents: nil)
         do {
             fileLoopWriter = try FileHandle(forWritingTo: url)
@@ -1023,7 +1102,7 @@ final class DroneSynthEngine {
                 return
             }
             self.fileLoopQueue.async {
-                let buffer = self.makeLoopBuffer(url: self.loopFileURL(), format: destFormat)
+                let buffer = self.makeLoopBufferTryingFormats(destFormat: destFormat)
                 let duration: Double
                 if let buffer, buffer.format.sampleRate > 1, buffer.frameLength > 1 {
                     duration = Double(buffer.frameLength) / buffer.format.sampleRate

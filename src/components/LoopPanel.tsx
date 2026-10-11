@@ -14,7 +14,7 @@ type LoopPanelProps = {
   onClearFile: LoopControlsProps['onClearFile']
 }
 
-/** Loop (WAV slots) page. */
+/** Loop (audio slots) page. */
 export function LoopPanel({
   onEnabledChange,
   onSyncChange,

@@ -1,7 +1,8 @@
 import { registerPlugin } from '@capacitor/core'
+import { mimeTypeForLoopFileName } from '../audio/loopAudioFormats'
 
 type LoopFilePickerPlugin = {
-  pickWav(): Promise<{ canceled: boolean; name?: string; data?: string }>
+  pickAudio(): Promise<{ canceled: boolean; name?: string; data?: string }>
 }
 
 export const LoopFilePicker = registerPlugin<LoopFilePickerPlugin>('LoopFilePicker')
@@ -20,14 +21,14 @@ function base64ToBytes(base64: string): Uint8Array {
   return bytes
 }
 
-/** Opens the iOS Files picker for a WAV. Returns null if the user cancels. */
-export async function pickLoopWavFile(): Promise<File | null> {
-  const result = await LoopFilePicker.pickWav()
+/** Opens the iOS Files picker for audio. Returns null if the user cancels. */
+export async function pickLoopAudioFile(): Promise<File | null> {
+  const result = await LoopFilePicker.pickAudio()
   if (result.canceled || !result.data || !result.name) {
     return null
   }
   const bytes = base64ToBytes(result.data)
   const buffer = new ArrayBuffer(bytes.byteLength)
   new Uint8Array(buffer).set(bytes)
-  return new File([buffer], result.name, { type: 'audio/wav' })
+  return new File([buffer], result.name, { type: mimeTypeForLoopFileName(result.name) })
 }

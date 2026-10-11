@@ -6,7 +6,7 @@ type LoopConfig = {
   enabled: boolean
   volumeDb: number
   muted: boolean
-  /** When false, the WAV plays once then stops. */
+  /** When false, the audio plays once then stops. */
   repeat: boolean
 }
 
@@ -441,7 +441,14 @@ export class LoopEngine {
     }
     const context = await this.ensureWebGraph()
     const copy = await blob.arrayBuffer()
-    this.buffer = await context.decodeAudioData(copy)
+    try {
+      this.buffer = await context.decodeAudioData(copy)
+    } catch {
+      this.buffer = null
+      this.nativeDuration = 0
+      this.hasNativeAudio = false
+      return
+    }
     this.nativeDuration = this.buffer.length / this.buffer.sampleRate
     this.hasNativeAudio = false
     if (shouldPlay) {
