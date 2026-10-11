@@ -1,4 +1,4 @@
-import { Pause, Play, Volume2, VolumeX } from 'lucide-react'
+import { Pause, Play, Repeat, Volume2, VolumeX } from 'lucide-react'
 import { useRef, type ChangeEvent } from 'react'
 import { LOOP_SLOTS, loopSlotLabel, type LoopSlot, type LoopSlotFiles } from '../audio/loopSlots'
 import { pickLoopWavFile } from '../native/loopFilePicker'
@@ -16,12 +16,14 @@ type LoopControlsProps = {
   slots: LoopSlotFiles
   volumeDb: number
   muted: boolean
+  repeat: boolean
   onEnabledChange: (enabled: boolean) => void
   onSelectSlot: (slot: LoopSlot) => void
   onPickFile: (file: File) => void
   onClearFile: () => void
   onVolumeChange: (db: number) => void
   onMutedChange: (muted: boolean) => void
+  onRepeatChange: (repeat: boolean) => void
 }
 
 export function LoopControls({
@@ -30,12 +32,14 @@ export function LoopControls({
   slots,
   volumeDb,
   muted,
+  repeat,
   onEnabledChange,
   onSelectSlot,
   onPickFile,
   onClearFile,
   onVolumeChange,
   onMutedChange,
+  onRepeatChange,
 }: LoopControlsProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const fileName = slots[activeSlot - 1]
@@ -76,7 +80,7 @@ export function LoopControls({
 
   return (
     <div>
-      <div className="flex justify-center pb-9">
+      <div className="flex flex-col items-center gap-4 pb-9">
         <button
           type="button"
           className={`${powerButtonClass} transition-[transform,background-color,box-shadow,border-color] duration-75`}
@@ -85,6 +89,20 @@ export function LoopControls({
           aria-label={enabled ? 'Stop loop' : 'Start loop'}
         >
           {enabled ? <Pause size={30} /> : <Play size={30} />}
+        </button>
+        <button
+          type="button"
+          className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition ${
+            repeat
+              ? 'border-emerald-300/70 bg-emerald-300/20 text-emerald-50'
+              : 'border-white/15 bg-white/10 text-white/80 hover:bg-white/15'
+          }`}
+          onClick={() => onRepeatChange(!repeat)}
+          aria-pressed={repeat}
+          aria-label={repeat ? 'Play WAV once instead of looping' : 'Loop this WAV'}
+        >
+          <Repeat size={16} />
+          {repeat ? 'Loop' : 'Once'}
         </button>
       </div>
 

@@ -75,6 +75,8 @@ type SongEntry = {
   loopVolumeDb?: number
   loopMuted?: boolean
   loopSyncEnabled?: boolean
+  /** When false, the WAV plays once then stops. Defaults to true. */
+  loopRepeatEnabled?: boolean
 }
 
 type DroneState = {
@@ -122,6 +124,8 @@ type DroneState = {
   loopVolumeDb: number
   loopMuted: boolean
   loopEnabled: boolean
+  /** When false, the WAV plays once then stops. */
+  loopRepeatEnabled: boolean
   /** When true and no preset has loop sync, transport play/pause starts/stops the loop. */
   loopSyncEnabled: boolean
   /** When false, Loop tab and loop sync controls are hidden. */
@@ -194,6 +198,7 @@ type DroneState = {
   setLoopVolumeDb: (db: number) => void
   setLoopMuted: (muted: boolean) => void
   setLoopEnabled: (enabled: boolean) => void
+  setLoopRepeatEnabled: (enabled: boolean) => void
   setLoopSyncEnabled: (enabled: boolean) => void
   setLoopFeaturesEnabled: (enabled: boolean) => void
   setMicFeaturesEnabled: (enabled: boolean) => void
@@ -704,6 +709,7 @@ function syncPresetsToCurrentSong(
     | 'activeLoopSlot'
     | 'loopVolumeDb'
     | 'loopMuted'
+    | 'loopRepeatEnabled'
     | 'loopSyncEnabled'
   >,
 ): Pick<DroneState, 'songLibrary'> | Record<string, never> {
@@ -724,26 +730,40 @@ function syncPresetsToCurrentSong(
     activeLoopSlot: state.activeLoopSlot,
     loopVolumeDb: state.loopVolumeDb,
     loopMuted: state.loopMuted,
+    loopRepeatEnabled: state.loopRepeatEnabled,
     loopSyncEnabled: state.loopSyncEnabled,
   }
   return { songLibrary: nextLibrary }
 }
 
 function loopFieldsFromState(
-  state: Pick<DroneState, 'loopSlots' | 'activeLoopSlot' | 'loopVolumeDb' | 'loopMuted' | 'loopSyncEnabled'>,
-): Pick<SongEntry, 'loopSlots' | 'activeLoopSlot' | 'loopVolumeDb' | 'loopMuted' | 'loopSyncEnabled'> {
+  state: Pick<
+    DroneState,
+    'loopSlots' | 'activeLoopSlot' | 'loopVolumeDb' | 'loopMuted' | 'loopRepeatEnabled' | 'loopSyncEnabled'
+  >,
+): Pick<
+  SongEntry,
+  'loopSlots' | 'activeLoopSlot' | 'loopVolumeDb' | 'loopMuted' | 'loopRepeatEnabled' | 'loopSyncEnabled'
+> {
   return {
     loopSlots: [...state.loopSlots],
     activeLoopSlot: state.activeLoopSlot,
     loopVolumeDb: state.loopVolumeDb,
     loopMuted: state.loopMuted,
+    loopRepeatEnabled: state.loopRepeatEnabled,
     loopSyncEnabled: state.loopSyncEnabled,
   }
 }
 
 function loopStateFromSong(song: SongEntry): Pick<
   DroneState,
-  'loopSlots' | 'activeLoopSlot' | 'loopVolumeDb' | 'loopMuted' | 'loopSyncEnabled' | 'loopEnabled'
+  | 'loopSlots'
+  | 'activeLoopSlot'
+  | 'loopVolumeDb'
+  | 'loopMuted'
+  | 'loopRepeatEnabled'
+  | 'loopSyncEnabled'
+  | 'loopEnabled'
 > {
   return {
     loopSlots: normalizeLoopSlots(song.loopSlots, song.loopFileName),
@@ -754,6 +774,7 @@ function loopStateFromSong(song: SongEntry): Pick<
       MAX_METRONOME_VOLUME_DB,
     ),
     loopMuted: song.loopMuted ?? false,
+    loopRepeatEnabled: song.loopRepeatEnabled ?? true,
     loopSyncEnabled: song.loopSyncEnabled ?? false,
     loopEnabled: false,
   }
@@ -892,6 +913,7 @@ export function migratePersistedDroneState(persistedState: unknown, version: num
             presetNavigation: songPresetNavigation,
             loopSlots: normalizeLoopSlots(song.loopSlots, song.loopFileName),
             activeLoopSlot: normalizeLoopSlot(song.activeLoopSlot) ?? 1,
+            loopRepeatEnabled: song.loopRepeatEnabled ?? true,
             activeNavigationKey:
               song.activeNavigationKey &&
               songPresetNavigation.some(
@@ -928,6 +950,7 @@ export function migratePersistedDroneState(persistedState: unknown, version: num
       ),
       loopMuted: typed.loopMuted ?? false,
       loopEnabled: false,
+      loopRepeatEnabled: typed.loopRepeatEnabled ?? true,
       loopSyncEnabled: typed.loopSyncEnabled ?? false,
       loopFeaturesEnabled: typed.loopFeaturesEnabled ?? true,
       micFeaturesEnabled: typed.micFeaturesEnabled ?? true,
@@ -1035,6 +1058,7 @@ export const useDroneStore = create<DroneState>()(
       loopVolumeDb: DEFAULT_METRONOME_VOLUME_DB,
       loopMuted: false,
       loopEnabled: false,
+      loopRepeatEnabled: true,
       loopSyncEnabled: false,
       loopFeaturesEnabled: true,
       micFeaturesEnabled: true,
@@ -1560,6 +1584,11 @@ export const useDroneStore = create<DroneState>()(
           ...syncPresetsToCurrentSong({ ...state, loopMuted: muted }),
         })),
       setLoopEnabled: (enabled) => set({ loopEnabled: enabled }),
+      setLoopRepeatEnabled: (enabled) =>
+        set((state) => ({
+          loopRepeatEnabled: enabled,
+          ...syncPresetsToCurrentSong({ ...state, loopRepeatEnabled: enabled }),
+        })),
       setLoopSyncEnabled: (enabled) =>
         set((state) => ({
           loopSyncEnabled: enabled,
@@ -2262,6 +2291,7 @@ export const useDroneStore = create<DroneState>()(
                   activeLoopSlot: normalizeLoopSlot(source.activeLoopSlot) ?? 1,
                   loopVolumeDb: source.loopVolumeDb,
                   loopMuted: source.loopMuted,
+                  loopRepeatEnabled: source.loopRepeatEnabled ?? true,
                   loopSyncEnabled: source.loopSyncEnabled,
                 }),
           }
@@ -2450,6 +2480,7 @@ export const useDroneStore = create<DroneState>()(
         activeLoopSlot: state.activeLoopSlot,
         loopVolumeDb: state.loopVolumeDb,
         loopMuted: state.loopMuted,
+        loopRepeatEnabled: state.loopRepeatEnabled,
         loopSyncEnabled: state.loopSyncEnabled,
         loopFeaturesEnabled: state.loopFeaturesEnabled,
         micFeaturesEnabled: state.micFeaturesEnabled,

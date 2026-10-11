@@ -97,6 +97,7 @@ final class DroneSynthEngine {
     /// Samples until the next metronome click. 0 = click on this sample.
     private var metroCountdown = 0
     var metroBeatHandler: (() -> Void)?
+    var loopEndedHandler: (() -> Void)?
     private var clickPlayer: AVAudioPlayerNode?
     private var clickFormat: AVAudioFormat?
     private var fileLoopPlayer: AVAudioPlayerNode?
@@ -107,6 +108,8 @@ final class DroneSynthEngine {
     private var fileLoopEnabled = false
     private var fileLoopPlaying = false
     private var fileLoopStopAtEnd = false
+    private var fileLoopRepeat = true
+    private var fileLoopPlayGeneration = 0
     private var fileLoopWriter: FileHandle?
     private var fileLoopBytes = 0
     private var fileLoopExpectedBytes = 0
@@ -810,7 +813,14 @@ final class DroneSynthEngine {
         }
     }
 
-    func setLoopPlayback(enabled: Bool, volumeDb: Double, muted: Bool, restart: Bool, stopAtEnd: Bool = false) {
+    func setLoopPlayback(
+        enabled: Bool,
+        volumeDb: Double,
+        muted: Bool,
+        restart: Bool,
+        stopAtEnd: Bool = false,
+        looping: Bool = true
+    ) {
         let gain = muted ? 0 : Float(min(1, max(0, pow(10.0, volumeDb / 20.0))))
         let apply = {
             self.lock.lock()
@@ -822,6 +832,7 @@ final class DroneSynthEngine {
                 if stopAtEnd && self.fileLoopPlaying {
                     self.stopFileLoopAtCycleEnd()
                 } else {
+                    self.fileLoopPlayGeneration += 1
                     self.fileLoopStopAtEnd = false
                     self.fileLoopPlaying = false
                     self.fileLoopPlayer?.stop()
@@ -830,6 +841,8 @@ final class DroneSynthEngine {
                 return
             }
             let wasStopping = self.fileLoopStopAtEnd
+            let loopingChanged = self.fileLoopRepeat != looping
+            self.fileLoopRepeat = looping
             self.fileLoopStopAtEnd = false
             self.fileLoopEnabled = true
             self.wantsPlaybackSession = true
@@ -839,7 +852,11 @@ final class DroneSynthEngine {
                 NSLog("DroneSynth loop start failed: \(error.localizedDescription)")
                 return
             }
-            self.startFileLoop(restart: restart || wasStopping || !(self.fileLoopPlayer?.isPlaying ?? false))
+            self.startFileLoop(
+                restart: restart || wasStopping || (looping && loopingChanged)
+                    || !(self.fileLoopPlayer?.isPlaying ?? false),
+                looping: looping
+            )
             Self.publishNowPlaying(playing: self.isAudible)
         }
         if Thread.isMainThread {
@@ -851,6 +868,7 @@ final class DroneSynthEngine {
 
     func clearLoopAudio() {
         let apply = {
+            self.fileLoopPlayGeneration += 1
             self.fileLoopEnabled = false
             self.fileLoopPlaying = false
             self.fileLoopStopAtEnd = false
@@ -1022,7 +1040,7 @@ final class DroneSynthEngine {
                         self.fileLoopBytes
                     )
                     if self.fileLoopEnabled {
-                        self.startFileLoop(restart: true)
+                        self.startFileLoop(restart: true, looping: self.fileLoopRepeat)
                     }
                     completion?(duration)
                 }
@@ -1223,16 +1241,34 @@ final class DroneSynthEngine {
         return (outL, outR)
     }
 
-    private func startFileLoop(restart: Bool) {
+    private func startFileLoop(restart: Bool, looping: Bool) {
         guard let player = fileLoopPlayer, let buffer = fileLoopBuffer, buffer.frameLength > 1 else { return }
         player.volume = fileLoopGain
         if !restart && player.isPlaying && !fileLoopStopAtEnd {
             return
         }
+        if !restart && !player.isPlaying && !looping {
+            return
+        }
+        fileLoopPlayGeneration += 1
+        let generation = fileLoopPlayGeneration
         fileLoopStopAtEnd = false
         fileLoopPlaying = true
         player.stop()
-        player.scheduleBuffer(buffer, at: nil, options: .loops)
+        if looping {
+            player.scheduleBuffer(buffer, at: nil, options: .loops)
+        } else {
+            player.scheduleBuffer(buffer, at: nil, options: []) { [weak self] in
+                DispatchQueue.main.async {
+                    guard let self, self.fileLoopPlayGeneration == generation else { return }
+                    guard self.fileLoopEnabled else { return }
+                    self.fileLoopPlaying = false
+                    self.fileLoopEnabled = false
+                    self.loopEndedHandler?()
+                    Self.publishNowPlaying(playing: self.isAudible)
+                }
+            }
+        }
         player.play()
     }
 
@@ -1246,18 +1282,25 @@ final class DroneSynthEngine {
             let format = fileLoopBuffer?.format,
             let silent = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 64)
         else {
+            fileLoopPlayGeneration += 1
             player.stop()
             fileLoopPlaying = false
+            loopEndedHandler?()
             return
         }
         silent.frameLength = 64
+        fileLoopPlayGeneration += 1
+        let generation = fileLoopPlayGeneration
         fileLoopStopAtEnd = true
         player.scheduleBuffer(silent, at: nil, options: [.interruptsAtLoop]) { [weak self] in
             DispatchQueue.main.async {
-                guard let self, self.fileLoopStopAtEnd else { return }
+                guard let self, self.fileLoopPlayGeneration == generation else { return }
+                guard self.fileLoopStopAtEnd else { return }
                 self.fileLoopPlayer?.stop()
                 self.fileLoopPlaying = false
                 self.fileLoopStopAtEnd = false
+                self.fileLoopEnabled = false
+                self.loopEndedHandler?()
                 Self.publishNowPlaying(playing: self.isAudible)
             }
         }

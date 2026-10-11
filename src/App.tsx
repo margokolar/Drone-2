@@ -214,6 +214,7 @@ function App() {
   const loopVolumeDb = useDroneStore((state) => state.loopVolumeDb)
   const loopMuted = useDroneStore((state) => state.loopMuted)
   const loopEnabled = useDroneStore((state) => state.loopEnabled)
+  const loopRepeatEnabled = useDroneStore((state) => state.loopRepeatEnabled)
   const loopFeaturesEnabled = useDroneStore((state) => state.loopFeaturesEnabled)
   const liveShineEnabled = useDroneStore((state) => state.shine.enabled)
   const micFeaturesEnabled = useDroneStore((state) => state.micFeaturesEnabled)
@@ -1853,6 +1854,7 @@ function App() {
     enabled: loopFeaturesEnabled && loopEnabled,
     volumeDb: loopVolumeDb,
     muted: loopMuted,
+    repeat: loopRepeatEnabled,
   })
   const shine = useShine(referenceA4Hz, SEMITONES_FROM_C[tonalCenter], masterGainDb, playing)
 

@@ -53,11 +53,12 @@ export type NativeDroneSynthPlugin = {
     muted?: boolean
     restart?: number
     stopAtEnd?: number
+    repeat?: number
   }): Promise<void>
   getLoopPlayback(): Promise<{ playing?: boolean; duration?: number; position?: number }>
   clearLoop(): Promise<void>
   addListener(
-    eventName: 'metroBeat',
+    eventName: 'metroBeat' | 'loopEnded',
     listenerFunc: () => void,
   ): Promise<PluginListenerHandle>
 }

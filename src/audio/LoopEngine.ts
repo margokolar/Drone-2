@@ -6,6 +6,8 @@ type LoopConfig = {
   enabled: boolean
   volumeDb: number
   muted: boolean
+  /** When false, the WAV plays once then stops. */
+  repeat: boolean
 }
 
 type WebAudioContextCtor = typeof AudioContext
@@ -95,6 +97,7 @@ export class LoopEngine {
     enabled: false,
     volumeDb: -6,
     muted: false,
+    repeat: true,
   }
   private context: AudioContext | null = null
   private gainNode: GainNode | null = null
@@ -110,12 +113,28 @@ export class LoopEngine {
   private finishing = false
   private cycleStartTimer: number | null = null
   private cycleStartGeneration = 0
+  private endedListeners = new Set<() => void>()
+  private nativeEndedUnsub: (() => void) | null = null
+  private nativeEndedListenInFlight: Promise<void> | null = null
 
   private linearGain(): number {
     if (this.config.muted) {
       return 0
     }
     return clamp01(dbToGain(this.config.volumeDb))
+  }
+
+  private nativePlayback(restart: number, stopAtEnd = 0) {
+    return {
+      on: this.config.enabled ? 1 : 0,
+      enabled: this.config.enabled,
+      volumeDb: this.config.volumeDb,
+      mute: this.config.muted ? 1 : 0,
+      muted: this.config.muted,
+      repeat: this.config.repeat ? 1 : 0,
+      restart,
+      stopAtEnd,
+    }
   }
 
   private applyGain(): void {
@@ -125,14 +144,41 @@ export class LoopEngine {
     if (!isNativeSynth() || !this.hasNativeAudio) {
       return
     }
-    void DroneSynth.setLoopPlayback({
-      on: this.config.enabled ? 1 : 0,
-      enabled: this.config.enabled,
-      volumeDb: this.config.volumeDb,
-      mute: this.config.muted ? 1 : 0,
-      muted: this.config.muted,
-      restart: 0,
-    }).catch(() => {})
+    void DroneSynth.setLoopPlayback(this.nativePlayback(0)).catch(() => {})
+  }
+
+  onEnded(listener: () => void): () => void {
+    this.endedListeners.add(listener)
+    return () => {
+      this.endedListeners.delete(listener)
+    }
+  }
+
+  private fireEnded(): void {
+    this.finishing = false
+    this.config = { ...this.config, enabled: false }
+    this.endedListeners.forEach((listener) => listener())
+  }
+
+  private async ensureNativeEndedListener(): Promise<void> {
+    if (!isNativeSynth() || this.nativeEndedUnsub) {
+      return
+    }
+    if (!this.nativeEndedListenInFlight) {
+      this.nativeEndedListenInFlight = (async () => {
+        const handle = await DroneSynth.addListener('loopEnded', () => {
+          this.fireEnded()
+        })
+        this.nativeEndedUnsub = () => {
+          void handle.remove()
+        }
+      })()
+    }
+    try {
+      await this.nativeEndedListenInFlight
+    } finally {
+      this.nativeEndedListenInFlight = null
+    }
   }
 
   private stopWebSource(): void {
@@ -177,11 +223,13 @@ export class LoopEngine {
     }
     if (!this.source || !this.context || !this.buffer) {
       this.stopWebSource()
+      this.fireEnded()
       return
     }
     const remaining = this.cycleRemainingSeconds()
     if (remaining <= 0.0004) {
       this.stopWebSource()
+      this.fireEnded()
       return
     }
     this.finishing = true
@@ -193,12 +241,13 @@ export class LoopEngine {
         return
       }
       this.source = null
-      this.finishing = false
+      this.fireEnded()
     }
     try {
       source.stop(this.context.currentTime + remaining)
     } catch {
       this.stopWebSource()
+      this.fireEnded()
     }
   }
 
@@ -226,9 +275,19 @@ export class LoopEngine {
     this.stopWebSource()
     const source = this.context.createBufferSource()
     source.buffer = this.buffer
-    source.loop = true
-    source.loopStart = 0
-    source.loopEnd = this.buffer.length / this.buffer.sampleRate
+    source.loop = this.config.repeat
+    if (this.config.repeat) {
+      source.loopStart = 0
+      source.loopEnd = this.buffer.length / this.buffer.sampleRate
+    } else {
+      source.onended = () => {
+        if (this.source !== source) {
+          return
+        }
+        this.source = null
+        this.fireEnded()
+      }
+    }
     source.connect(this.gainNode)
     this.startedAt = this.context.currentTime
     this.startedAtMs = performance.now()
@@ -430,21 +489,14 @@ export class LoopEngine {
         return
       }
       void (async () => {
+        await this.ensureNativeEndedListener()
         await DroneSynth.reclaim().catch(() => {})
         if (!this.config.enabled) {
           onStarted?.()
           return
         }
         try {
-          await DroneSynth.setLoopPlayback({
-            on: 1,
-            enabled: true,
-            volumeDb: this.config.volumeDb,
-            mute: this.config.muted ? 1 : 0,
-            muted: this.config.muted,
-            restart: 1,
-            stopAtEnd: 0,
-          })
+          await DroneSynth.setLoopPlayback(this.nativePlayback(1))
           if (!this.config.enabled) {
             return
           }
@@ -477,19 +529,17 @@ export class LoopEngine {
     if (!this.config.enabled || this.finishing) {
       return
     }
+    if (!this.config.repeat) {
+      this.applyGain()
+      return
+    }
     if (isNativeSynth()) {
       if (!this.hasNativeAudio) {
         return
       }
-      void DroneSynth.setLoopPlayback({
-        on: 1,
-        enabled: true,
-        volumeDb: this.config.volumeDb,
-        mute: this.config.muted ? 1 : 0,
-        muted: this.config.muted,
-        restart: 0,
-        stopAtEnd: 0,
-      }).catch(() => {})
+      void this.ensureNativeEndedListener().then(() =>
+        DroneSynth.setLoopPlayback(this.nativePlayback(0)).catch(() => {}),
+      )
       return
     }
     if (!this.source && this.buffer) {
@@ -505,13 +555,9 @@ export class LoopEngine {
       }
       this.finishing = true
       void DroneSynth.setLoopPlayback({
+        ...this.nativePlayback(0, 1),
         on: 0,
         enabled: false,
-        volumeDb: this.config.volumeDb,
-        mute: this.config.muted ? 1 : 0,
-        muted: this.config.muted,
-        restart: 0,
-        stopAtEnd: 1,
       }).catch(() => {})
       return
     }
@@ -530,18 +576,15 @@ export class LoopEngine {
       return
     }
     void DroneSynth.setLoopPlayback({
+      ...this.nativePlayback(0, 0),
       on: 0,
       enabled: false,
-      volumeDb: this.config.volumeDb,
-      mute: this.config.muted ? 1 : 0,
-      muted: this.config.muted,
-      restart: 0,
-      stopAtEnd: 0,
     }).catch(() => {})
   }
 
   async setConfig(config: LoopConfig): Promise<void> {
     const wasEnabled = this.config.enabled
+    const wasRepeat = this.config.repeat
     this.config = config
     if (!config.enabled) {
       if (wasEnabled || this.isPlaying()) {
@@ -549,12 +592,16 @@ export class LoopEngine {
       }
       return
     }
+    if (wasEnabled && wasRepeat && !config.repeat && this.isPlaying()) {
+      this.stopFromGesture()
+      return
+    }
     this.finishing = false
     this.applyGain()
     if (!this.hasAudio()) {
       return
     }
-    if (!wasEnabled || !this.isPlaying()) {
+    if (!wasEnabled || !this.isPlaying() || (!wasRepeat && config.repeat)) {
       this.playFromStart()
     }
   }

@@ -29,6 +29,9 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
         DroneSynthEngine.shared.metroBeatHandler = { [weak self] in
             self?.notifyListeners("metroBeat", data: [:])
         }
+        DroneSynthEngine.shared.loopEndedHandler = { [weak self] in
+            self?.notifyListeners("loopEnded", data: [:])
+        }
     }
 
     @objc func reclaim(_ call: CAPPluginCall) {
@@ -142,12 +145,14 @@ public class DroneSynthPlugin: CAPPlugin, CAPBridgedPlugin {
         let mute = Self.number(call, "mute", Self.flag(call, "muted") ? 1 : 0) > 0.5
         let restart = Self.number(call, "restart", 0) > 0.5
         let stopAtEnd = Self.number(call, "stopAtEnd", 0) > 0.5
+        let looping = Self.number(call, "repeat", 1) > 0.5
         DroneSynthEngine.shared.setLoopPlayback(
             enabled: on,
             volumeDb: Self.number(call, "volumeDb", -6),
             muted: mute,
             restart: restart,
-            stopAtEnd: stopAtEnd
+            stopAtEnd: stopAtEnd,
+            looping: looping
         )
         call.resolve()
     }

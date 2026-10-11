@@ -100,6 +100,24 @@ describe('saved data survives an app update', () => {
   it('does not keep the loop running across restarts', () => {
     expect(migrate({ ...savedByUser, loopEnabled: true }, CURRENT - 1).loopEnabled).toBe(false)
   })
+
+  it('keeps WAV looping unless the song turned it off', () => {
+    expect(migrate(savedByUser, CURRENT - 1).loopRepeatEnabled).toBe(true)
+    expect(migrate({ ...savedByUser, loopRepeatEnabled: false }, CURRENT - 1).loopRepeatEnabled).toBe(
+      false,
+    )
+    const result = migrate(
+      {
+        ...savedByUser,
+        songLibrary: savedByUser.songLibrary.map((song, index) =>
+          index === 0 ? { ...song, loopRepeatEnabled: false } : song,
+        ),
+      },
+      CURRENT - 1,
+    )
+    expect(result.songLibrary[0]).toMatchObject({ loopRepeatEnabled: false })
+    expect(result.songLibrary[1]).toMatchObject({ loopRepeatEnabled: true })
+  })
 })
 
 describe('damaged or very old saves', () => {

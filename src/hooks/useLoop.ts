@@ -8,10 +8,11 @@ type LoopRuntimeConfig = {
   enabled: boolean
   volumeDb: number
   muted: boolean
+  repeat: boolean
 }
 
 export function useLoop(config: LoopRuntimeConfig): void {
-  const { enabled, volumeDb, muted } = config
+  const { enabled, volumeDb, muted, repeat } = config
   const songName = useDroneStore((state) => state.songName)
   const songLibrary = useDroneStore((state) => state.songLibrary)
   const activeLoopSlot = useDroneStore((state) => state.activeLoopSlot)
@@ -28,6 +29,12 @@ export function useLoop(config: LoopRuntimeConfig): void {
   }, [activeFileName, activeLoopSlot, songId])
 
   useEffect(() => {
-    void loopEngine.setConfig({ enabled, volumeDb, muted })
-  }, [enabled, muted, volumeDb])
+    return loopEngine.onEnded(() => {
+      useDroneStore.getState().setLoopEnabled(false)
+    })
+  }, [])
+
+  useEffect(() => {
+    void loopEngine.setConfig({ enabled, volumeDb, muted, repeat })
+  }, [enabled, muted, repeat, volumeDb])
 }
