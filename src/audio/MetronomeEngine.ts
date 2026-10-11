@@ -50,8 +50,8 @@ export class MetronomeEngine {
     if (isNativeSynth()) {
       this.config = { ...this.config, enabled: true, muted: false }
       void this.ensureNativeBeatListener()
-      void DroneSynth.reclaim().catch(() => {})
       this.pushNative(true)
+      void DroneSynth.reclaim().catch(() => {})
       return
     }
     const context = this.ensureContext()

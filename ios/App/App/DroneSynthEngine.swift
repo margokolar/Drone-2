@@ -100,6 +100,7 @@ final class DroneSynthEngine {
     var loopEndedHandler: (() -> Void)?
     private var clickPlayer: AVAudioPlayerNode?
     private var clickFormat: AVAudioFormat?
+    private var metroClickBuffer: AVAudioPCMBuffer?
     private var fileLoopPlayer: AVAudioPlayerNode?
     private var fileLoopFormat: AVAudioFormat?
     private var fileLoopBuffer: AVAudioPCMBuffer?
@@ -371,6 +372,9 @@ final class DroneSynthEngine {
     var isAudible: Bool {
         lock.lock()
         defer { lock.unlock() }
+        if metroEnabled && !metroMuted {
+            return true
+        }
         if fileLoopPlaying && fileLoopSeconds > 0.01 && fileLoopGain > 0.0001 {
             return true
         }
@@ -709,16 +713,23 @@ final class DroneSynthEngine {
         }
         lock.unlock()
         let apply = {
-            self.clickPlayer?.stop()
             if !enabled {
+                self.clickPlayer?.stop()
+                Self.publishNowPlaying(playing: self.isAudible)
                 return
             }
+            self.clickPlayer?.volume = Float(peak)
             do {
                 self.wantsPlaybackSession = true
                 try self.startIfNeeded()
+                self.ensureMetroClickBuffer()
+                if self.clickPlayer?.isPlaying != true {
+                    self.clickPlayer?.play()
+                }
             } catch {
                 NSLog("DroneSynth metronome start failed: \(error.localizedDescription)")
             }
+            Self.publishNowPlaying(playing: self.isAudible)
         }
         if Thread.isMainThread {
             apply()
@@ -964,8 +975,9 @@ final class DroneSynthEngine {
         guard let format = AVAudioFormat(standardFormatWithSampleRate: hwRate, channels: 2) else {
             throw NSError(domain: "DroneSynthEngine", code: 1)
         }
-        let node = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, audioBufferList -> OSStatus in
+        let node = AVAudioSourceNode(format: format) { [weak self] isSilence, _, frameCount, audioBufferList -> OSStatus in
             self?.render(frameCount: Int(frameCount), audioBufferList: audioBufferList)
+            isSilence.pointee = false
             return noErr
         }
         engine.attach(node)
@@ -1409,12 +1421,13 @@ final class DroneSynthEngine {
         let usePlanar = planarRight != nil
         let useInterleaved = !usePlanar && floatsInFirst >= frameCount * 2
         var metroBeats = 0
+        var metroClicks = 0
 
         for frame in 0..<frameCount {
             if metroEnabled {
                 if metroCountdown <= 0 {
                     if !metroMuted {
-                        armClickLocked(frequency: 1240, peak: metroPeak)
+                        metroClicks += 1
                     }
                     metroCountdown = max(1, Int(sr * 60.0 / max(30, min(404, metroBpm))))
                     metroBeats += 1
@@ -1543,13 +1556,73 @@ final class DroneSynthEngine {
                 left[frame] = (outL + outR) * 0.5
             }
         }
-        if metroBeats > 0, let handler = metroBeatHandler {
-            let count = metroBeats
+        if metroBeats > 0 {
+            let beatCount = metroBeats
+            let clickCount = metroClicks
+            let peak = Float(min(1, max(0, metroPeak)))
             DispatchQueue.main.async {
-                for _ in 0..<count {
-                    handler()
+                if clickCount > 0 {
+                    self.playMetroClicks(count: clickCount, peak: peak)
+                }
+                if let handler = self.metroBeatHandler {
+                    for _ in 0..<beatCount {
+                        handler()
+                    }
                 }
             }
+        }
+    }
+
+    private func ensureMetroClickBuffer() {
+        let format = clickFormat ?? AVAudioFormat(standardFormatWithSampleRate: max(1000, sampleRate), channels: 2)
+        guard let format, format.channelCount >= 1 else { return }
+        if let existing = metroClickBuffer, existing.format.sampleRate == format.sampleRate {
+            return
+        }
+        let clickFrames = max(64, Int(0.05 * format.sampleRate))
+        guard
+            let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(clickFrames)),
+            let channels = buffer.floatChannelData
+        else {
+            return
+        }
+        buffer.frameLength = AVAudioFrameCount(clickFrames)
+        let rate = Float(format.sampleRate)
+        let channelCount = Int(format.channelCount)
+        let interleaved = format.isInterleaved
+        for i in 0..<clickFrames {
+            let env = powf(1 - Float(i) / Float(max(1, clickFrames)), 1.8)
+            let sample = sinf(2 * Float.pi * 1240 * Float(i) / rate) * env
+            if interleaved {
+                for ch in 0..<channelCount {
+                    channels[0][i * channelCount + ch] = sample
+                }
+            } else {
+                for ch in 0..<channelCount {
+                    channels[ch][i] = sample
+                }
+            }
+        }
+        metroClickBuffer = buffer
+    }
+
+    private func playMetroClicks(count: Int, peak: Float) {
+        guard count > 0, peak > 0.0001 else { return }
+        do {
+            wantsPlaybackSession = true
+            try startIfNeeded()
+        } catch {
+            NSLog("DroneSynth metronome click start failed: \(error.localizedDescription)")
+            return
+        }
+        ensureMetroClickBuffer()
+        guard let player = clickPlayer, let buffer = metroClickBuffer else { return }
+        player.volume = peak
+        for _ in 0..<count {
+            player.scheduleBuffer(buffer, at: nil, options: [])
+        }
+        if !player.isPlaying {
+            player.play()
         }
     }
 
