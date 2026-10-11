@@ -5,6 +5,7 @@ class BridgeViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(AudioSessionPlugin())
         bridge?.registerPluginInstance(DroneSynthPlugin())
+        bridge?.registerPluginInstance(LoopFilePickerPlugin())
         bridge?.registerPluginInstance(MidiPlugin())
     }
 }

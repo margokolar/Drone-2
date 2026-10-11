@@ -1,11 +1,13 @@
 import { Pause, Play, Volume2, VolumeX } from 'lucide-react'
 import { useRef, type ChangeEvent } from 'react'
 import { LOOP_SLOTS, loopSlotLabel, type LoopSlot, type LoopSlotFiles } from '../audio/loopSlots'
+import { pickLoopWavFile } from '../native/loopFilePicker'
 import {
   DEFAULT_METRONOME_VOLUME_DB,
   MAX_METRONOME_VOLUME_DB,
   MIN_METRONOME_VOLUME_DB,
 } from '../presets/defaultPresets'
+import { isIosApp } from '../utils/platform'
 import { ResettableRangeInput } from './ResettableRangeInput'
 
 type LoopControlsProps = {
@@ -45,6 +47,22 @@ export function LoopControls({
       onPickFile(file)
     }
     event.target.value = ''
+  }
+
+  const handleLoadWav = () => {
+    if (!isIosApp()) {
+      fileInputRef.current?.click()
+      return
+    }
+    void pickLoopWavFile()
+      .then((file) => {
+        if (file) {
+          onPickFile(file)
+        }
+      })
+      .catch(() => {
+        fileInputRef.current?.click()
+      })
   }
 
   let powerButtonClass =
@@ -107,7 +125,7 @@ export function LoopControls({
             <button
               type="button"
               className="button-safe min-h-11 rounded-md border border-white/15 bg-white/10 px-3 text-sm font-medium text-white/85 transition hover:bg-white/15"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={handleLoadWav}
             >
               {hasFile ? 'Replace WAV' : 'Load WAV'}
             </button>
@@ -124,7 +142,7 @@ export function LoopControls({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".wav,audio/wav,audio/x-wav,audio/wave,audio/*"
+            accept=".wav,audio/wav,audio/x-wav,audio/wave"
             className="hidden"
             onChange={handleFileChange}
           />

@@ -13,6 +13,7 @@
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		A1B2C3D41E5F600100AA01 /* AudioSessionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41E5F600200AA02 /* AudioSessionPlugin.swift */; };
 		B3C4D5E61F5F700100CC01 /* MidiPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E61F5F700200CC02 /* MidiPlugin.swift */; };
+		D7E8F9A01B9D800100FF01 /* LoopFilePickerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7E8F9A01B9D800200FF02 /* LoopFilePickerPlugin.swift */; };
 		C5D6E7F81A8C010100EE01 /* DroneSynthEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5D6E7F81A8C010200EE02 /* DroneSynthEngine.swift */; };
 		C5D6E7F81A8C010300EE03 /* DroneSynthPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5D6E7F81A8C010400EE04 /* DroneSynthPlugin.swift */; };
 		A1B2C3D41E5F600300BB03 /* BridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41E5F600400BB04 /* BridgeViewController.swift */; };
@@ -29,6 +30,7 @@
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A1B2C3D41E5F600200AA02 /* AudioSessionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSessionPlugin.swift; sourceTree = "<group>"; };
 		B3C4D5E61F5F700200CC02 /* MidiPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MidiPlugin.swift; sourceTree = "<group>"; };
+		D7E8F9A01B9D800200FF02 /* LoopFilePickerPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopFilePickerPlugin.swift; sourceTree = "<group>"; };
 		C5D6E7F81A8C010200EE02 /* DroneSynthEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DroneSynthEngine.swift; sourceTree = "<group>"; };
 		C5D6E7F81A8C010400EE04 /* DroneSynthPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DroneSynthPlugin.swift; sourceTree = "<group>"; };
 		A1B2C3D41E5F600400BB04 /* BridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeViewController.swift; sourceTree = "<group>"; };
@@ -78,6 +80,7 @@
 				C5D6E7F81A8C010200EE02 /* DroneSynthEngine.swift */,
 				C5D6E7F81A8C010400EE04 /* DroneSynthPlugin.swift */,
 				B3C4D5E61F5F700200CC02 /* MidiPlugin.swift */,
+				D7E8F9A01B9D800200FF02 /* LoopFilePickerPlugin.swift */,
 				A1B2C3D41E5F600400BB04 /* BridgeViewController.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -176,6 +179,7 @@
 				C5D6E7F81A8C010100EE01 /* DroneSynthEngine.swift in Sources */,
 				C5D6E7F81A8C010300EE03 /* DroneSynthPlugin.swift in Sources */,
 				B3C4D5E61F5F700100CC01 /* MidiPlugin.swift in Sources */,
+				D7E8F9A01B9D800100FF01 /* LoopFilePickerPlugin.swift in Sources */,
 				A1B2C3D41E5F600300BB03 /* BridgeViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
