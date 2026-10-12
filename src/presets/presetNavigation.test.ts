@@ -95,9 +95,66 @@ describe('ring navigation', () => {
 })
 
 describe('shouldClickFollowTransport', () => {
-  it('follows transport only when Click tab / play-marker SYNC is on', () => {
-    expect(shouldClickFollowTransport({ metronomeSyncEnabled: false })).toBe(false)
-    expect(shouldClickFollowTransport({ metronomeSyncEnabled: true })).toBe(true)
+  const markerNav: PresetNavigationEntry[] = [
+    { kind: 'transport', id: 'm1', metronomeSyncEnabled: true },
+    { kind: 'preset', presetId: 'p1' },
+    { kind: 'preset', presetId: 'p2' },
+  ]
+  const markedPresets = [
+    { ...preset('p1'), metronomeSyncEnabled: true },
+    preset('p2'),
+    preset('p3'),
+  ]
+
+  it('does not follow when Click tab SYNC is off', () => {
+    expect(
+      shouldClickFollowTransport({
+        metronomeSyncEnabled: false,
+        activeNavigationKey: 'p1',
+        activePresetId: 'p1',
+        presetNavigation: markerNav,
+        presets: markedPresets,
+      }),
+    ).toBe(false)
+  })
+
+  it('follows globally when SYNC is on and there is no play/pause marker', () => {
+    expect(
+      shouldClickFollowTransport({
+        metronomeSyncEnabled: true,
+        activeNavigationKey: 'p2',
+        activePresetId: 'p2',
+        presetNavigation: [
+          { kind: 'preset', presetId: 'p1' },
+          { kind: 'preset', presetId: 'p2' },
+        ],
+        presets,
+      }),
+    ).toBe(true)
+  })
+
+  it('does not follow a gray preset metronome after a synced play/pause marker', () => {
+    expect(
+      shouldClickFollowTransport({
+        metronomeSyncEnabled: true,
+        activeNavigationKey: 'p2',
+        activePresetId: 'p2',
+        presetNavigation: markerNav,
+        presets: markedPresets,
+      }),
+    ).toBe(false)
+  })
+
+  it('follows a lit preset metronome after a synced play/pause marker', () => {
+    expect(
+      shouldClickFollowTransport({
+        metronomeSyncEnabled: true,
+        activeNavigationKey: 'p1',
+        activePresetId: 'p1',
+        presetNavigation: markerNav,
+        presets: markedPresets,
+      }),
+    ).toBe(true)
   })
 })
 

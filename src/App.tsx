@@ -24,7 +24,7 @@ import {
   transportTogglePlay,
 } from './audio/transportControls'
 import { buildRuntimeConfigFromStore } from './audio/runtimeConfigFromStore'
-import { activatePresetFromNavigation, activateTransportMarker, applyClickSyncForPreset, applyLoopSyncForPreset, cancelPendingLoopQuantize, playNextPresetAfterTransportMarker, syncClickWithTransportPlayState } from './audio/presetNavigationTransport'
+import { activatePresetFromNavigation, activateTransportMarker, applyClickSyncForPreset, applyLoopSyncForPreset, cancelPendingLoopQuantize, playNextPresetAfterTransportMarker, stopSyncedClick, syncClickWithTransportPlayState } from './audio/presetNavigationTransport'
 import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isPresetInClickSyncSegment, isTransportMarkerKey, navigationEntryKey } from './presets/presetNavigation'
 import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL } from './utils/nowPlayingLabels'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
@@ -1243,19 +1243,19 @@ function App() {
     (enabled: boolean) => {
       setMetronomeSyncEnabled(enabled)
       if (!enabled) {
+        stopSyncedClick()
         return
       }
       const state = useDroneStore.getState()
       if (isTransportMarkerKey(state.activeNavigationKey, state.presetNavigation)) {
-        metronomeEngine.stopFromGesture()
-        setMetronomeEnabled(false)
+        stopSyncedClick()
         return
       }
       if (playing) {
         syncClickWithTransportPlayState(true)
       }
     },
-    [playing, setMetronomeEnabled, setMetronomeSyncEnabled],
+    [playing, setMetronomeSyncEnabled],
   )
 
   const handleTransportMarkerMetronomeSyncChange = useCallback(
@@ -1271,10 +1271,16 @@ function App() {
       const onThisPreset =
         activePresetId === presetId &&
         !isTransportMarkerKey(activeNavigationKey, useDroneStore.getState().presetNavigation)
-      if (!onThisPreset || !playing) {
+      if (!onThisPreset) {
         return
       }
-      applyClickSyncForPreset(presetId)
+      if (!enabled) {
+        stopSyncedClick()
+        return
+      }
+      if (playing) {
+        applyClickSyncForPreset(presetId)
+      }
     },
     [activeNavigationKey, activePresetId, playing, setPresetMetronomeSync],
   )

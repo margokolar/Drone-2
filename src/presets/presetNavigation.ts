@@ -267,9 +267,31 @@ export function isPresetClickSyncEnabled(
   return presets.some((preset) => preset.id === presetId && preset.metronomeSyncEnabled === true)
 }
 
-/** Click tab SYNC and play/pause marker SYNC are the same switch. */
-export function shouldClickFollowTransport(options: { metronomeSyncEnabled: boolean }): boolean {
-  return options.metronomeSyncEnabled
+/**
+ * Click tab / play-marker SYNC is the master switch. A gray preset metronome
+ * means this preset does not take the click with Play/Pause.
+ */
+export function shouldClickFollowTransport(options: {
+  metronomeSyncEnabled: boolean
+  activeNavigationKey: string
+  activePresetId: string
+  presetNavigation: PresetNavigationEntry[]
+  presets: Preset[]
+}): boolean {
+  if (!options.metronomeSyncEnabled) {
+    return false
+  }
+  if (isTransportMarkerKey(options.activeNavigationKey, options.presetNavigation)) {
+    return false
+  }
+  if (hasTransportClickSync(options.presetNavigation)) {
+    return isPresetClickSyncEnabled(
+      options.presets,
+      options.activePresetId,
+      options.presetNavigation,
+    )
+  }
+  return true
 }
 
 export function hasPresetLoopSync(presets: Preset[]): boolean {

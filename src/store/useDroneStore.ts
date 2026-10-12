@@ -1045,11 +1045,7 @@ export const useDroneStore = create<DroneState>()(
       micFeaturesEnabled: true,
       controlsLocked: false,
       btControlMode: 'pedal',
-      setPlaying: (playing) =>
-        set((state) => ({
-          playing,
-          ...(state.metronomeSyncEnabled ? { metronomeEnabled: playing } : {}),
-        })),
+      setPlaying: (playing) => set({ playing }),
       togglePlaying: () => set((state) => ({ playing: !state.playing })),
       setReferenceA4Hz: (frequency) => set({ referenceA4Hz: clamp(frequency, 400, 480) }),
       nudgeReferenceA4Hz: (delta) =>

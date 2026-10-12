@@ -57,7 +57,7 @@ function startSyncedClick(): void {
   state.setMetronomeEnabled(true)
 }
 
-function stopSyncedClick(): void {
+export function stopSyncedClick(): void {
   clickFollowsTransport = false
   metronomeEngine.stopFromGesture()
   useDroneStore.getState().setMetronomeEnabled(false)
@@ -213,6 +213,9 @@ export function syncClickWithTransportPlayState(playing: boolean): void {
   }
   if (playing) {
     if (!shouldStartClickWithCurrentItem()) {
+      if (clickFollowsTransport) {
+        stopSyncedClick()
+      }
       return
     }
     startSyncedClick()
