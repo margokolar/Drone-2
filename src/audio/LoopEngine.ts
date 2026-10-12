@@ -8,6 +8,7 @@ type LoopConfig = {
   muted: boolean
   /** When false, the audio plays once then stops. */
   repeat: boolean
+  slot: 1 | 2 | 3
 }
 
 type WebAudioContextCtor = typeof AudioContext
@@ -98,6 +99,7 @@ export class LoopEngine {
     volumeDb: -6,
     muted: false,
     repeat: true,
+    slot: 1,
   }
   private context: AudioContext | null = null
   private gainNode: GainNode | null = null
@@ -482,6 +484,10 @@ export class LoopEngine {
     void this.ensureWebGraph().catch(() => {})
   }
 
+  setRepeat(repeat: boolean): void {
+    this.config = { ...this.config, repeat }
+  }
+
   playFromStart(onStarted?: () => void): void {
     this.finishing = false
     this.cancelScheduledCycleStart()
@@ -592,6 +598,7 @@ export class LoopEngine {
   async setConfig(config: LoopConfig): Promise<void> {
     const wasEnabled = this.config.enabled
     const wasRepeat = this.config.repeat
+    const slotChanged = config.slot !== this.config.slot
     this.config = config
     if (!config.enabled) {
       if (wasEnabled || this.isPlaying()) {
@@ -599,7 +606,7 @@ export class LoopEngine {
       }
       return
     }
-    if (wasEnabled && wasRepeat && !config.repeat && this.isPlaying()) {
+    if (!slotChanged && wasEnabled && wasRepeat && !config.repeat && this.isPlaying()) {
       this.stopFromGesture()
       return
     }
@@ -608,7 +615,7 @@ export class LoopEngine {
     if (!this.hasAudio()) {
       return
     }
-    if (!wasEnabled || !this.isPlaying() || (!wasRepeat && config.repeat)) {
+    if (slotChanged || !wasEnabled || !this.isPlaying() || (!wasRepeat && config.repeat)) {
       this.playFromStart()
     }
   }

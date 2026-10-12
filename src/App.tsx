@@ -25,7 +25,7 @@ import {
 } from './audio/transportControls'
 import { buildRuntimeConfigFromStore } from './audio/runtimeConfigFromStore'
 import { activatePresetFromNavigation, activateTransportMarker, applyClickSyncForPreset, applyLoopSyncForPreset, cancelPendingLoopQuantize, playNextPresetAfterTransportMarker } from './audio/presetNavigationTransport'
-import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isPresetInClickSyncSegment, isTransportMarkerKey, navigationEntryKey, resolveNavigationClickBpm, transportMarkerHasActiveFollowingClick } from './presets/presetNavigation'
+import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isPresetInClickSyncSegment, isTransportMarkerKey, navigationEntryKey, transportMarkerHasActiveFollowingClick } from './presets/presetNavigation'
 import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL } from './utils/nowPlayingLabels'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig, WavetableCoeffs } from './audio/types'
@@ -214,7 +214,7 @@ function App() {
   const loopVolumeDb = useDroneStore((state) => state.loopVolumeDb)
   const loopMuted = useDroneStore((state) => state.loopMuted)
   const loopEnabled = useDroneStore((state) => state.loopEnabled)
-  const loopRepeatEnabled = useDroneStore((state) => state.loopRepeatEnabled)
+  const loopRepeatBySlot = useDroneStore((state) => state.loopRepeatBySlot)
   const loopFeaturesEnabled = useDroneStore((state) => state.loopFeaturesEnabled)
   const liveShineEnabled = useDroneStore((state) => state.shine.enabled)
   const micFeaturesEnabled = useDroneStore((state) => state.micFeaturesEnabled)
@@ -302,8 +302,7 @@ function App() {
         showMetronomeSync: isTransport
           ? true
           : isPresetInClickSyncSegment(presetNavigation, entry.presetId),
-        metronomeBpm:
-          resolveNavigationClickBpm(enabledNav, presets, index) ?? metronomeBpm,
+        metronomeBpm,
         shineEnabled: isTransport
           ? false
           : navigationEntryKey(entry) === activeNavigationKey
@@ -1320,6 +1319,7 @@ function App() {
           setLoopMuted(false)
         }
         loopEngine.prepareContext()
+        loopEngine.setRepeat(state.loopRepeatBySlot[state.activeLoopSlot - 1] !== false)
         loopEngine.playFromStart()
       } else {
         loopEngine.stopFromGesture()
@@ -1338,6 +1338,7 @@ function App() {
           setLoopMuted(false)
         }
         loopEngine.prepareContext()
+        loopEngine.setRepeat(state.loopRepeatBySlot[state.activeLoopSlot - 1] !== false)
         loopEngine.playFromStart()
         setLoopEnabled(true)
       }
@@ -1861,7 +1862,8 @@ function App() {
     enabled: loopFeaturesEnabled && loopEnabled,
     volumeDb: loopVolumeDb,
     muted: loopMuted,
-    repeat: loopRepeatEnabled,
+    repeat: loopRepeatBySlot[activeLoopSlot - 1] !== false,
+    slot: activeLoopSlot,
   })
   const shine = useShine(referenceA4Hz, SEMITONES_FROM_C[tonalCenter], masterGainDb, playing)
 

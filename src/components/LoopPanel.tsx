@@ -28,10 +28,10 @@ export function LoopPanel({
   const slots = useDroneStore((state) => state.loopSlots)
   const volumeDb = useDroneStore((state) => state.loopVolumeDb)
   const muted = useDroneStore((state) => state.loopMuted)
-  const repeat = useDroneStore((state) => state.loopRepeatEnabled)
+  const repeats = useDroneStore((state) => state.loopRepeatBySlot)
   const setVolumeDb = useDroneStore((state) => state.setLoopVolumeDb)
   const setMuted = useDroneStore((state) => state.setLoopMuted)
-  const setRepeat = useDroneStore((state) => state.setLoopRepeatEnabled)
+  const setSlotRepeat = useDroneStore((state) => state.setLoopSlotRepeat)
 
   return (
     <SectionCard
@@ -57,14 +57,14 @@ export function LoopPanel({
         slots={slots}
         volumeDb={volumeDb}
         muted={muted}
-        repeat={repeat}
+        repeats={repeats}
         onEnabledChange={onEnabledChange}
         onSelectSlot={onSelectSlot}
         onPickFile={onPickFile}
         onClearFile={onClearFile}
         onVolumeChange={setVolumeDb}
         onMutedChange={setMuted}
-        onRepeatChange={setRepeat}
+        onRepeatChange={setSlotRepeat}
       />
     </SectionCard>
   )

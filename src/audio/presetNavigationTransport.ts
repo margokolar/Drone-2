@@ -152,6 +152,7 @@ function startSyncedLoop(restart: boolean, onStarted?: () => void, presetId?: st
     state.setLoopMuted(false)
   }
   loopEngine.prepareContext()
+  loopEngine.setRepeat(state.loopRepeatBySlot[slot - 1] !== false)
   if (state.activeLoopSlot !== slot) {
     state.setActiveLoopSlot(slot)
   }

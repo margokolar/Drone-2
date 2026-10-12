@@ -7,6 +7,11 @@
 #
 # NOTE: with a free Apple ID the install expires after 7 days; just re-run
 # this script to refresh it.
+#
+# REQUIRE_INSTALL=1  (used by ~/deploy-ios-apps.sh)
+#   Fail instead of "build only" when the phone is not reachable, and fail if
+#   the app is not actually installed. A build without an install can mint a
+#   new 7-day profile and immediately kill the copy already on the phone.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -15,18 +20,13 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Develope
 
 BUNDLE_ID="com.margokolar.bourdon"
 DERIVED_DATA="ios/DerivedData"
+REQUIRE_INSTALL="${REQUIRE_INSTALL:-0}"
 
-echo "==> Building web app"
-npm run build
-
-echo "==> Syncing Capacitor"
-npx cap sync ios
-
-echo "==> Looking for a connected iPhone"
-DEVICE_JSON=$(mktemp)
-xcrun devicectl list devices --json-output "$DEVICE_JSON" >/dev/null
-
-UDID=$(python3 - "$DEVICE_JSON" <<'EOF'
+find_phone_udid() {
+  local device_json
+  device_json=$(mktemp)
+  xcrun devicectl list devices --json-output "$device_json" >/dev/null
+  python3 - "$device_json" <<'EOF'
 import json, sys
 data = json.load(open(sys.argv[1]))
 devices = data.get("result", {}).get("devices", [])
@@ -38,29 +38,71 @@ for d in devices:
         continue
     if hw.get("platform") != "iOS":
         continue
-    if conn.get("tunnelState") == "unavailable":
+    if conn.get("tunnelState") != "connected":
         continue
     identifier = d.get("identifier", "")
     if not identifier:
         continue
-    # Prefer an iPhone if several physical iOS devices are reachable.
     candidates.append((0 if hw.get("deviceType") == "iPhone" else 1, identifier))
 candidates.sort()
 if candidates:
     print(candidates[0][1])
 EOF
-)
-rm -f "$DEVICE_JSON"
+  rm -f "$device_json"
+}
+
+app_is_on_phone() {
+  local udid="$1"
+  local bundle_id="$2"
+  local apps_json
+  apps_json=$(mktemp)
+  if ! xcrun devicectl device info apps --device "$udid" --json-output "$apps_json" >/dev/null; then
+    rm -f "$apps_json"
+    return 1
+  fi
+  local ok=0
+  python3 - "$apps_json" "$bundle_id" <<'EOF' || ok=1
+import json, sys
+
+data = json.load(open(sys.argv[1]))
+wanted = sys.argv[2]
+
+def walk(obj):
+    if isinstance(obj, dict):
+        if obj.get("bundleIdentifier") == wanted or obj.get("bundleID") == wanted:
+            return True
+        return any(walk(value) for value in obj.values())
+    if isinstance(obj, list):
+        return any(walk(value) for value in obj)
+    return False
+
+sys.exit(0 if walk(data) else 1)
+EOF
+  rm -f "$apps_json"
+  return "$ok"
+}
+
+echo "==> Looking for a connected iPhone"
+UDID="$(find_phone_udid)"
 
 if [ -n "$UDID" ]; then
   DESTINATION="id=$UDID"
   echo "    Device: $UDID"
 else
-  # No phone reachable: still produce a full device build so it is ready to
-  # install the next time the phone shows up.
   DESTINATION="generic/platform=iOS"
+  if [ "$REQUIRE_INSTALL" = "1" ]; then
+    echo "ERROR: iPhone is not connected (cable or paired Wi-Fi) and unlocked."
+    echo "       The 7-day permission was NOT refreshed. Unlock the phone and re-run."
+    exit 1
+  fi
   echo "    No iPhone reachable - building only (install will be skipped)."
 fi
+
+echo "==> Building web app"
+npm run build
+
+echo "==> Syncing Capacitor"
+npx cap sync ios
 
 echo "==> Building iOS app (xcodebuild)"
 xcodebuild \
@@ -87,13 +129,23 @@ if [ -z "$UDID" ]; then
 fi
 
 echo "==> Installing on device"
-xcrun devicectl device install app --device "$UDID" "$APP_PATH"
+if ! xcrun devicectl device install app --device "$UDID" "$APP_PATH"; then
+  echo "ERROR: Install failed. The 7-day permission was NOT refreshed."
+  echo "       Unlock the phone, leave it awake, and re-run."
+  exit 1
+fi
+
+if ! app_is_on_phone "$UDID" "$BUNDLE_ID"; then
+  echo "ERROR: $BUNDLE_ID is not on the phone after install."
+  echo "       The 7-day permission was NOT refreshed."
+  exit 1
+fi
 
 echo "==> Launching"
 xcrun devicectl device process launch --device "$UDID" "$BUNDLE_ID" || {
-  echo "(Launch failed - if this is the first install, tap the icon on the"
-  echo " phone and approve the developer in Settings > General > VPN & Device"
-  echo " Management, then Developer Mode prompts if any.)"
+  echo "(Launch failed — the app is installed, so the 7-day permission was refreshed."
+  echo " Unlock the phone and tap the icon. If it is the first install, approve the"
+  echo " developer in Settings > General > VPN & Device Management.)"
 }
 
-echo "==> Done"
+echo "==> Done (installed on phone)"

@@ -1,7 +1,14 @@
 import { Pause, Play, Repeat, Volume2, VolumeX } from 'lucide-react'
 import { useRef, type ChangeEvent } from 'react'
 import { LOOP_AUDIO_FILE_ACCEPT } from '../audio/loopAudioFormats'
-import { LOOP_SLOTS, loopSlotLabel, type LoopSlot, type LoopSlotFiles } from '../audio/loopSlots'
+import {
+  LOOP_SLOTS,
+  loopSlotLabel,
+  loopSlotRepeat,
+  type LoopSlot,
+  type LoopSlotFiles,
+  type LoopSlotRepeats,
+} from '../audio/loopSlots'
 import { pickLoopAudioFile } from '../native/loopFilePicker'
 import {
   DEFAULT_METRONOME_VOLUME_DB,
@@ -17,14 +24,14 @@ type LoopControlsProps = {
   slots: LoopSlotFiles
   volumeDb: number
   muted: boolean
-  repeat: boolean
+  repeats: LoopSlotRepeats
   onEnabledChange: (enabled: boolean) => void
   onSelectSlot: (slot: LoopSlot) => void
   onPickFile: (file: File) => void
   onClearFile: () => void
   onVolumeChange: (db: number) => void
   onMutedChange: (muted: boolean) => void
-  onRepeatChange: (repeat: boolean) => void
+  onRepeatChange: (slot: LoopSlot, repeat: boolean) => void
 }
 
 export function LoopControls({
@@ -33,7 +40,7 @@ export function LoopControls({
   slots,
   volumeDb,
   muted,
-  repeat,
+  repeats,
   onEnabledChange,
   onSelectSlot,
   onPickFile,
@@ -91,20 +98,6 @@ export function LoopControls({
         >
           {enabled ? <Pause size={30} /> : <Play size={30} />}
         </button>
-        <button
-          type="button"
-          className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition ${
-            repeat
-              ? 'border-emerald-300/70 bg-emerald-300/20 text-emerald-50'
-              : 'border-white/15 bg-white/10 text-white/80 hover:bg-white/15'
-          }`}
-          onClick={() => onRepeatChange(!repeat)}
-          aria-pressed={repeat}
-          aria-label={repeat ? 'Play audio once instead of looping' : 'Loop this audio'}
-        >
-          <Repeat size={16} />
-          {repeat ? 'Loop' : 'Once'}
-        </button>
       </div>
 
       <div className="space-y-3">
@@ -114,26 +107,46 @@ export function LoopControls({
             {LOOP_SLOTS.map((slot) => {
               const slotFile = slots[slot - 1]
               const isActive = slot === activeSlot
+              const slotRepeats = loopSlotRepeat(repeats, slot)
               return (
-                <button
-                  key={slot}
-                  type="button"
-                  onClick={() => onSelectSlot(slot)}
-                  className={`button-safe flex min-h-11 flex-col items-center justify-center rounded-md border px-2 py-1.5 transition ${
-                    isActive
-                      ? 'border-emerald-300/70 bg-emerald-300/20 text-emerald-50'
-                      : slotFile
-                        ? 'border-white/20 bg-white/10 text-white/85 hover:bg-white/15'
-                        : 'border-white/10 bg-white/5 text-white/45 hover:bg-white/10'
-                  }`}
-                  aria-pressed={isActive}
-                  aria-label={`${loopSlotLabel(slot)}${slotFile ? `, ${slotFile}` : ', empty'}`}
-                >
-                  <span className="text-sm font-semibold leading-none">{loopSlotLabel(slot)}</span>
-                  <span className="mt-1 max-w-full truncate text-[10px] leading-none text-current/80">
-                    {slotFile ?? 'Empty'}
-                  </span>
-                </button>
+                <div key={slot} className="flex min-w-0 flex-col gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onSelectSlot(slot)}
+                    className={`button-safe flex min-h-11 flex-col items-center justify-center rounded-md border px-2 py-1.5 transition ${
+                      isActive
+                        ? 'border-emerald-300/70 bg-emerald-300/20 text-emerald-50'
+                        : slotFile
+                          ? 'border-white/20 bg-white/10 text-white/85 hover:bg-white/15'
+                          : 'border-white/10 bg-white/5 text-white/45 hover:bg-white/10'
+                    }`}
+                    aria-pressed={isActive}
+                    aria-label={`${loopSlotLabel(slot)}${slotFile ? `, ${slotFile}` : ', empty'}`}
+                  >
+                    <span className="text-sm font-semibold leading-none">{loopSlotLabel(slot)}</span>
+                    <span className="mt-1 max-w-full truncate text-[10px] leading-none text-current/80">
+                      {slotFile ?? 'Empty'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex h-8 items-center justify-center gap-1 rounded-md border px-1.5 text-[11px] font-medium transition ${
+                      slotRepeats
+                        ? 'border-emerald-300/70 bg-emerald-300/20 text-emerald-50'
+                        : 'border-white/15 bg-white/10 text-white/80 hover:bg-white/15'
+                    }`}
+                    onClick={() => onRepeatChange(slot, !slotRepeats)}
+                    aria-pressed={slotRepeats}
+                    aria-label={
+                      slotRepeats
+                        ? `Play ${loopSlotLabel(slot)} once instead of looping`
+                        : `Loop ${loopSlotLabel(slot)}`
+                    }
+                  >
+                    <Repeat size={14} />
+                    {slotRepeats ? 'Loop' : 'Once'}
+                  </button>
+                </div>
               )
             })}
           </div>

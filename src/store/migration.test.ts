@@ -102,9 +102,9 @@ describe('saved data survives an app update', () => {
   })
 
   it('keeps WAV looping unless the song turned it off', () => {
-    expect(migrate(savedByUser, CURRENT - 1).loopRepeatEnabled).toBe(true)
-    expect(migrate({ ...savedByUser, loopRepeatEnabled: false }, CURRENT - 1).loopRepeatEnabled).toBe(
-      false,
+    expect(migrate(savedByUser, CURRENT - 1).loopRepeatBySlot).toEqual([true, true, true])
+    expect(migrate({ ...savedByUser, loopRepeatEnabled: false }, CURRENT - 1).loopRepeatBySlot).toEqual(
+      [false, false, false],
     )
     const result = migrate(
       {
@@ -115,8 +115,23 @@ describe('saved data survives an app update', () => {
       },
       CURRENT - 1,
     )
-    expect(result.songLibrary[0]).toMatchObject({ loopRepeatEnabled: false })
-    expect(result.songLibrary[1]).toMatchObject({ loopRepeatEnabled: true })
+    expect(result.songLibrary[0]).toMatchObject({ loopRepeatBySlot: [false, false, false] })
+    expect(result.songLibrary[1]).toMatchObject({ loopRepeatBySlot: [true, true, true] })
+  })
+
+  it('keeps Loop/Once per slot after an update', () => {
+    const result = migrate(
+      {
+        ...savedByUser,
+        loopRepeatBySlot: [true, false, true],
+        songLibrary: savedByUser.songLibrary.map((song, index) =>
+          index === 0 ? { ...song, loopRepeatBySlot: [false, true, false] } : song,
+        ),
+      },
+      CURRENT - 1,
+    )
+    expect(result.loopRepeatBySlot).toEqual([true, false, true])
+    expect(result.songLibrary[0]).toMatchObject({ loopRepeatBySlot: [false, true, false] })
   })
 })
 

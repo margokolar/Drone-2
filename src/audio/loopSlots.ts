@@ -1,9 +1,45 @@
 export const LOOP_SLOTS = [1, 2, 3] as const
 export type LoopSlot = (typeof LOOP_SLOTS)[number]
 export type LoopSlotFiles = [string | null, string | null, string | null]
+export type LoopSlotRepeats = [boolean, boolean, boolean]
 
 export function emptyLoopSlots(): LoopSlotFiles {
   return [null, null, null]
+}
+
+export function emptyLoopSlotRepeats(): LoopSlotRepeats {
+  return [true, true, true]
+}
+
+/** Accepts the new per-slot flags, or the old single Loop/Once boolean. */
+export function normalizeLoopSlotRepeats(
+  value: unknown,
+  fallbackEnabled: unknown = true,
+): LoopSlotRepeats {
+  if (Array.isArray(value) && value.length >= 3) {
+    return [value[0] !== false, value[1] !== false, value[2] !== false]
+  }
+  const enabled =
+    typeof value === 'boolean'
+      ? value
+      : typeof fallbackEnabled === 'boolean'
+        ? fallbackEnabled
+        : true
+  return [enabled, enabled, enabled]
+}
+
+export function loopSlotRepeat(repeats: LoopSlotRepeats, slot: LoopSlot): boolean {
+  return repeats[slot - 1] !== false
+}
+
+export function withLoopSlotRepeat(
+  repeats: LoopSlotRepeats,
+  slot: LoopSlot,
+  enabled: boolean,
+): LoopSlotRepeats {
+  const next: LoopSlotRepeats = [repeats[0], repeats[1], repeats[2]]
+  next[slot - 1] = enabled
+  return next
 }
 
 export function normalizeLoopSlot(value: unknown): LoopSlot | null {
