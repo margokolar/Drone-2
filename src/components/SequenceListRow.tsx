@@ -144,10 +144,10 @@ export function SequenceListRow({
               `${
                 metronomeSyncEnabled
                   ? showTransport
-                    ? 'Disable click sync for this play/pause marker'
+                    ? 'Disable click sync with drone transport play and pause'
                     : 'Disable click sync for this preset'
                   : showTransport
-                    ? 'Sync click start and stop with this play/pause marker'
+                    ? 'Sync click start and stop with drone transport play and pause'
                     : 'Sync click start and stop with this preset'
               }${onLongPressMetronome ? '. Long-press to open Click.' : ''}`
             }

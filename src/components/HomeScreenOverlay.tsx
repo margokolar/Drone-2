@@ -158,7 +158,7 @@ export function HomeScreenOverlay({
               ? `Stop click${onOpenClickTab ? '. Long-press to open Click.' : ''}`
               : `${
                   activeItem.isTransport
-                    ? 'Disable click sync for this play/pause marker'
+                    ? 'Disable click sync with drone transport play and pause'
                     : 'Disable click sync for this preset'
                 }${onOpenClickTab ? '. Long-press to open Click.' : ''}`
           }

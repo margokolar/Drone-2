@@ -6,6 +6,8 @@ import {
   normalizePresetNavigation,
   selectNextInRing,
   selectPreviousInRing,
+  shouldClickFollowTransport,
+  withMirroredClickSync,
   type PresetNavigationEntry,
 } from './presetNavigation'
 
@@ -89,5 +91,31 @@ describe('ring navigation', () => {
 
   it('does nothing with a single item', () => {
     expect(selectNextInRing(['a'], 'a', id)).toBeUndefined()
+  })
+})
+
+describe('shouldClickFollowTransport', () => {
+  it('follows transport only when Click tab / play-marker SYNC is on', () => {
+    expect(shouldClickFollowTransport({ metronomeSyncEnabled: false })).toBe(false)
+    expect(shouldClickFollowTransport({ metronomeSyncEnabled: true })).toBe(true)
+  })
+})
+
+describe('withMirroredClickSync', () => {
+  it('sets every play/pause marker to the Click tab SYNC state', () => {
+    const navigation: PresetNavigationEntry[] = [
+      { kind: 'transport', id: 'm1', metronomeSyncEnabled: true },
+      { kind: 'preset', presetId: 'p1' },
+      { kind: 'transport', id: 'm2' },
+    ]
+    expect(withMirroredClickSync(navigation, false)).toEqual([
+      { kind: 'transport', id: 'm1', metronomeSyncEnabled: false },
+      { kind: 'preset', presetId: 'p1' },
+      { kind: 'transport', id: 'm2', metronomeSyncEnabled: false },
+    ])
+    expect(withMirroredClickSync(navigation, true)[2]).toMatchObject({
+      id: 'm2',
+      metronomeSyncEnabled: true,
+    })
   })
 })

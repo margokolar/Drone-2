@@ -50,16 +50,15 @@ import {
   type ShineConfig,
 } from '../presets/defaultPresets'
 import {
-  applyDefaultPresetClickSync,
   buildDefaultPresetNavigation,
   createTransportMarkerId,
   getEnabledNavigationEntries,
-  hasTransportClickSync,
   navigationEntryKey,
   isTransportMarkerKey,
   normalizePresetNavigation,
   resolveFirstActiveNavigationTarget,
   resolvePresetBeforeMarker,
+  withMirroredClickSync,
   type PresetNavigationEntry,
 } from '../presets/presetNavigation'
 
@@ -805,7 +804,7 @@ function resolveActivePresetId(presets: Preset[], activePresetId: string | undef
   return presets[0]?.id ?? INITIAL_PRESET.id
 }
 
-export const DRONE_STORE_PERSIST_VERSION = 29
+export const DRONE_STORE_PERSIST_VERSION = 30
 /** Entry glide cents switched polarity in this version; only older saves may be flipped. */
 const ENTRY_GLIDE_POLARITY_SWAP_VERSION = 13
 
@@ -846,7 +845,11 @@ export function migratePersistedDroneState(persistedState: unknown, version: num
       resolvedPresets,
       typed.activePresetId,
     )
-    const presetNavigation = normalizePresetNavigation(typed.presetNavigation, resolvedPresets)
+    const clickSyncEnabled = typed.metronomeSyncEnabled ?? false
+    const presetNavigation = withMirroredClickSync(
+      normalizePresetNavigation(typed.presetNavigation, resolvedPresets),
+      clickSyncEnabled,
+    )
     const activeNavigationKey =
       typed.activeNavigationKey &&
       presetNavigation.some(
@@ -880,7 +883,10 @@ export function migratePersistedDroneState(persistedState: unknown, version: num
       songLibrary:
         typed.songLibrary?.map((song) => {
           const songPresets = (song.presets ?? []).map((preset) => duplicatePresetData(preset))
-          const songPresetNavigation = normalizePresetNavigation(song.presetNavigation, songPresets)
+          const songPresetNavigation = withMirroredClickSync(
+            normalizePresetNavigation(song.presetNavigation, songPresets),
+            clickSyncEnabled,
+          )
           return normalizeSongNavigationEnabled({
             ...song,
             enabled: song.enabled ?? true,
@@ -915,7 +921,7 @@ export function migratePersistedDroneState(persistedState: unknown, version: num
         MAX_METRONOME_VOLUME_DB,
       ),
       metronomeMuted: typed.metronomeMuted ?? false,
-      metronomeSyncEnabled: typed.metronomeSyncEnabled ?? false,
+      metronomeSyncEnabled: clickSyncEnabled,
       loopSlots: normalizeLoopSlots(typed.loopSlots, typed.loopFileName),
       activeLoopSlot: normalizeLoopSlot(typed.activeLoopSlot) ?? 1,
       loopVolumeDb: clamp(
@@ -1042,9 +1048,7 @@ export const useDroneStore = create<DroneState>()(
       setPlaying: (playing) =>
         set((state) => ({
           playing,
-          ...(state.metronomeSyncEnabled && !hasTransportClickSync(state.presetNavigation)
-            ? { metronomeEnabled: playing }
-            : {}),
+          ...(state.metronomeSyncEnabled ? { metronomeEnabled: playing } : {}),
         })),
       togglePlaying: () => set((state) => ({ playing: !state.playing })),
       setReferenceA4Hz: (frequency) => set({ referenceA4Hz: clamp(frequency, 400, 480) }),
@@ -1524,9 +1528,25 @@ export const useDroneStore = create<DroneState>()(
       setMetronomeVolumeDb: (db) =>
         set({ metronomeVolumeDb: clamp(db, MIN_METRONOME_VOLUME_DB, MAX_METRONOME_VOLUME_DB) }),
       setMetronomeMuted: (muted) => set({ metronomeMuted: muted }),
-      setMetronomeSyncEnabled: (enabled) => set({ metronomeSyncEnabled: enabled }),
+      setMetronomeSyncEnabled: (enabled) =>
+        set((state) => {
+          const presetNavigation = withMirroredClickSync(state.presetNavigation, enabled)
+          return {
+            metronomeSyncEnabled: enabled,
+            presetNavigation,
+            ...syncPresetsToCurrentSong({ ...state, presetNavigation }),
+          }
+        }),
       toggleMetronomeSyncEnabled: () =>
-        set((state) => ({ metronomeSyncEnabled: !state.metronomeSyncEnabled })),
+        set((state) => {
+          const enabled = !state.metronomeSyncEnabled
+          const presetNavigation = withMirroredClickSync(state.presetNavigation, enabled)
+          return {
+            metronomeSyncEnabled: enabled,
+            presetNavigation,
+            ...syncPresetsToCurrentSong({ ...state, presetNavigation }),
+          }
+        }),
       setLoopSlotFileName: (slot, fileName) =>
         set((state) => {
           const loopSlots: LoopSlotFiles = [
@@ -1770,6 +1790,7 @@ export const useDroneStore = create<DroneState>()(
             kind: 'transport' as const,
             id: createTransportMarkerId(),
             enabled: true,
+            metronomeSyncEnabled: state.metronomeSyncEnabled,
           }
           const presetNavigation = [...state.presetNavigation]
           presetNavigation.splice(index + 1, 0, marker)
@@ -1853,16 +1874,11 @@ export const useDroneStore = create<DroneState>()(
           if (!marker || marker.kind !== 'transport') {
             return state
           }
-          const presetNavigation = state.presetNavigation.map((entry) =>
-            entry.kind === 'transport' && entry.id === markerId
-              ? { ...entry, metronomeSyncEnabled: enabled }
-              : entry,
-          )
-          const presets = applyDefaultPresetClickSync(presetNavigation, state.presets)
+          const presetNavigation = withMirroredClickSync(state.presetNavigation, enabled)
           return {
+            metronomeSyncEnabled: enabled,
             presetNavigation,
-            presets,
-            ...syncPresetsToCurrentSong({ ...state, presetNavigation, presets }),
+            ...syncPresetsToCurrentSong({ ...state, presetNavigation }),
           }
         }),
       setPresetMetronomeSync: (presetId, enabled) =>
@@ -2025,7 +2041,10 @@ export const useDroneStore = create<DroneState>()(
             return state
           }
           const copiedPresets = song.presets.map((preset) => duplicatePresetData(preset))
-          const presetNavigation = normalizePresetNavigation(song.presetNavigation, copiedPresets)
+          const presetNavigation = withMirroredClickSync(
+            normalizePresetNavigation(song.presetNavigation, copiedPresets),
+            state.metronomeSyncEnabled,
+          )
           const firstActive = resolveFirstActiveNavigationTarget(presetNavigation, copiedPresets)
           if (!firstActive) {
             return state

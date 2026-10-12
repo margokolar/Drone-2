@@ -60,6 +60,7 @@ export function PresetList({
   onActivateTransport,
 }: PresetListProps) {
   const loopFeaturesEnabled = useDroneStore((state) => state.loopFeaturesEnabled)
+  const clickSyncEnabled = useDroneStore((state) => state.metronomeSyncEnabled)
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
@@ -201,10 +202,10 @@ export function PresetList({
                 <div className={clsx('flex min-h-10 items-center gap-2', !isCollapsed && 'mb-1.5')}>
                   <PlayPauseIcon size={28} className="shrink-0 text-amber-100/90" />
                   <ClickSyncButton
-                    enabled={entry.metronomeSyncEnabled === true}
+                    enabled={clickSyncEnabled}
                     onClick={(event) => {
                       event.stopPropagation()
-                      onSetTransportMetronomeSync(entry.id, entry.metronomeSyncEnabled !== true)
+                      onSetTransportMetronomeSync(entry.id, !clickSyncEnabled)
                     }}
                     className="ml-auto"
                     inactiveClassName={
@@ -213,9 +214,9 @@ export function PresetList({
                         : 'border-white/10 bg-white/5 text-white/55 hover:bg-white/10'
                     }
                     ariaLabel={
-                      entry.metronomeSyncEnabled
-                        ? 'Disable click sync for this play/pause marker'
-                        : 'Sync click start and stop with this play/pause marker'
+                      clickSyncEnabled
+                        ? 'Disable click sync with drone transport play and pause'
+                        : 'Sync click start and stop with drone transport play and pause'
                     }
                   />
                   <NavigationCheckbox

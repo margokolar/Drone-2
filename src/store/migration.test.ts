@@ -97,6 +97,27 @@ describe('saved data survives an app update', () => {
     })
   })
 
+  it('keeps play/pause marker click SYNC in step with the Click tab switch', () => {
+    const result = migrate(
+      {
+        ...savedByUser,
+        metronomeSyncEnabled: false,
+        presetNavigation: [
+          { kind: 'preset', presetId: 'mine-1' },
+          { kind: 'transport', id: 'm1', metronomeSyncEnabled: true },
+          { kind: 'preset', presetId: 'mine-2' },
+        ],
+      },
+      CURRENT - 1,
+    )
+    expect(result.metronomeSyncEnabled).toBe(false)
+    expect(result.presetNavigation).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'transport', id: 'm1', metronomeSyncEnabled: false }),
+      ]),
+    )
+  })
+
   it('does not keep the loop running across restarts', () => {
     expect(migrate({ ...savedByUser, loopEnabled: true }, CURRENT - 1).loopEnabled).toBe(false)
   })

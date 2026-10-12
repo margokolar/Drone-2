@@ -24,8 +24,8 @@ import {
   transportTogglePlay,
 } from './audio/transportControls'
 import { buildRuntimeConfigFromStore } from './audio/runtimeConfigFromStore'
-import { activatePresetFromNavigation, activateTransportMarker, applyClickSyncForPreset, applyLoopSyncForPreset, cancelPendingLoopQuantize, playNextPresetAfterTransportMarker } from './audio/presetNavigationTransport'
-import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isPresetInClickSyncSegment, isTransportMarkerKey, navigationEntryKey, transportMarkerHasActiveFollowingClick } from './presets/presetNavigation'
+import { activatePresetFromNavigation, activateTransportMarker, applyClickSyncForPreset, applyLoopSyncForPreset, cancelPendingLoopQuantize, playNextPresetAfterTransportMarker, syncClickWithTransportPlayState } from './audio/presetNavigationTransport'
+import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isPresetInClickSyncSegment, isTransportMarkerKey, navigationEntryKey } from './presets/presetNavigation'
 import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL } from './utils/nowPlayingLabels'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
 import type { DroneRuntimeConfig, PartialConfig, TimbreBlend, ToneConfig, WavetableCoeffs } from './audio/types'
@@ -206,6 +206,7 @@ function App() {
   const globalOvertoneEditEnabled = useDroneStore((state) => state.globalOvertoneEditEnabled)
   const masterGainDb = useDroneStore((state) => state.masterGainDb)
   const metronomeEnabled = useDroneStore((state) => state.metronomeEnabled)
+  const metronomeSyncEnabled = useDroneStore((state) => state.metronomeSyncEnabled)
   const metronomeBpm = useDroneStore((state) => state.metronomeBpm)
   const metronomeVolumeDb = useDroneStore((state) => state.metronomeVolumeDb)
   const metronomeMuted = useDroneStore((state) => state.metronomeMuted)
@@ -255,9 +256,6 @@ function App() {
   const saveDroneState = useDroneStore((state) => state.saveDroneState)
   const saveAsPreset = useDroneStore((state) => state.saveAsPreset)
   const loadPreset = useDroneStore((state) => state.loadPreset)
-  const setTransportMarkerMetronomeSync = useDroneStore(
-    (state) => state.setTransportMarkerMetronomeSync,
-  )
   const setPresetMetronomeSync = useDroneStore((state) => state.setPresetMetronomeSync)
   const importSong = useDroneStore((state) => state.importSong)
   const importSongLibrary = useDroneStore((state) => state.importSongLibrary)
@@ -292,12 +290,10 @@ function App() {
         isActive: navigationEntryKey(entry) === activeNavigationKey,
         isTransport,
         metronomeSyncEnabled: isTransport
-          ? entry.kind === 'transport' && entry.metronomeSyncEnabled === true
+          ? metronomeSyncEnabled
           : preset?.metronomeSyncEnabled === true,
         metronomeLit: isTransport
-          ? entry.kind === 'transport' &&
-            entry.metronomeSyncEnabled === true &&
-            transportMarkerHasActiveFollowingClick(enabledNav, presets, entry.id)
+          ? metronomeSyncEnabled
           : preset?.metronomeSyncEnabled === true,
         showMetronomeSync: isTransport
           ? true
@@ -330,6 +326,7 @@ function App() {
     loopFeaturesEnabled,
     loopSlots,
     metronomeBpm,
+    metronomeSyncEnabled,
     presetNavigation,
     presets,
     songLibrary,
@@ -1245,27 +1242,27 @@ function App() {
   const handleMetronomeSyncChange = useCallback(
     (enabled: boolean) => {
       setMetronomeSyncEnabled(enabled)
-      if (enabled && playing) {
-        if (useDroneStore.getState().metronomeMuted) {
-          setMetronomeMuted(false)
-        }
-        metronomeEngine.prepareContext()
-        setMetronomeEnabled(true)
+      if (!enabled) {
+        return
+      }
+      const state = useDroneStore.getState()
+      if (isTransportMarkerKey(state.activeNavigationKey, state.presetNavigation)) {
+        metronomeEngine.stopFromGesture()
+        setMetronomeEnabled(false)
+        return
+      }
+      if (playing) {
+        syncClickWithTransportPlayState(true)
       }
     },
-    [playing, setMetronomeEnabled, setMetronomeMuted, setMetronomeSyncEnabled],
+    [playing, setMetronomeEnabled, setMetronomeSyncEnabled],
   )
 
   const handleTransportMarkerMetronomeSyncChange = useCallback(
-    (markerId: string, enabled: boolean) => {
-      setTransportMarkerMetronomeSync(markerId, enabled)
-      if (!enabled || activeNavigationKey !== markerId) {
-        return
-      }
-      metronomeEngine.stopFromGesture()
-      setMetronomeEnabled(false)
+    (_markerId: string, enabled: boolean) => {
+      handleMetronomeSyncChange(enabled)
     },
-    [activeNavigationKey, setMetronomeEnabled, setTransportMarkerMetronomeSync],
+    [handleMetronomeSyncChange],
   )
 
   const handlePresetMetronomeSyncChange = useCallback(
@@ -1274,27 +1271,12 @@ function App() {
       const onThisPreset =
         activePresetId === presetId &&
         !isTransportMarkerKey(activeNavigationKey, useDroneStore.getState().presetNavigation)
-      if (!onThisPreset) {
+      if (!onThisPreset || !playing) {
         return
       }
-      if (enabled) {
-        if (playing) {
-          applyClickSyncForPreset(presetId)
-        }
-        return
-      }
-      if (playing && !useDroneStore.getState().metronomeSyncEnabled) {
-        metronomeEngine.stopFromGesture()
-        setMetronomeEnabled(false)
-      }
+      applyClickSyncForPreset(presetId)
     },
-    [
-      activeNavigationKey,
-      activePresetId,
-      playing,
-      setMetronomeEnabled,
-      setPresetMetronomeSync,
-    ],
+    [activeNavigationKey, activePresetId, playing, setPresetMetronomeSync],
   )
 
   const handleHomeItemMetronomeSyncChange = useCallback(

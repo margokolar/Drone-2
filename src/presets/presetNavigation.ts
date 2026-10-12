@@ -160,6 +160,25 @@ export function hasTransportClickSync(navigation: PresetNavigationEntry[]): bool
   return navigation.some((entry) => entry.kind === 'transport' && entry.metronomeSyncEnabled === true)
 }
 
+/** Stamp every play/pause marker so it matches the Click tab SYNC switch. */
+export function withMirroredClickSync(
+  navigation: PresetNavigationEntry[],
+  enabled: boolean,
+): PresetNavigationEntry[] {
+  let changed = false
+  const next = navigation.map((entry) => {
+    if (entry.kind !== 'transport') {
+      return entry
+    }
+    if (entry.metronomeSyncEnabled === enabled) {
+      return entry
+    }
+    changed = true
+    return { ...entry, metronomeSyncEnabled: enabled }
+  })
+  return changed ? next : navigation
+}
+
 /** True when this preset sits after a play/pause marker that has SYNC on, before the next marker. */
 export function isPresetInClickSyncSegment(
   navigation: PresetNavigationEntry[],
@@ -246,6 +265,11 @@ export function isPresetClickSyncEnabled(
     return false
   }
   return presets.some((preset) => preset.id === presetId && preset.metronomeSyncEnabled === true)
+}
+
+/** Click tab SYNC and play/pause marker SYNC are the same switch. */
+export function shouldClickFollowTransport(options: { metronomeSyncEnabled: boolean }): boolean {
+  return options.metronomeSyncEnabled
 }
 
 export function hasPresetLoopSync(presets: Preset[]): boolean {
