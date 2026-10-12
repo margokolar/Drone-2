@@ -38,15 +38,17 @@ for d in devices:
         continue
     if hw.get("platform") != "iOS":
         continue
-    if conn.get("tunnelState") != "connected":
+    if conn.get("tunnelState") == "unavailable":
         continue
-    identifier = d.get("identifier", "")
+    identifier = hw.get("udid") or d.get("identifier", "")
     if not identifier:
         continue
-    candidates.append((0 if hw.get("deviceType") == "iPhone" else 1, identifier))
+    iphone = 0 if hw.get("deviceType") == "iPhone" else 1
+    wired = 0 if conn.get("transportType") == "wired" else 1
+    candidates.append((iphone, wired, identifier))
 candidates.sort()
 if candidates:
-    print(candidates[0][1])
+    print(candidates[0][2])
 EOF
   rm -f "$device_json"
 }
