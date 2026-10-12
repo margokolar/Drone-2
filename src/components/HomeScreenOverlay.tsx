@@ -165,7 +165,10 @@ export function HomeScreenOverlay({
         >
           <MetronomeIcon className="h-full w-full" />
         </button>
-        {largeMetroBpm != null ? (
+        {largeMetroBpm != null &&
+        !unsyncedLiveClick &&
+        !activeItem.isTransport &&
+        activeItem.metronomeSyncEnabled === true ? (
           <span
             className={clsx(
               'flex h-[0.58em] shrink-0 items-center text-[0.58em] font-bold tabular-nums leading-none',
@@ -284,7 +287,6 @@ export function HomeScreenOverlay({
               isTransport={item.isTransport}
               metronomeSyncEnabled={item.metronomeSyncEnabled}
               metronomeLit={item.metronomeLit}
-              metronomeBpm={item.metronomeBpm}
               shineEnabled={item.shineEnabled}
               loopSyncEnabled={item.loopSyncEnabled}
               loopSyncSlot={item.loopSyncSlot}

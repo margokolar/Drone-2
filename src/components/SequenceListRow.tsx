@@ -6,9 +6,6 @@ import { ShineListButton } from './ShineListButton'
 import { PlayPauseIcon } from './PlayPauseIcon'
 import { PLAY_PAUSE_SEQUENCE_LABEL } from '../utils/nowPlayingLabels'
 
-/** Preset-list BPM column width: three tabular digits, measured as 444. */
-const LIST_BPM_WIDTH_SAMPLE = '444'
-
 type SequenceListRowProps = {
   number: number
   name: string
@@ -16,7 +13,6 @@ type SequenceListRowProps = {
   isTransport?: boolean
   metronomeSyncEnabled?: boolean
   metronomeLit?: boolean
-  metronomeBpm?: number
   shineEnabled?: boolean
   loopSyncEnabled?: boolean
   loopSyncSlot?: LoopSlot | null
@@ -36,7 +32,6 @@ export function SequenceListRow({
   isTransport = false,
   metronomeSyncEnabled = false,
   metronomeLit,
-  metronomeBpm,
   shineEnabled = false,
   loopSyncEnabled = false,
   loopSyncSlot = null,
@@ -105,28 +100,6 @@ export function SequenceListRow({
         ariaLabel={shineEnabled ? 'Open Shine. Shine is on.' : 'Open Shine.'}
       />
     ) : null
-  const bpmSlot =
-    !showTransport && (onToggleMetronomeSync || shineButton) ? (
-      <span
-        className={clsx(
-          'relative flex h-[22px] shrink-0 items-center justify-end text-[22px] font-semibold tabular-nums leading-none',
-          onToggleMetronomeSync && metronomeBpm != null
-            ? metronomeSyncEnabled
-              ? isActive
-                ? 'text-fuchsia-100'
-                : 'text-fuchsia-100/75'
-              : 'text-white/40'
-            : 'text-transparent',
-        )}
-      >
-        <span className="invisible select-none" aria-hidden>
-          {LIST_BPM_WIDTH_SAMPLE}
-        </span>
-        {onToggleMetronomeSync && metronomeBpm != null ? (
-          <span className="absolute inset-0 flex items-center justify-end">{Math.round(metronomeBpm)}</span>
-        ) : null}
-      </span>
-    ) : null
   const loopButton = onToggleLoopSync ? (
     <LoopSyncButton
       enabled={loopSyncEnabled}
@@ -154,7 +127,6 @@ export function SequenceListRow({
     shineButton || onToggleMetronomeSync || loopButton ? (
       <div className="ml-auto flex h-9 shrink-0 items-center gap-1.5">
         {shineButton}
-        {bpmSlot}
         {onToggleMetronomeSync ? (
           <ClickSyncButton
             enabled={metroLit}
