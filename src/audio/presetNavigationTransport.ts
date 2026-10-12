@@ -1,6 +1,5 @@
 import {
   getEnabledNavigationEntries,
-  hasPresetLoopSync,
   hasTransportClickSync,
   isPresetClickSyncEnabled,
   isTransportMarkerClickSyncEnabled,
@@ -100,11 +99,9 @@ function applyClickSyncForTransport(playing: boolean, markerId?: string): void {
 
 /** True after the loop was started because a play/pause marker coupled it to playback. */
 let loopFollowsTransport = false
-let pendingLoopQuantize: { presetId: string; startPlayback: boolean } | null = null
 let loopStartGeneration = 0
 
 export function cancelPendingLoopQuantize(): void {
-  pendingLoopQuantize = null
   loopStartGeneration += 1
   loopEngine.cancelScheduledCycleStart()
 }
@@ -119,16 +116,10 @@ function resolvePlaybackLoopSlot(presetId?: string): LoopSlot | null {
   if (!state.loopFeaturesEnabled) {
     return null
   }
-  if (hasPresetLoopSync(state.presets)) {
-    const id = presetId ?? state.activePresetId
-    const slot = presetLoopSyncSlot(state.presets.find((preset) => preset.id === id))
-    if (slot == null) {
-      return null
-    }
-    return loopSlotFileName(state.loopSlots, slot) ? slot : null
-  }
-  if (!state.loopSyncEnabled) {
-    return null
+  const id = presetId ?? state.activePresetId
+  const presetSlot = presetLoopSyncSlot(state.presets.find((preset) => preset.id === id))
+  if (presetSlot != null) {
+    return loopSlotFileName(state.loopSlots, presetSlot) ? presetSlot : null
   }
   return loopSlotFileName(state.loopSlots, state.activeLoopSlot) ? state.activeLoopSlot : null
 }
@@ -196,7 +187,7 @@ function startSyncedLoop(restart: boolean, onStarted?: () => void, presetId?: st
 function stopSyncedLoop(): void {
   loopFollowsTransport = false
   cancelPendingLoopQuantize()
-  loopEngine.stopFromGesture()
+  loopEngine.stopNow()
   useDroneStore.getState().setLoopEnabled(false)
 }
 
@@ -235,37 +226,6 @@ function startPresetPlayback(config: DroneRuntimeConfig): void {
   syncMediaSessionPlaying()
 }
 
-function startLoopThenDrone(config: DroneRuntimeConfig, presetId: string): void {
-  droneEngine.prepareContextForGesture()
-  loopEngine.prepareContext()
-  const slot = resolvePlaybackLoopSlot(presetId)
-  const restart = slot == null || !sameLoopIsCycling(slot)
-  startSyncedLoop(restart, () => {
-    startPresetPlayback(config)
-    syncClickWithTransportPlayState(true)
-    applyClickSyncForPreset(presetId)
-  }, presetId)
-}
-
-/** Play the current tone at the next loop start when sync is on and a cycle is already running. */
-export function playLoopSyncedTransport(config: DroneRuntimeConfig): void {
-  cancelPendingLoopQuantize()
-  droneEngine.prepareContextForGesture()
-  loopEngine.prepareContext()
-  const loopAlreadyCycling = loopEngine.isCycling()
-  const startNow = () => {
-    startSyncedLoop(!loopAlreadyCycling, () => {
-      startPresetPlayback(config)
-      syncClickWithTransportPlayState(true)
-    })
-  }
-  if (loopAlreadyCycling) {
-    loopEngine.scheduleAtNextCycleStart(startNow)
-    return
-  }
-  startNow()
-}
-
 /** Transport play/pause button and remotes: keep click in step when SYNC is on. */
 export function syncClickWithTransportPlayState(playing: boolean): void {
   if (playing) {
@@ -281,7 +241,7 @@ export function syncClickWithTransportPlayState(playing: boolean): void {
   stopSyncedClick()
 }
 
-/** Transport play/pause: keep the WAV loop in step when a preset (or global SYNC) wants it. */
+/** Transport play/pause: start or stop the loaded loop immediately with the drones. */
 export function syncLoopWithTransportPlayState(playing: boolean): void {
   if (playing) {
     if (!shouldStartLoopWithCurrentItem()) {
@@ -337,37 +297,16 @@ function applyPresetFromNavigationNow(presetId: string, startPlayback: boolean):
     applyClickSyncForPreset(presetId)
     return
   }
-  const freshConfig = buildRuntimeConfigFromStore(useDroneStore.getState())
-  if (shouldLoopSyncForPreset(presetId)) {
-    startLoopThenDrone(freshConfig, presetId)
-    return
-  }
-  startPresetPlayback(freshConfig)
+  startPresetPlayback(buildRuntimeConfigFromStore(useDroneStore.getState()))
   applyClickSyncForPreset(presetId)
 }
 
 function applyPresetFromNavigation(presetId: string, startPlayback = false): void {
   cancelPendingLoopQuantize()
-  const willPlay = startPlayback || useDroneStore.getState().playing
-  if (shouldLoopSyncForPreset(presetId) && willPlay && loopEngine.isCycling()) {
-    pendingLoopQuantize = { presetId, startPlayback }
-    useDroneStore.setState({ activeNavigationKey: presetId })
-    droneEngine.prepareContextForGesture()
-    loopEngine.prepareContext()
-    loopEngine.scheduleAtNextCycleStart(() => {
-      const pending = pendingLoopQuantize
-      pendingLoopQuantize = null
-      if (!pending) {
-        return
-      }
-      applyPresetFromNavigationNow(pending.presetId, pending.startPlayback)
-    })
-    return
-  }
   applyPresetFromNavigationNow(presetId, startPlayback)
 }
 
-/** Load a preset from the list or home screen, waiting for the loop start when sync is on. */
+/** Load a preset from the list or home screen. */
 export function activatePresetFromNavigation(presetId: string, startPlayback = false): void {
   applyPresetFromNavigation(presetId, startPlayback)
 }

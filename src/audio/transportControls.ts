@@ -1,9 +1,7 @@
 import { droneEngine } from './DroneEngine'
 import type { DroneRuntimeConfig } from './types'
 import {
-  playLoopSyncedTransport,
   playNextPresetFromTransportMarker,
-  shouldStartLoopWithCurrentItem,
   stepPresetNavigation,
   syncClickWithTransportPlayState,
   syncLoopWithTransportPlayState,
@@ -43,10 +41,6 @@ export function transportPlay(config: DroneRuntimeConfig): void {
     playNextPresetFromTransportMarker()
     return
   }
-  if (shouldStartLoopWithCurrentItem()) {
-    playLoopSyncedTransport(config)
-    return
-  }
   droneEngine.setPlaybackIntent(true)
   droneEngine.markGesturePlaybackStarted()
   if (droneEngine.canFastResume()) {
@@ -70,10 +64,6 @@ export function transportPlayFromRemote(config: DroneRuntimeConfig): void {
   }
   if (isOnTransportMarker()) {
     playNextPresetFromTransportMarker()
-    return
-  }
-  if (shouldStartLoopWithCurrentItem()) {
-    playLoopSyncedTransport(config)
     return
   }
   droneEngine.setPlaybackIntent(true)
@@ -129,10 +119,6 @@ export function transportTogglePlay(config: DroneRuntimeConfig): void {
 }
 
 export function transportResume(config: DroneRuntimeConfig): void {
-  if (shouldStartLoopWithCurrentItem()) {
-    playLoopSyncedTransport(config)
-    return
-  }
   droneEngine.setPlaybackIntent(true)
   droneEngine.fastResume(config)
   useDroneStore.getState().setPlaying(true)
