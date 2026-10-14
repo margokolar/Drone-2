@@ -94,12 +94,13 @@ final class DroneSynthEngine {
     private var metroMuted = false
     private var metroPeak = 0.5
     private var metroBpm = 72.0
-    /// Samples until the next metronome click. 0 = click on this sample.
-    private var metroCountdown = 0
     var metroBeatHandler: (() -> Void)?
     var loopEndedHandler: (() -> Void)?
     private var clickPlayer: AVAudioPlayerNode?
     private var clickFormat: AVAudioFormat?
+    private var metroClickBuffer: AVAudioPCMBuffer?
+    private var metroNextSampleTime: AVAudioFramePosition = 0
+    private var metroTimer: DispatchSourceTimer?
     private var fileLoopPlayer: AVAudioPlayerNode?
     private var fileLoopFormat: AVAudioFormat?
     private var fileLoopBuffer: AVAudioPCMBuffer?
@@ -346,6 +347,7 @@ final class DroneSynthEngine {
         fileLoopPlaying = false
         fileLoopStopAtEnd = false
         lock.unlock()
+        stopMetroScheduler()
         clickPlayer?.stop()
         fileLoopPlayer?.stop()
         Self.publishNowPlaying(playing: false)
@@ -699,20 +701,10 @@ final class DroneSynthEngine {
         metroMuted = muted
         metroPeak = peak
         metroBpm = tempo
-        if !enabled {
-            metroCountdown = 0
-        } else if !wasOn {
-            let sr = max(1000, sampleRate)
-            metroCountdown = max(1, Int(0.03 * sr))
-        } else if abs(previousBpm - tempo) > 0.2, metroCountdown > 0 {
-            let sr = max(1000, sampleRate)
-            let oldPeriod = max(1, sr * 60.0 / max(30, previousBpm))
-            let newPeriod = max(1, sr * 60.0 / tempo)
-            metroCountdown = max(0, Int(Double(metroCountdown) / oldPeriod * newPeriod))
-        }
         lock.unlock()
         let apply = {
             if !enabled {
+                self.stopMetroScheduler()
                 self.clickPlayer?.stop()
                 Self.publishNowPlaying(playing: self.isAudible)
                 return
@@ -723,6 +715,22 @@ final class DroneSynthEngine {
             } catch {
                 NSLog("DroneSynth metronome start failed: \(error.localizedDescription)")
             }
+            self.ensureMetroClickBuffer()
+            self.clickPlayer?.volume = muted ? 0 : Float(peak)
+            let sr = max(1000, self.sampleRate)
+            if !wasOn || self.clickPlayer?.isPlaying != true {
+                self.clickPlayer?.stop()
+                self.metroNextSampleTime = 0
+                self.clickPlayer?.play()
+            } else if abs(previousBpm - tempo) > 0.2, self.metroNextSampleTime > 0 {
+                let now = self.metroNowSampleTime()
+                let remaining = max(0, self.metroNextSampleTime - now)
+                let oldPeriod = max(1, sr * 60.0 / max(30, previousBpm))
+                let newPeriod = max(1, sr * 60.0 / tempo)
+                self.metroNextSampleTime = now + AVAudioFramePosition(Double(remaining) / oldPeriod * newPeriod)
+            }
+            self.startMetroScheduler()
+            self.scheduleMetroAhead()
             Self.publishNowPlaying(playing: self.isAudible)
         }
         if Thread.isMainThread {
@@ -1414,19 +1422,8 @@ final class DroneSynthEngine {
         let floatsInFirst = Int(first.mDataByteSize) / MemoryLayout<Float>.stride
         let usePlanar = planarRight != nil
         let useInterleaved = !usePlanar && floatsInFirst >= frameCount * 2
-        var metroBeats = 0
 
         for frame in 0..<frameCount {
-            if metroEnabled {
-                if metroCountdown <= 0 {
-                    if !metroMuted {
-                        armClickLocked(frequency: 1240, peak: metroPeak)
-                    }
-                    metroCountdown = max(1, Int(sr * 60.0 / max(30, min(404, metroBpm))))
-                    metroBeats += 1
-                }
-                metroCountdown -= 1
-            }
             if masterInc != 0 {
                 master += masterInc
                 if (masterInc > 0 && master >= masterTarget) || (masterInc < 0 && master <= masterTarget) {
@@ -1549,13 +1546,124 @@ final class DroneSynthEngine {
                 left[frame] = (outL + outR) * 0.5
             }
         }
-        if metroBeats > 0, let handler = metroBeatHandler {
-            let count = metroBeats
-            DispatchQueue.main.async {
-                for _ in 0..<count {
-                    handler()
+    }
+
+    private func startMetroScheduler() {
+        if metroTimer != nil { return }
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now(), repeating: .milliseconds(25), leeway: .milliseconds(5))
+        timer.setEventHandler { [weak self] in
+            self?.scheduleMetroAhead()
+        }
+        metroTimer = timer
+        timer.resume()
+    }
+
+    private func stopMetroScheduler() {
+        metroTimer?.cancel()
+        metroTimer = nil
+    }
+
+    private func metroNowSampleTime() -> AVAudioFramePosition {
+        if let player = clickPlayer,
+           let nodeTime = player.lastRenderTime,
+           nodeTime.isSampleTimeValid,
+           let playerTime = player.playerTime(forNodeTime: nodeTime),
+           playerTime.isSampleTimeValid {
+            return playerTime.sampleTime
+        }
+        return 0
+    }
+
+    private func metroTime(forSample tick: AVAudioFramePosition, rate sr: Double) -> AVAudioTime? {
+        guard let player = clickPlayer,
+              let last = player.lastRenderTime,
+              last.isSampleTimeValid,
+              let playerTime = player.playerTime(forNodeTime: last),
+              playerTime.isSampleTimeValid
+        else {
+            return nil
+        }
+        if last.isHostTimeValid {
+            let deltaSeconds = Double(tick - playerTime.sampleTime) / sr
+            let host = last.hostTime &+ AVAudioTime.hostTime(forSeconds: deltaSeconds)
+            return AVAudioTime(hostTime: host, sampleTime: tick, atRate: sr)
+        }
+        return AVAudioTime(sampleTime: tick, atRate: sr)
+    }
+
+    private func ensureMetroClickBuffer() {
+        let format = clickFormat ?? AVAudioFormat(standardFormatWithSampleRate: max(1000, sampleRate), channels: 2)
+        guard let format, format.channelCount >= 1 else { return }
+        if let existing = metroClickBuffer, existing.format.sampleRate == format.sampleRate {
+            return
+        }
+        let clickFrames = max(64, Int(0.05 * format.sampleRate))
+        guard
+            let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(clickFrames)),
+            let channels = buffer.floatChannelData
+        else {
+            return
+        }
+        buffer.frameLength = AVAudioFrameCount(clickFrames)
+        let rate = Float(format.sampleRate)
+        let channelCount = Int(format.channelCount)
+        let interleaved = format.isInterleaved
+        for i in 0..<clickFrames {
+            let env = powf(1 - Float(i) / Float(max(1, clickFrames)), 1.8)
+            let sample = sinf(2 * Float.pi * 1240 * Float(i) / rate) * env
+            if interleaved {
+                for ch in 0..<channelCount {
+                    channels[0][i * channelCount + ch] = sample
+                }
+            } else {
+                for ch in 0..<channelCount {
+                    channels[ch][i] = sample
                 }
             }
+        }
+        metroClickBuffer = buffer
+    }
+
+    private func scheduleMetroAhead() {
+        lock.lock()
+        let enabled = metroEnabled
+        let muted = metroMuted
+        let bpm = metroBpm
+        let peak = Float(min(1, max(0, metroPeak)))
+        lock.unlock()
+        guard enabled, let player = clickPlayer else { return }
+        ensureMetroClickBuffer()
+        guard let buffer = metroClickBuffer else { return }
+        player.volume = muted ? 0 : peak
+        if player.isPlaying != true {
+            player.play()
+        }
+        let sr = max(1000, sampleRate)
+        guard player.lastRenderTime != nil else { return }
+        let now = metroNowSampleTime()
+        if metroNextSampleTime == 0 {
+            metroNextSampleTime = now + AVAudioFramePosition(0.03 * sr)
+        }
+        let period = max(1, AVAudioFramePosition(sr * 60.0 / max(30, min(404, bpm))))
+        let ahead = AVAudioFramePosition(sr * 0.25)
+        let slack = AVAudioFramePosition(sr * 0.008)
+        while metroNextSampleTime < now + ahead {
+            let tick = metroNextSampleTime
+            if tick >= now - slack, let time = metroTime(forSample: tick, rate: sr) {
+                player.scheduleBuffer(buffer, at: time, options: [])
+                let delay = Double(tick - now) / sr
+                DispatchQueue.main.asyncAfter(deadline: .now() + max(0, delay)) { [weak self] in
+                    guard let self else { return }
+                    self.lock.lock()
+                    let stillOn = self.metroEnabled
+                    self.lock.unlock()
+                    if stillOn {
+                        self.metroBeatHandler?()
+                    }
+                }
+            }
+            metroNextSampleTime += period
         }
     }
 
