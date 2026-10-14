@@ -4,7 +4,9 @@ import { DroneSynth } from '../native/droneSynth'
 import { MAX_METRONOME_BPM, MIN_METRONOME_BPM } from '../presets/defaultPresets'
 
 const LOOKAHEAD_MS = 25
-const SCHEDULE_AHEAD_SECONDS = 0.15
+const SCHEDULE_AHEAD_SECONDS = 0.25
+/** Play a slightly late tick; skip farther-behind ones so a JS stall does not burst. */
+const LATE_TICK_SLACK_SECONDS = 0.008
 
 type MetronomeConfig = {
   enabled: boolean
@@ -119,13 +121,13 @@ export class MetronomeEngine {
   }
 
   private startJsScheduler(clockNow: number): void {
-    if (this.schedulerTimer !== null) {
-      return
+    if (this.schedulerTimer === null) {
+      this.nextTickAt = clockNow + 0.03
+      this.schedulerTimer = window.setInterval(() => {
+        this.scheduleTicks()
+      }, LOOKAHEAD_MS)
     }
-    this.nextTickAt = clockNow + 0.03
-    this.schedulerTimer = window.setInterval(() => {
-      this.scheduleTicks()
-    }, LOOKAHEAD_MS)
+    this.scheduleTicks()
   }
 
   private async ensureNativeBeatListener(): Promise<void> {
@@ -174,7 +176,9 @@ export class MetronomeEngine {
     const secondsPerBeat = 60 / bpm
     const now = this.audioClock()
     while (this.nextTickAt < now + SCHEDULE_AHEAD_SECONDS) {
-      this.playClickAt(this.nextTickAt)
+      if (this.nextTickAt >= now - LATE_TICK_SLACK_SECONDS) {
+        this.playClickAt(Math.max(this.nextTickAt, now))
+      }
       this.nextTickAt += secondsPerBeat
     }
   }
