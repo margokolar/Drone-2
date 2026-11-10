@@ -298,7 +298,7 @@ export function PresetList({
                 'rounded-xl border px-3 transition',
                 isCollapsed ? 'py-1.5' : 'py-2',
                 isActive
-                  ? 'border-fuchsia-300/70 bg-fuchsia-300/20 shadow-[0_0_18px_rgba(240,171,252,0.16)]'
+                  ? 'border-amber-300/70 bg-amber-300/15 shadow-[0_0_18px_rgba(251,191,36,0.12)]'
                   : 'border-white/10 bg-white/5 hover:bg-white/10',
                 !isNavigationEnabled && 'opacity-55',
                 !isEditing && 'cursor-pointer',
@@ -353,7 +353,7 @@ export function PresetList({
                             commitRename(preset.id)
                           }
                         }}
-                        className="min-h-8 w-full appearance-none rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-lg font-semibold leading-tight text-white outline-none focus:border-fuchsia-300/50 [user-select:text] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
+                        className="min-h-8 w-full appearance-none rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-lg font-semibold leading-tight text-white outline-none focus:border-amber-300/50 [user-select:text] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
                         aria-label="Preset title"
                         autoComplete="off"
                         autoCorrect="off"
@@ -414,7 +414,7 @@ export function PresetList({
                       checked={isNavigationEnabled}
                       onToggle={() => onToggleNavigationEnabled(preset.id)}
                       buttonClassName={navigationToggleButtonClass}
-                      accentColor="fuchsia"
+                      accentColor="amber"
                       ariaLabelWhenChecked="Disable preset in prev/next navigation"
                       ariaLabelWhenUnchecked="Enable preset in prev/next navigation"
                     />
@@ -434,7 +434,7 @@ export function PresetList({
                       event.stopPropagation()
                       commitRename(preset.id)
                     }}
-                    className="flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-fuchsia-300/50 bg-fuchsia-300/20 p-1.5 text-fuchsia-100 transition hover:bg-fuchsia-300/30"
+                    className="flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-amber-300/50 bg-amber-300/20 p-1.5 text-amber-100 transition hover:bg-amber-300/30"
                     aria-label="Save preset title"
                   >
                     <Check size={16} />

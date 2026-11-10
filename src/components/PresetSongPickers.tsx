@@ -25,9 +25,6 @@ export function PresetSongPickers({
   songItems,
   onSelectSong,
 }: PresetSongPickersProps) {
-  const selectedPreset = presetItems.find((item) => item.id === selectedPresetKey)
-  const presetIsTransport = selectedPreset?.kind === 'transport'
-
   return (
     <div className="mx-auto mt-3 grid max-w-[26.5rem] grid-cols-2 gap-3 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem]">
       <article className="relative min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/55 p-3 shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-sm">
@@ -52,7 +49,7 @@ export function PresetSongPickers({
           items={presetItems}
           onSelect={onSelectPreset}
           appearance="select"
-          accent={presetIsTransport ? 'amber' : 'fuchsia'}
+          accent="amber"
           openAriaLabel="Open preset list"
         />
       </article>

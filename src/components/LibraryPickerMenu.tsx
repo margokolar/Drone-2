@@ -55,6 +55,11 @@ const SELECT_TRIGGER_BOX_CLASS: Record<LibraryPickerAccent, string> = {
   cyan: 'border-cyan-300/70 bg-cyan-300/15 hover:bg-cyan-300/25 focus:border-cyan-300/80',
   amber: 'border-amber-300/70 bg-amber-300/15 hover:bg-amber-300/25 focus:border-amber-300/80',
 }
+const SELECT_ITEM_SELECTED_CLASS: Record<LibraryPickerAccent, string> = {
+  fuchsia: 'bg-fuchsia-300/20 text-fuchsia-100',
+  cyan: 'bg-cyan-300/15 text-cyan-100',
+  amber: 'bg-amber-300/15 text-amber-100',
+}
 const COMPACT_ITEM_CLASS = 'block w-full rounded-md px-2 py-1.5 text-left text-sm transition'
 const SELECT_ITEM_CLASS =
   'flex w-full min-h-[48px] items-center gap-3 whitespace-nowrap rounded-lg px-4 py-3 text-left text-xl leading-none transition'
@@ -264,10 +269,8 @@ export function LibraryPickerMenu({
                   isSelectAppearance
                     ? isSelected
                       ? isTransport
-                        ? 'bg-amber-300/15 text-amber-100'
-                        : accent === 'cyan'
-                          ? 'bg-cyan-300/15 text-cyan-100'
-                          : 'bg-fuchsia-300/20 text-fuchsia-100'
+                        ? SELECT_ITEM_SELECTED_CLASS.amber
+                        : SELECT_ITEM_SELECTED_CLASS[accent]
                       : isTransport
                         ? 'text-amber-100 hover:bg-white/10'
                         : 'text-white/90 hover:bg-white/10'
