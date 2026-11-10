@@ -11,6 +11,7 @@
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
+		E8F0A1B21C3D4E5F60718294 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F0A1B21C3D4E5F60718293 /* SceneDelegate.swift */; };
 		A1B2C3D41E5F600100AA01 /* AudioSessionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41E5F600200AA02 /* AudioSessionPlugin.swift */; };
 		B3C4D5E61F5F700100CC01 /* MidiPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E61F5F700200CC02 /* MidiPlugin.swift */; };
 		D7E8F9A01B9D800100FF01 /* LoopFilePickerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7E8F9A01B9D800200FF02 /* LoopFilePickerPlugin.swift */; };
@@ -28,6 +29,7 @@
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		E8F0A1B21C3D4E5F60718293 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		A1B2C3D41E5F600200AA02 /* AudioSessionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSessionPlugin.swift; sourceTree = "<group>"; };
 		B3C4D5E61F5F700200CC02 /* MidiPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MidiPlugin.swift; sourceTree = "<group>"; };
 		D7E8F9A01B9D800200FF02 /* LoopFilePickerPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopFilePickerPlugin.swift; sourceTree = "<group>"; };
@@ -76,6 +78,7 @@
 			children = (
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				E8F0A1B21C3D4E5F60718293 /* SceneDelegate.swift */,
 				A1B2C3D41E5F600200AA02 /* AudioSessionPlugin.swift */,
 				C5D6E7F81A8C010200EE02 /* DroneSynthEngine.swift */,
 				C5D6E7F81A8C010400EE04 /* DroneSynthPlugin.swift */,
@@ -175,6 +178,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				E8F0A1B21C3D4E5F60718294 /* SceneDelegate.swift in Sources */,
 				A1B2C3D41E5F600100AA01 /* AudioSessionPlugin.swift in Sources */,
 				C5D6E7F81A8C010100EE01 /* DroneSynthEngine.swift in Sources */,
 				C5D6E7F81A8C010300EE03 /* DroneSynthPlugin.swift in Sources */,
