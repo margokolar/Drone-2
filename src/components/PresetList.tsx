@@ -373,10 +373,10 @@ export function PresetList({
                   <>
                     {isPresetInClickSyncSegment(presetNavigation, preset.id) ? (
                       <ClickSyncButton
-                        enabled={preset.metronomeSyncEnabled === true}
+                        enabled={preset.metronomeSyncEnabled !== false}
                         onClick={(event) => {
                           event.stopPropagation()
-                          onSetPresetMetronomeSync(preset.id, preset.metronomeSyncEnabled !== true)
+                          onSetPresetMetronomeSync(preset.id, preset.metronomeSyncEnabled === false)
                         }}
                         inactiveClassName={
                           isActive
@@ -384,7 +384,7 @@ export function PresetList({
                             : 'border-white/10 bg-white/5 text-white/55 hover:bg-white/10'
                         }
                         ariaLabel={
-                          preset.metronomeSyncEnabled
+                          preset.metronomeSyncEnabled !== false
                             ? 'Disable click sync for this preset'
                             : 'Sync click start and stop with this preset'
                         }

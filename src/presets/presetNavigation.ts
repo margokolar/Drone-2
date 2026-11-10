@@ -256,6 +256,11 @@ export function applyDefaultPresetClickSync(
   return changed ? nextPresets : presets
 }
 
+/** A preset takes Play/Pause click unless it was explicitly turned off. */
+export function isPresetClickSyncOn(preset: Preset | undefined): boolean {
+  return preset?.metronomeSyncEnabled !== false
+}
+
 export function isPresetClickSyncEnabled(
   presets: Preset[],
   presetId: string,
@@ -264,12 +269,13 @@ export function isPresetClickSyncEnabled(
   if (!isPresetInClickSyncSegment(navigation, presetId)) {
     return false
   }
-  return presets.some((preset) => preset.id === presetId && preset.metronomeSyncEnabled === true)
+  return isPresetClickSyncOn(presets.find((preset) => preset.id === presetId))
 }
 
 /**
- * Click tab / play-marker SYNC is the master switch. A gray preset metronome
- * means this preset does not take the click with Play/Pause.
+ * Click tab / play-marker SYNC is the master switch. Play/Pause then starts
+ * and stops the click on a sounding preset. A gray preset metronome is an
+ * opt-out for that one preset only.
  */
 export function shouldClickFollowTransport(options: {
   metronomeSyncEnabled: boolean
@@ -284,11 +290,12 @@ export function shouldClickFollowTransport(options: {
   if (isTransportMarkerKey(options.activeNavigationKey, options.presetNavigation)) {
     return false
   }
-  if (hasTransportClickSync(options.presetNavigation)) {
-    return isPresetClickSyncEnabled(
-      options.presets,
-      options.activePresetId,
-      options.presetNavigation,
+  if (
+    hasTransportClickSync(options.presetNavigation) &&
+    isPresetInClickSyncSegment(options.presetNavigation, options.activePresetId)
+  ) {
+    return isPresetClickSyncOn(
+      options.presets.find((preset) => preset.id === options.activePresetId),
     )
   }
   return true

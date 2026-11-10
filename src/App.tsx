@@ -291,10 +291,10 @@ function App() {
         isTransport,
         metronomeSyncEnabled: isTransport
           ? metronomeSyncEnabled
-          : preset?.metronomeSyncEnabled === true,
+          : preset?.metronomeSyncEnabled !== false,
         metronomeLit: isTransport
           ? metronomeSyncEnabled
-          : preset?.metronomeSyncEnabled === true,
+          : preset?.metronomeSyncEnabled !== false,
         showMetronomeSync: isTransport
           ? true
           : isPresetInClickSyncSegment(presetNavigation, entry.presetId),
