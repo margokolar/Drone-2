@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_PRESETS, MAX_METRONOME_BPM, type Preset } from '../presets/defaultPresets'
+import {
+  DEFAULT_METRONOME_TEMPO_MEMORIES,
+  DEFAULT_PRESETS,
+  MAX_METRONOME_BPM,
+  type Preset,
+} from '../presets/defaultPresets'
 import { DRONE_STORE_PERSIST_VERSION, migratePersistedDroneState } from './useDroneStore'
 
 type Migrated = Record<string, unknown> & {
@@ -164,6 +169,22 @@ describe('damaged or very old saves', () => {
     expect(result.songLibrary).toHaveLength(1)
     expect(result.songLibrary[0].presets.length).toBe(result.presets.length)
     expect(result.presetNavigation.length).toBe(result.presets.length)
+  })
+
+  it('keeps click tempo memory slots and fills missing ones', () => {
+    expect(migrate(savedByUser, CURRENT - 1).metronomeTempoMemories).toEqual([
+      ...DEFAULT_METRONOME_TEMPO_MEMORIES,
+    ])
+    const fourSlotSave = [88, 9999]
+    const result = migrate({ ...savedByUser, metronomeTempoMemories: fourSlotSave }, CURRENT - 1)
+    expect(result.metronomeTempoMemories).toEqual([
+      40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 88, MAX_METRONOME_BPM, 180, 190,
+    ])
+    expect(migrate(result, CURRENT).metronomeTempoMemories).toEqual(result.metronomeTempoMemories)
+    expect(
+      migrate({ ...savedByUser, metronomeTempoMemories: [null, 170, null, 190] }, CURRENT - 1)
+        .metronomeTempoMemories,
+    ).toEqual([40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, null, 170, null, 190])
   })
 
   it('pulls out-of-range numbers back into range', () => {

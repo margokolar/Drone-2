@@ -13,9 +13,11 @@ export function ClickPanel({ onEnabledChange, onSyncChange }: ClickPanelProps) {
   const enabled = useDroneStore((state) => state.metronomeEnabled)
   const syncEnabled = useDroneStore((state) => state.metronomeSyncEnabled)
   const bpm = useDroneStore((state) => state.metronomeBpm)
+  const tempoMemories = useDroneStore((state) => state.metronomeTempoMemories)
   const volumeDb = useDroneStore((state) => state.metronomeVolumeDb)
   const muted = useDroneStore((state) => state.metronomeMuted)
   const setBpm = useDroneStore((state) => state.setMetronomeBpm)
+  const setTempoMemory = useDroneStore((state) => state.setMetronomeTempoMemory)
   const setVolumeDb = useDroneStore((state) => state.setMetronomeVolumeDb)
   const setMuted = useDroneStore((state) => state.setMetronomeMuted)
 
@@ -41,8 +43,10 @@ export function ClickPanel({ onEnabledChange, onSyncChange }: ClickPanelProps) {
         bpm={bpm}
         volumeDb={volumeDb}
         muted={muted}
+        tempoMemories={tempoMemories}
         onEnabledChange={onEnabledChange}
         onBpmChange={setBpm}
+        onTempoMemorySave={setTempoMemory}
         onVolumeChange={setVolumeDb}
         onMutedChange={setMuted}
       />

@@ -3,17 +3,19 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEv
 import { metronomeEngine } from '../audio/MetronomeEngine'
 import {
   DEFAULT_METRONOME_BPM,
+  DEFAULT_METRONOME_TEMPO_MEMORIES,
   DEFAULT_METRONOME_VOLUME_DB,
   MAX_METRONOME_BPM,
   MIN_METRONOME_BPM,
   MAX_METRONOME_VOLUME_DB,
   MIN_METRONOME_VOLUME_DB,
+  type MetronomeTempoMemory,
 } from '../presets/defaultPresets'
+import { METRONOME_LONG_PRESS_MS } from './ClickSyncButton'
 import { NumericValueField } from './NumericValueField'
 import { ResettableRangeInput } from './ResettableRangeInput'
 
-const TEMPO_PRESETS = Array.from({ length: 12 }, (_, index) => 40 + index * 10)
-const IOS_TEMPO_PRESET_ROW = [160, 170, 180, 190]
+const TEMPO_MEMORY_MULTI_CLICK_MS = 350
 const TAP_TEMPO_RESET_MS = 2000
 const TAP_TEMPO_MIN_BPM = MIN_METRONOME_BPM
 const TAP_TEMPO_MAX_BPM = MAX_METRONOME_BPM
@@ -28,10 +30,141 @@ type MetronomeControlsProps = {
   bpm: number
   volumeDb: number
   muted: boolean
+  tempoMemories: MetronomeTempoMemory[]
   onEnabledChange: (enabled: boolean) => void
   onBpmChange: (bpm: number) => void
   onVolumeChange: (db: number) => void
   onMutedChange: (muted: boolean) => void
+  onTempoMemorySave: (index: number, bpm: MetronomeTempoMemory) => void
+}
+
+function TempoMemoryButton({
+  slotIndex,
+  slotBpm,
+  defaultBpm,
+  currentBpm,
+  justSaved,
+  onRecall,
+  onSave,
+  onRestoreDefault,
+  onClear,
+}: {
+  slotIndex: number
+  slotBpm: MetronomeTempoMemory
+  defaultBpm: number
+  currentBpm: number
+  justSaved: boolean
+  onRecall: () => void
+  onSave: () => void
+  onRestoreDefault: () => void
+  onClear: () => void
+}) {
+  const longPressTimerRef = useRef<number | null>(null)
+  const longPressFiredRef = useRef(false)
+  const clickCountRef = useRef(0)
+  const clickTimerRef = useRef<number | null>(null)
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }
+  const clearClickTimer = () => {
+    if (clickTimerRef.current !== null) {
+      window.clearTimeout(clickTimerRef.current)
+      clickTimerRef.current = null
+    }
+  }
+  const resetClickCount = () => {
+    clearClickTimer()
+    clickCountRef.current = 0
+  }
+  useEffect(
+    () => () => {
+      if (longPressTimerRef.current !== null) {
+        window.clearTimeout(longPressTimerRef.current)
+      }
+      if (clickTimerRef.current !== null) {
+        window.clearTimeout(clickTimerRef.current)
+      }
+    },
+    [],
+  )
+  const isEmpty = slotBpm == null
+  const isActive = !isEmpty && Math.round(currentBpm) === slotBpm
+  const slotLabel = isEmpty ? `M${slotIndex + 1}` : String(slotBpm)
+  let presetClassName =
+    'button-safe min-h-[40px] select-none rounded-md border px-2 py-2 text-sm tabular-nums transition'
+  if (justSaved) {
+    presetClassName +=
+      ' border-fuchsia-100 bg-fuchsia-300/40 text-fuchsia-50 shadow-[0_0_16px_rgba(245,158,255,0.45)]'
+  } else if (isActive) {
+    presetClassName +=
+      ' border-fuchsia-300/70 bg-fuchsia-300/25 text-fuchsia-50 shadow-[0_0_0_1px_rgba(245,158,255,0.25)]'
+  } else if (isEmpty) {
+    presetClassName +=
+      ' border-fuchsia-300/25 bg-fuchsia-300/8 text-fuchsia-100/55 hover:border-fuchsia-300/40 hover:bg-fuchsia-300/14'
+  } else {
+    presetClassName +=
+      ' border-fuchsia-300/35 bg-fuchsia-300/12 text-fuchsia-100/85 hover:border-fuchsia-300/50 hover:bg-fuchsia-300/18'
+  }
+  return (
+    <button
+      type="button"
+      className={presetClassName}
+      onPointerDown={() => {
+        longPressFiredRef.current = false
+        clearLongPressTimer()
+        longPressTimerRef.current = window.setTimeout(() => {
+          longPressTimerRef.current = null
+          longPressFiredRef.current = true
+          resetClickCount()
+          onSave()
+        }, METRONOME_LONG_PRESS_MS)
+      }}
+      onPointerUp={clearLongPressTimer}
+      onPointerLeave={clearLongPressTimer}
+      onPointerCancel={clearLongPressTimer}
+      onContextMenu={(event) => {
+        event.preventDefault()
+      }}
+      onDoubleClick={(event) => {
+        event.preventDefault()
+      }}
+      onClick={(event) => {
+        if (longPressFiredRef.current) {
+          longPressFiredRef.current = false
+          event.preventDefault()
+          resetClickCount()
+          return
+        }
+        clickCountRef.current += 1
+        clearClickTimer()
+        if (clickCountRef.current >= 3) {
+          resetClickCount()
+          onClear()
+          return
+        }
+        clickTimerRef.current = window.setTimeout(() => {
+          const clickCount = clickCountRef.current
+          resetClickCount()
+          if (clickCount === 1 && !isEmpty) {
+            onRecall()
+          }
+          if (clickCount === 2) {
+            onRestoreDefault()
+          }
+        }, TEMPO_MEMORY_MULTI_CLICK_MS)
+      }}
+      aria-label={
+        isEmpty
+          ? `Empty tempo memory ${slotIndex + 1}. Long-press to save the current tempo. Double-click to restore ${defaultBpm}. Triple-click to clear.`
+          : `Recall ${slotBpm} BPM. Long-press to save the current tempo. Double-click to restore ${defaultBpm}. Triple-click to clear.`
+      }
+    >
+      {slotLabel}
+    </button>
+  )
 }
 
 export function MetronomeControls({
@@ -39,12 +172,16 @@ export function MetronomeControls({
   bpm,
   volumeDb,
   muted,
+  tempoMemories,
   onEnabledChange,
   onBpmChange,
   onVolumeChange,
   onMutedChange,
+  onTempoMemorySave,
 }: MetronomeControlsProps) {
   const [beatFlash, setBeatFlash] = useState(false)
+  const [justSavedMemoryIndex, setJustSavedMemoryIndex] = useState<number | null>(null)
+  const justSavedMemoryTimeoutRef = useRef<number | null>(null)
   const beatFlashTimeoutRef = useRef<number | null>(null)
   const tapTimesRef = useRef<number[]>([])
   const bpmRef = useRef(bpm)
@@ -114,6 +251,50 @@ export function MetronomeControls({
   })
 
   useEffect(() => stopTempoHold, [stopTempoHold])
+
+  const flashTempoMemory = useCallback((index: number) => {
+    setJustSavedMemoryIndex(index)
+    if (justSavedMemoryTimeoutRef.current !== null) {
+      window.clearTimeout(justSavedMemoryTimeoutRef.current)
+    }
+    justSavedMemoryTimeoutRef.current = window.setTimeout(() => {
+      justSavedMemoryTimeoutRef.current = null
+      setJustSavedMemoryIndex(null)
+    }, 700)
+  }, [])
+
+  const saveTempoMemory = useCallback(
+    (index: number) => {
+      onTempoMemorySave(index, Math.round(bpmRef.current))
+      flashTempoMemory(index)
+    },
+    [flashTempoMemory, onTempoMemorySave],
+  )
+
+  const restoreTempoMemory = useCallback(
+    (index: number) => {
+      onTempoMemorySave(index, DEFAULT_METRONOME_TEMPO_MEMORIES[index])
+      flashTempoMemory(index)
+    },
+    [flashTempoMemory, onTempoMemorySave],
+  )
+
+  const clearTempoMemory = useCallback(
+    (index: number) => {
+      onTempoMemorySave(index, null)
+      setJustSavedMemoryIndex(null)
+    },
+    [onTempoMemorySave],
+  )
+
+  useEffect(
+    () => () => {
+      if (justSavedMemoryTimeoutRef.current !== null) {
+        window.clearTimeout(justSavedMemoryTimeoutRef.current)
+      }
+    },
+    [],
+  )
 
   const handleTapTempo = () => {
     const now = performance.now()
@@ -247,37 +428,25 @@ export function MetronomeControls({
             aria-label="Tempo BPM. Double-click or double-tap to reset to default."
             className="h-2 w-full accent-fuchsia-300"
           />
-          <div className="mt-3">
-            <div className="grid grid-cols-4 gap-2">
-              {[...TEMPO_PRESETS, ...IOS_TEMPO_PRESET_ROW].map((presetBpm) => {
-                const isActive = Math.round(bpm) === presetBpm
-                const isIosOnly = IOS_TEMPO_PRESET_ROW.includes(presetBpm)
-                let presetClassName =
-                  'min-h-[40px] rounded-md border px-2 py-2 text-sm tabular-nums transition'
-                if (isIosOnly) {
-                  presetClassName += ' hidden ios-app:block'
-                }
-                if (isActive) {
-                  presetClassName +=
-                    ' border-fuchsia-300/70 bg-fuchsia-300/25 text-fuchsia-50 shadow-[0_0_0_1px_rgba(245,158,255,0.25)]'
-                }
-                if (!isActive) {
-                  presetClassName +=
-                    ' border-white/15 bg-white/10 text-white/80 hover:border-white/25 hover:bg-white/15'
-                }
-                return (
-                  <button
-                    key={presetBpm}
-                    type="button"
-                    className={presetClassName}
-                    onClick={() => onBpmChange(presetBpm)}
-                    aria-label={`Set tempo to ${presetBpm} BPM`}
-                  >
-                    {presetBpm}
-                  </button>
-                )
-              })}
-            </div>
+          <div className="mt-3 grid grid-cols-4 gap-2">
+            {tempoMemories.map((slotBpm, index) => (
+              <TempoMemoryButton
+                key={`tempo-memory-${index}`}
+                slotIndex={index}
+                slotBpm={slotBpm}
+                defaultBpm={DEFAULT_METRONOME_TEMPO_MEMORIES[index]}
+                currentBpm={bpm}
+                justSaved={justSavedMemoryIndex === index}
+                onRecall={() => {
+                  if (slotBpm != null) {
+                    onBpmChange(slotBpm)
+                  }
+                }}
+                onSave={() => saveTempoMemory(index)}
+                onRestoreDefault={() => restoreTempoMemory(index)}
+                onClear={() => clearTempoMemory(index)}
+              />
+            ))}
           </div>
         </div>
 

@@ -37,6 +37,9 @@ import {
   DEFAULT_TIMBRE_BLEND,
   DEFAULT_TONE_DETUNE_CENTS,
   DEFAULT_METRONOME_VOLUME_DB,
+  METRONOME_TEMPO_MEMORY_COUNT,
+  normalizeMetronomeTempoMemories,
+  type MetronomeTempoMemory,
   MAX_METRONOME_BPM,
   MAX_METRONOME_VOLUME_DB,
   MIN_METRONOME_BPM,
@@ -119,6 +122,7 @@ type DroneState = {
   shine: ShineConfig
   metronomeEnabled: boolean
   metronomeBpm: number
+  metronomeTempoMemories: MetronomeTempoMemory[]
   metronomeVolumeDb: number
   metronomeMuted: boolean
   /** When true, drone transport play/pause also starts/stops the click. */
@@ -193,6 +197,7 @@ type DroneState = {
   removeTonePartial: (noteId: NoteId, partialId: string) => void
   setMetronomeEnabled: (enabled: boolean) => void
   setMetronomeBpm: (bpm: number) => void
+  setMetronomeTempoMemory: (index: number, bpm: MetronomeTempoMemory) => void
   setMetronomeVolumeDb: (db: number) => void
   setMetronomeMuted: (muted: boolean) => void
   setMetronomeSyncEnabled: (enabled: boolean) => void
@@ -804,7 +809,7 @@ function resolveActivePresetId(presets: Preset[], activePresetId: string | undef
   return presets[0]?.id ?? INITIAL_PRESET.id
 }
 
-export const DRONE_STORE_PERSIST_VERSION = 30
+export const DRONE_STORE_PERSIST_VERSION = 31
 /** Entry glide cents switched polarity in this version; only older saves may be flipped. */
 const ENTRY_GLIDE_POLARITY_SWAP_VERSION = 13
 
@@ -915,6 +920,7 @@ export function migratePersistedDroneState(persistedState: unknown, version: num
         ],
       metronomeEnabled: typed.metronomeEnabled ?? false,
       metronomeBpm: clamp(typed.metronomeBpm ?? 72, MIN_METRONOME_BPM, MAX_METRONOME_BPM),
+      metronomeTempoMemories: normalizeMetronomeTempoMemories(typed.metronomeTempoMemories),
       metronomeVolumeDb: clamp(
         typed.metronomeVolumeDb ?? DEFAULT_METRONOME_VOLUME_DB,
         MIN_METRONOME_VOLUME_DB,
@@ -1031,6 +1037,7 @@ export const useDroneStore = create<DroneState>()(
       shine: normalizeShine(INITIAL_PRESET.shine),
       metronomeEnabled: false,
       metronomeBpm: 72,
+      metronomeTempoMemories: normalizeMetronomeTempoMemories(undefined),
       metronomeVolumeDb: DEFAULT_METRONOME_VOLUME_DB,
       metronomeMuted: false,
       metronomeSyncEnabled: false,
@@ -1521,6 +1528,16 @@ export const useDroneStore = create<DroneState>()(
       setMetronomeEnabled: (enabled) => set({ metronomeEnabled: enabled }),
       setMetronomeBpm: (bpm) =>
         set({ metronomeBpm: clamp(bpm, MIN_METRONOME_BPM, MAX_METRONOME_BPM) }),
+      setMetronomeTempoMemory: (index, bpm) =>
+        set((state) => {
+          if (index < 0 || index >= METRONOME_TEMPO_MEMORY_COUNT) {
+            return state
+          }
+          const metronomeTempoMemories = normalizeMetronomeTempoMemories(state.metronomeTempoMemories)
+          metronomeTempoMemories[index] =
+            bpm == null ? null : clamp(Math.round(bpm), MIN_METRONOME_BPM, MAX_METRONOME_BPM)
+          return { metronomeTempoMemories }
+        }),
       setMetronomeVolumeDb: (db) =>
         set({ metronomeVolumeDb: clamp(db, MIN_METRONOME_VOLUME_DB, MAX_METRONOME_VOLUME_DB) }),
       setMetronomeMuted: (muted) => set({ metronomeMuted: muted }),
@@ -2444,6 +2461,7 @@ export const useDroneStore = create<DroneState>()(
         shine: state.shine,
         metronomeEnabled: state.metronomeEnabled,
         metronomeBpm: state.metronomeBpm,
+        metronomeTempoMemories: state.metronomeTempoMemories,
         metronomeVolumeDb: state.metronomeVolumeDb,
         metronomeMuted: state.metronomeMuted,
         metronomeSyncEnabled: state.metronomeSyncEnabled,

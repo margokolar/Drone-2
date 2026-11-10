@@ -10,6 +10,33 @@ export const DEFAULT_METRONOME_BPM = 72
 export const DEFAULT_METRONOME_VOLUME_DB = -6
 export const MIN_METRONOME_BPM = 30
 export const MAX_METRONOME_BPM = 404
+export const DEFAULT_METRONOME_TEMPO_MEMORIES = [
+  40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190,
+] as const
+export const METRONOME_TEMPO_MEMORY_COUNT = DEFAULT_METRONOME_TEMPO_MEMORIES.length
+export const LEGACY_METRONOME_TEMPO_MEMORY_COUNT = 4
+export type MetronomeTempoMemory = number | null
+
+function slotFromRaw(raw: unknown, fallback: number): MetronomeTempoMemory {
+  if (raw === null) {
+    return null
+  }
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+    return fallback
+  }
+  return clamp(Math.round(raw), MIN_METRONOME_BPM, MAX_METRONOME_BPM)
+}
+
+export function normalizeMetronomeTempoMemories(value: unknown): MetronomeTempoMemory[] {
+  const incoming = Array.isArray(value) ? value : []
+  const legacyBottomRow =
+    incoming.length > 0 && incoming.length <= LEGACY_METRONOME_TEMPO_MEMORY_COUNT
+  const legacyOffset = DEFAULT_METRONOME_TEMPO_MEMORIES.length - LEGACY_METRONOME_TEMPO_MEMORY_COUNT
+  return DEFAULT_METRONOME_TEMPO_MEMORIES.map((fallback, index) => {
+    const raw = legacyBottomRow ? incoming[index - legacyOffset] : incoming[index]
+    return slotFromRaw(raw, fallback)
+  })
+}
 export const MIN_METRONOME_VOLUME_DB = -60
 export const MAX_METRONOME_VOLUME_DB = 6
 export const DEFAULT_TONE_PAN = 0
