@@ -24,7 +24,7 @@ import {
   transportTogglePlay,
 } from './audio/transportControls'
 import { buildRuntimeConfigFromStore } from './audio/runtimeConfigFromStore'
-import { activatePresetFromNavigation, activateTransportMarker, applyClickSyncForPreset, applyLoopSyncForPreset, cancelPendingLoopQuantize, playNextPresetAfterTransportMarker, stopSyncedClick, syncClickWithTransportPlayState } from './audio/presetNavigationTransport'
+import { activatePresetFromNavigation, activateTransportMarker, applyClickSyncForPreset, applyLoopSyncForPreset, cancelPendingLoopQuantize, playNextPresetAfterTransportMarker, stopSyncedClick, stopSyncedLoop, syncClickWithTransportPlayState } from './audio/presetNavigationTransport'
 import { buildPresetNavigationPickerItems, getEnabledNavigationEntries, isPresetInClickSyncSegment, isTransportMarkerKey, navigationEntryKey } from './presets/presetNavigation'
 import { nowPlayingLabels, PLAY_PAUSE_SEQUENCE_LABEL } from './utils/nowPlayingLabels'
 import { analyzeWavOvertones, integerizeAnalysisRatios, type OvertoneAnalysisResult } from './audio/overtoneAnalysis'
@@ -1319,19 +1319,31 @@ function App() {
 
   const handleLoopSyncChange = useCallback(
     (enabled: boolean) => {
-      setLoopSyncEnabled(enabled)
       const state = useDroneStore.getState()
-      if (enabled && playing && loopSlotFileName(state.loopSlots, state.activeLoopSlot)) {
-        if (state.loopMuted) {
-          setLoopMuted(false)
-        }
-        loopEngine.prepareContext()
-        loopEngine.setRepeat(state.loopRepeatBySlot[state.activeLoopSlot - 1] !== false)
-        loopEngine.playFromStart()
-        setLoopEnabled(true)
+      const presetId = state.activePresetId
+      if (!enabled) {
+        setPresetLoopSyncSlot(presetId, null)
+        setLoopSyncEnabled(false)
+        stopSyncedLoop()
+        return
+      }
+      const loaded = loadedLoopSlots(state.loopSlots)
+      const slot = loopSlotFileName(state.loopSlots, state.activeLoopSlot)
+        ? state.activeLoopSlot
+        : (loaded[0] ?? null)
+      if (slot == null) {
+        return
+      }
+      setPresetLoopSyncSlot(presetId, slot)
+      setLoopSyncEnabled(true)
+      if (
+        playing &&
+        !isTransportMarkerKey(state.activeNavigationKey, state.presetNavigation)
+      ) {
+        applyLoopSyncForPreset(presetId)
       }
     },
-    [playing, setLoopEnabled, setLoopMuted, setLoopSyncEnabled],
+    [playing, setLoopSyncEnabled, setPresetLoopSyncSlot],
   )
 
   const handleSelectLoopSlot = useCallback(
@@ -1382,11 +1394,31 @@ function App() {
     setLoopSlotFileName(slot, null)
   }, [setLoopEnabled, setLoopSlotFileName])
 
+  const disablePresetLoopSync = useCallback(
+    (presetId: string) => {
+      setPresetLoopSyncSlot(presetId, null)
+      const state = useDroneStore.getState()
+      const onThisPreset =
+        state.activePresetId === presetId &&
+        !isTransportMarkerKey(state.activeNavigationKey, state.presetNavigation)
+      if (!onThisPreset) {
+        return
+      }
+      setLoopSyncEnabled(false)
+      stopSyncedLoop()
+    },
+    [setLoopSyncEnabled, setPresetLoopSyncSlot],
+  )
+
   const handlePresetLoopSyncChange = useCallback(
     (presetId: string) => {
       const state = useDroneStore.getState()
       const preset = state.presets.find((item) => item.id === presetId)
       const next = nextLoopSyncSlot(presetLoopSyncSlot(preset), loadedLoopSlots(state.loopSlots))
+      if (next == null) {
+        disablePresetLoopSync(presetId)
+        return
+      }
       setPresetLoopSyncSlot(presetId, next)
       const onThisPreset =
         activePresetId === presetId &&
@@ -1394,18 +1426,17 @@ function App() {
       if (!onThisPreset) {
         return
       }
-      if (next != null) {
-        if (playing) {
-          applyLoopSyncForPreset(presetId)
-        }
-        return
-      }
       if (playing) {
-        loopEngine.stopFromGesture()
-        setLoopEnabled(false)
+        applyLoopSyncForPreset(presetId)
       }
     },
-    [activeNavigationKey, activePresetId, playing, setLoopEnabled, setPresetLoopSyncSlot],
+    [
+      activeNavigationKey,
+      activePresetId,
+      disablePresetLoopSync,
+      playing,
+      setPresetLoopSyncSlot,
+    ],
   )
 
   const handleHomeItemLoopSyncChange = useCallback(
@@ -1416,6 +1447,18 @@ function App() {
       handlePresetLoopSyncChange(id)
     },
     [handlePresetLoopSyncChange],
+  )
+
+  const handleHomeItemLoopSyncDisable = useCallback(
+    (id: string) => {
+      if (isTransportMarkerKey(id, useDroneStore.getState().presetNavigation)) {
+        stopSyncedLoop()
+        setLoopSyncEnabled(false)
+        return
+      }
+      disablePresetLoopSync(id)
+    },
+    [disablePresetLoopSync, setLoopSyncEnabled],
   )
 
   const activeTones = useMemo(() => tonesInToneSet.filter((tone) => tone.enabled), [tonesInToneSet])
@@ -2127,6 +2170,7 @@ function App() {
       onSelectSong={handleHomeSongSelect}
       onToggleTransportMetronomeSync={handleHomeItemMetronomeSyncChange}
       onToggleLoopSync={loopFeaturesEnabled ? handleHomeItemLoopSyncChange : undefined}
+      onDisableLoopSync={loopFeaturesEnabled ? handleHomeItemLoopSyncDisable : undefined}
       onOpenClickTab={() => {
         suppressTrailingClickAfterLongPress()
         setActiveTab('metronome')
@@ -2156,7 +2200,6 @@ function App() {
       liveLoopPlaying={loopFeaturesEnabled && loopEnabled}
       liveLoopSlot={activeLoopSlot}
       onStopLiveClick={() => handleMetronomeEnabledChange(false)}
-      onStopLiveLoop={() => handleLoopEnabledChange(false)}
     />
   )
   const iosHomeOpen = isIosApp() && homeScreenOpen

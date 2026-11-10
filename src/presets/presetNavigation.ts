@@ -1,5 +1,5 @@
 import type { Preset } from './defaultPresets'
-import { presetLoopSyncSlot } from '../audio/loopSlots'
+import { loopSlotFileName, presetLoopSyncSlot, type LoopSlotFiles } from '../audio/loopSlots'
 
 export type PresetTransportMarker = {
   kind: 'transport'
@@ -299,6 +299,33 @@ export function hasPresetLoopSync(presets: Preset[]): boolean {
 
 export function isPresetLoopSyncEnabled(presets: Preset[], presetId: string): boolean {
   return presets.some((preset) => preset.id === presetId && presetLoopSyncSlot(preset) != null)
+}
+
+/**
+ * Play/Pause starts this preset's loop only when that preset has L1–L3 on.
+ * The Repeat mark means the link is off — a loaded loop file is not enough.
+ */
+export function shouldLoopFollowTransport(options: {
+  loopFeaturesEnabled: boolean
+  activeNavigationKey: string
+  activePresetId: string
+  presetNavigation: PresetNavigationEntry[]
+  presets: Preset[]
+  loopSlots: LoopSlotFiles
+}): boolean {
+  if (!options.loopFeaturesEnabled) {
+    return false
+  }
+  if (isTransportMarkerKey(options.activeNavigationKey, options.presetNavigation)) {
+    return false
+  }
+  const slot = presetLoopSyncSlot(
+    options.presets.find((preset) => preset.id === options.activePresetId),
+  )
+  if (slot == null) {
+    return false
+  }
+  return Boolean(loopSlotFileName(options.loopSlots, slot))
 }
 
 /** Preset card highlight: falls back to activePresetId when nav key is a disabled/missing marker. */

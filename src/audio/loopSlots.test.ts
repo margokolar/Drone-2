@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeLoopSlotRepeats, withLoopSlotRepeat } from './loopSlots'
+import { nextLoopSyncSlot, normalizeLoopSlotRepeats, withLoopSlotRepeat } from './loopSlots'
 
 describe('loop slot Loop/Once flags', () => {
   it('keeps three independent flags', () => {
@@ -14,5 +14,25 @@ describe('loop slot Loop/Once flags', () => {
 
   it('changes only the chosen slot', () => {
     expect(withLoopSlotRepeat([true, true, true], 2, false)).toEqual([true, false, true])
+  })
+})
+
+describe('nextLoopSyncSlot', () => {
+  it('starts at the first loaded loop', () => {
+    expect(nextLoopSyncSlot(null, [2, 3])).toBe(2)
+  })
+
+  it('advances to the next loaded loop', () => {
+    expect(nextLoopSyncSlot(1, [1, 3])).toBe(3)
+  })
+
+  it('turns the link off after the last loaded loop', () => {
+    expect(nextLoopSyncSlot(1, [1])).toBeNull()
+    expect(nextLoopSyncSlot(3, [1, 3])).toBeNull()
+  })
+
+  it('stays off when nothing is loaded', () => {
+    expect(nextLoopSyncSlot(1, [])).toBeNull()
+    expect(nextLoopSyncSlot(null, [])).toBeNull()
   })
 })

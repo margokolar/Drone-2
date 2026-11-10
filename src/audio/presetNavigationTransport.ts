@@ -2,6 +2,7 @@ import {
   getEnabledNavigationEntries,
   isTransportMarkerKey,
   shouldClickFollowTransport,
+  shouldLoopFollowTransport,
   navigationEntryKey,
   selectNextInRing,
   selectPreviousInRing,
@@ -102,10 +103,10 @@ function resolvePlaybackLoopSlot(presetId?: string): LoopSlot | null {
   }
   const id = presetId ?? state.activePresetId
   const presetSlot = presetLoopSyncSlot(state.presets.find((preset) => preset.id === id))
-  if (presetSlot != null) {
-    return loopSlotFileName(state.loopSlots, presetSlot) ? presetSlot : null
+  if (presetSlot == null) {
+    return null
   }
-  return loopSlotFileName(state.loopSlots, state.activeLoopSlot) ? state.activeLoopSlot : null
+  return loopSlotFileName(state.loopSlots, presetSlot) ? presetSlot : null
 }
 
 function shouldLoopSyncForPreset(presetId: string): boolean {
@@ -113,11 +114,7 @@ function shouldLoopSyncForPreset(presetId: string): boolean {
 }
 
 export function shouldStartLoopWithCurrentItem(): boolean {
-  const state = useDroneStore.getState()
-  if (isTransportMarkerKey(state.activeNavigationKey, state.presetNavigation)) {
-    return false
-  }
-  return shouldLoopSyncForPreset(state.activePresetId)
+  return shouldLoopFollowTransport(useDroneStore.getState())
 }
 
 function sameLoopIsCycling(slot: LoopSlot): boolean {
@@ -169,7 +166,7 @@ function startSyncedLoop(restart: boolean, onStarted?: () => void, presetId?: st
   })
 }
 
-function stopSyncedLoop(): void {
+export function stopSyncedLoop(): void {
   loopFollowsTransport = false
   cancelPendingLoopQuantize()
   loopEngine.stopNow()

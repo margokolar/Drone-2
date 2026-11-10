@@ -1,4 +1,4 @@
-import { loopSlotLabel } from '../audio/loopSlots'
+import { loopSlotLabel, presetLoopSyncSlot } from '../audio/loopSlots'
 import { useDroneStore } from '../store/useDroneStore'
 import { LoopControls } from './LoopControls'
 import { LoopSyncButton } from './LoopSyncButton'
@@ -23,7 +23,10 @@ export function LoopPanel({
   onClearFile,
 }: LoopPanelProps) {
   const enabled = useDroneStore((state) => state.loopEnabled)
-  const syncEnabled = useDroneStore((state) => state.loopSyncEnabled)
+  const activePresetId = useDroneStore((state) => state.activePresetId)
+  const presets = useDroneStore((state) => state.presets)
+  const associatedSlot = presetLoopSyncSlot(presets.find((preset) => preset.id === activePresetId))
+  const syncEnabled = associatedSlot != null
   const activeSlot = useDroneStore((state) => state.activeLoopSlot)
   const slots = useDroneStore((state) => state.loopSlots)
   const volumeDb = useDroneStore((state) => state.loopVolumeDb)
@@ -40,13 +43,13 @@ export function LoopPanel({
       rightSlot={
         <LoopSyncButton
           enabled={syncEnabled}
-          slot={syncEnabled ? activeSlot : null}
+          slot={associatedSlot}
           onClick={() => onSyncChange(!syncEnabled)}
           inactiveClassName="border-white/15 bg-white/5 text-white/55 hover:bg-white/10"
           ariaLabel={
-            syncEnabled
-              ? `Disable loop sync with drone transport play and pause (${loopSlotLabel(activeSlot)})`
-              : 'Sync loop start and stop with drone transport play and pause'
+            syncEnabled && associatedSlot != null
+              ? `Disable loop sync for this preset (${loopSlotLabel(associatedSlot)})`
+              : 'Sync loop start and stop with this preset'
           }
         />
       }

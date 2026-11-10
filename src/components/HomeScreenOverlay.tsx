@@ -33,6 +33,7 @@ type HomeScreenOverlayProps = {
   onSelectSong: (id: string) => void
   onToggleTransportMetronomeSync?: (id: string, enabled: boolean) => void
   onToggleLoopSync?: (id: string) => void
+  onDisableLoopSync?: (id: string) => void
   onOpenClickTab?: () => void
   onOpenLoopTab?: () => void
   onOpenShineTab?: (id: string) => void
@@ -41,7 +42,6 @@ type HomeScreenOverlayProps = {
   liveLoopPlaying?: boolean
   liveLoopSlot?: LoopSlot | null
   onStopLiveClick?: () => void
-  onStopLiveLoop?: () => void
 }
 
 const boxClass =
@@ -78,6 +78,7 @@ export function HomeScreenOverlay({
   onSelectSong,
   onToggleTransportMetronomeSync,
   onToggleLoopSync,
+  onDisableLoopSync,
   onOpenClickTab,
   onOpenLoopTab,
   onOpenShineTab,
@@ -86,7 +87,6 @@ export function HomeScreenOverlay({
   liveLoopPlaying = false,
   liveLoopSlot = null,
   onStopLiveClick,
-  onStopLiveLoop,
 }: HomeScreenOverlayProps) {
   const presetListRef = useScrollActiveIntoView(presets)
   const songListRef = useScrollActiveIntoView(songs)
@@ -197,7 +197,7 @@ export function HomeScreenOverlay({
       </button>
     ) : null
   const syncLargeLoop =
-    Boolean(onToggleLoopSync) &&
+    Boolean(onDisableLoopSync ?? onToggleLoopSync) &&
     activeItem != null &&
     !activeItem.isTransport &&
     activeItem.loopSyncEnabled === true
@@ -228,18 +228,14 @@ export function HomeScreenOverlay({
             loopLongPressFiredRef.current = false
             return
           }
-          if (unsyncedLiveLoop) {
-            onStopLiveLoop?.()
-            return
-          }
-          onToggleLoopSync?.(activeItem.id)
+          onDisableLoopSync?.(activeItem.id)
         }}
         className={clsx(largeMetronomeButtonClass, 'text-emerald-100')}
         aria-pressed
         aria-label={
           unsyncedLiveLoop
             ? `Stop loop${onOpenLoopTab ? '. Long-press to open Loop.' : ''}`
-            : `Cycle loop sync for this preset${onOpenLoopTab ? '. Long-press to open Loop.' : ''}`
+            : `Disable loop sync for this preset${onOpenLoopTab ? '. Long-press to open Loop.' : ''}`
         }
       >
         {syncLargeLoop && activeItem.loopSyncSlot != null ? (

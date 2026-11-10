@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { LoopSlotFiles } from '../audio/loopSlots'
 import type { Preset } from './defaultPresets'
 import {
   getEnabledNavigationEntries,
@@ -7,6 +8,7 @@ import {
   selectNextInRing,
   selectPreviousInRing,
   shouldClickFollowTransport,
+  shouldLoopFollowTransport,
   withMirroredClickSync,
   type PresetNavigationEntry,
 } from './presetNavigation'
@@ -179,6 +181,85 @@ describe('shouldClickFollowTransport', () => {
         presets: markedPresets,
       }),
     ).toBe(true)
+  })
+})
+
+describe('shouldLoopFollowTransport', () => {
+  const nav: PresetNavigationEntry[] = [
+    { kind: 'preset', presetId: 'p1' },
+    { kind: 'transport', id: 'm1' },
+    { kind: 'preset', presetId: 'p2' },
+  ]
+  const slots: LoopSlotFiles = ['loop.wav', null, 'c.wav']
+  const linked = [
+    { ...preset('p1'), loopSyncSlot: 1 as const, loopSyncEnabled: true },
+    preset('p2'),
+    preset('p3'),
+  ]
+
+  it('does not follow when the Repeat mark is off, even if a loop file is loaded', () => {
+    expect(
+      shouldLoopFollowTransport({
+        loopFeaturesEnabled: true,
+        activeNavigationKey: 'p1',
+        activePresetId: 'p1',
+        presetNavigation: nav,
+        presets,
+        loopSlots: slots,
+      }),
+    ).toBe(false)
+  })
+
+  it('follows when this preset is linked to a loaded loop', () => {
+    expect(
+      shouldLoopFollowTransport({
+        loopFeaturesEnabled: true,
+        activeNavigationKey: 'p1',
+        activePresetId: 'p1',
+        presetNavigation: nav,
+        presets: linked,
+        loopSlots: slots,
+      }),
+    ).toBe(true)
+  })
+
+  it('does not follow a linked slot that has no file', () => {
+    expect(
+      shouldLoopFollowTransport({
+        loopFeaturesEnabled: true,
+        activeNavigationKey: 'p1',
+        activePresetId: 'p1',
+        presetNavigation: nav,
+        presets: [{ ...preset('p1'), loopSyncSlot: 2 as const, loopSyncEnabled: true }, preset('p2')],
+        loopSlots: slots,
+      }),
+    ).toBe(false)
+  })
+
+  it('does not follow while resting on a play/pause marker', () => {
+    expect(
+      shouldLoopFollowTransport({
+        loopFeaturesEnabled: true,
+        activeNavigationKey: 'm1',
+        activePresetId: 'p1',
+        presetNavigation: nav,
+        presets: linked,
+        loopSlots: slots,
+      }),
+    ).toBe(false)
+  })
+
+  it('does not follow when loop features are off', () => {
+    expect(
+      shouldLoopFollowTransport({
+        loopFeaturesEnabled: false,
+        activeNavigationKey: 'p1',
+        activePresetId: 'p1',
+        presetNavigation: nav,
+        presets: linked,
+        loopSlots: slots,
+      }),
+    ).toBe(false)
   })
 })
 
