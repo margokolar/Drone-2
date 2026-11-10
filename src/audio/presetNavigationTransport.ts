@@ -55,6 +55,12 @@ function startSyncedClick(): void {
   }
   metronomeEngine.prepareContext()
   state.setMetronomeEnabled(true)
+  void metronomeEngine.setConfig({
+    enabled: true,
+    bpm: state.metronomeBpm,
+    volumeDb: state.metronomeVolumeDb,
+    muted: false,
+  })
 }
 
 export function stopSyncedClick(): void {

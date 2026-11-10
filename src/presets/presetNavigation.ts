@@ -274,8 +274,8 @@ export function isPresetClickSyncEnabled(
 
 /**
  * Click tab / play-marker SYNC is the master switch. Play/Pause then starts
- * and stops the click on a sounding preset. A gray preset metronome is an
- * opt-out for that one preset only.
+ * and stops the click on a sounding preset. Resting on a play/pause marker
+ * keeps the click off until Play advances to the next drone.
  */
 export function shouldClickFollowTransport(options: {
   metronomeSyncEnabled: boolean
@@ -289,14 +289,6 @@ export function shouldClickFollowTransport(options: {
   }
   if (isTransportMarkerKey(options.activeNavigationKey, options.presetNavigation)) {
     return false
-  }
-  if (
-    hasTransportClickSync(options.presetNavigation) &&
-    isPresetInClickSyncSegment(options.presetNavigation, options.activePresetId)
-  ) {
-    return isPresetClickSyncOn(
-      options.presets.find((preset) => preset.id === options.activePresetId),
-    )
   }
   return true
 }

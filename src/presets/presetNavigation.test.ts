@@ -145,7 +145,7 @@ describe('shouldClickFollowTransport', () => {
     ).toBe(true)
   })
 
-  it('does not follow a gray preset metronome after a synced play/pause marker', () => {
+  it('still follows Play/Pause when a later preset in the segment had click turned off', () => {
     expect(
       shouldClickFollowTransport({
         metronomeSyncEnabled: true,
@@ -153,6 +153,18 @@ describe('shouldClickFollowTransport', () => {
         activePresetId: 'p2',
         presetNavigation: markerNav,
         presets: [{ ...preset('p1'), metronomeSyncEnabled: true }, { ...preset('p2'), metronomeSyncEnabled: false }, preset('p3')],
+      }),
+    ).toBe(true)
+  })
+
+  it('does not follow while resting on a play/pause marker', () => {
+    expect(
+      shouldClickFollowTransport({
+        metronomeSyncEnabled: true,
+        activeNavigationKey: 'm1',
+        activePresetId: 'p1',
+        presetNavigation: markerNav,
+        presets: markedPresets,
       }),
     ).toBe(false)
   })
