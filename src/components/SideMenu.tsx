@@ -81,7 +81,7 @@ export function SideMenu({
       />
       <aside
         ref={sideMenuRef}
-        className="fixed left-0 top-0 z-50 flex h-full w-[280px] flex-col border-r border-white/10 bg-[#1a1825] p-4 shadow-2xl"
+        className="fixed left-0 top-0 z-50 flex h-full w-[280px] flex-col border-r border-white/10 bg-[#1a1825] p-4 shadow-2xl ios-app:pt-[calc(env(safe-area-inset-top,0px)+1rem)]"
         onClick={(event) => {
           const target = event.target as HTMLElement | null
           const interactiveAncestor = target?.closest(
