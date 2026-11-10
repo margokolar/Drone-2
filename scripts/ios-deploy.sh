@@ -34,7 +34,9 @@ candidates = []
 for d in devices:
     hw = d.get("hardwareProperties", {})
     conn = d.get("connectionProperties", {})
-    if hw.get("reality") != "physical":
+    # Newer Xcode omits reality="physical" for a real iPhone (it is null).
+    # Only skip simulators.
+    if hw.get("reality") == "simulated":
         continue
     if hw.get("platform") != "iOS":
         continue
@@ -51,6 +53,28 @@ if candidates:
     print(candidates[0][2])
 EOF
   rm -f "$device_json"
+}
+
+phone_tunnel_connected() {
+  local udid="$1"
+  local device_json
+  device_json=$(mktemp)
+  xcrun devicectl list devices --json-output "$device_json" >/dev/null
+  python3 - "$device_json" "$udid" <<'EOF'
+import json, sys
+wanted = sys.argv[2]
+data = json.load(open(sys.argv[1]))
+for d in data.get("result", {}).get("devices", []):
+    hw = d.get("hardwareProperties", {})
+    conn = d.get("connectionProperties", {})
+    identifier = hw.get("udid") or d.get("identifier", "")
+    if identifier == wanted and conn.get("tunnelState") == "connected":
+        sys.exit(0)
+sys.exit(1)
+EOF
+  local ok=$?
+  rm -f "$device_json"
+  return "$ok"
 }
 
 app_is_on_phone() {
@@ -90,6 +114,27 @@ UDID="$(find_phone_udid)"
 if [ -n "$UDID" ]; then
   DESTINATION="id=$UDID"
   echo "    Device: $UDID"
+  xcrun devicectl device info details --device "$UDID" >/dev/null 2>&1 || true
+  if ! phone_tunnel_connected "$UDID"; then
+    echo "    Phone is plugged in but asleep — unlock it and keep the screen on."
+    waited=0
+    while [ "$waited" -lt 90 ]; do
+      sleep 3
+      waited=$((waited + 3))
+      if phone_tunnel_connected "$UDID"; then
+        echo "    Phone is ready."
+        break
+      fi
+      echo "    Still waiting for the phone ($waited s)..."
+    done
+    if ! phone_tunnel_connected "$UDID"; then
+      if [ "$REQUIRE_INSTALL" = "1" ]; then
+        echo "ERROR: iPhone stayed asleep. Unlock it, leave the screen on, and re-run."
+        exit 1
+      fi
+      echo "    Phone still not ready — install may fail."
+    fi
+  fi
 else
   DESTINATION="generic/platform=iOS"
   if [ "$REQUIRE_INSTALL" = "1" ]; then
@@ -114,6 +159,7 @@ xcodebuild \
   -derivedDataPath "$DERIVED_DATA" \
   -allowProvisioningUpdates \
   SWIFT_OPTIMIZATION_LEVEL=-O \
+  CURRENT_PROJECT_VERSION="$(date +%Y%m%d%H%M)" \
   build
 
 APP_PATH="$DERIVED_DATA/Build/Products/Debug-iphoneos/App.app"
