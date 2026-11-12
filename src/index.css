@@ -161,15 +161,13 @@ select {
 }
 
 .ios-app .home-screen-overlay .home-screen-preset-name {
-  font-size: 5.2rem;
-  height: 1.5em;
-  overflow: visible;
+  font-size: 4.6rem;
+  height: 1.12em;
 }
 
 .ios-app .home-screen-overlay .home-screen-preset-name .truncate {
   display: block;
-  line-height: 1.5;
-  padding-bottom: 0.05em;
+  line-height: 1.12;
 }
 
 .title-bar-icon {
