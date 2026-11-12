@@ -160,6 +160,11 @@ select {
   display: contents;
 }
 
+.ios-app .home-screen-overlay .home-screen-preset-name {
+  font-size: 5.2rem;
+  height: 1.12em;
+}
+
 .title-bar-icon {
   box-sizing: border-box;
   width: 2.5rem;
