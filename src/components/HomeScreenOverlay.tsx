@@ -264,7 +264,7 @@ export function HomeScreenOverlay({
             </div>
           ) : (
             <div className="flex h-full min-w-0 items-center justify-center gap-[0.18em]">
-              <div className="min-w-0 truncate text-center font-bold leading-none tracking-tight">
+              <div className="min-w-0 truncate text-center font-bold leading-none tracking-tight ios-app:leading-[1.5]">
                 {presetTitle}
               </div>
               {largeShineButton}
