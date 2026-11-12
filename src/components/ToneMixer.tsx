@@ -345,7 +345,7 @@ export function ToneMixer({
             <button
               type="button"
               className={clsx(
-                'button-safe flex h-9 w-full items-center justify-center rounded-lg border px-2 tracking-[0.12em] transition',
+                'button-safe flex h-9 w-full items-center justify-center rounded-lg border px-2 tracking-[0.12em] transition ios-app:h-10 ios-app:px-2.5 ios-app:tracking-normal',
                 strictSolo
                   ? 'border-amber-300/70 bg-amber-300/30 text-amber-50 shadow-[0_0_18px_rgba(251,191,36,0.28)] hover:bg-amber-300/40'
                   : 'border-fuchsia-300/50 bg-fuchsia-300/20 text-fuchsia-50 shadow-[0_0_18px_rgba(240,171,252,0.16)] hover:bg-fuchsia-300/30',

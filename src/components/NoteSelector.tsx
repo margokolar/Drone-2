@@ -22,7 +22,7 @@ type NoteSelectorProps = {
 }
 
 const TONE_BUTTON_CLASS =
-  'flex min-h-[36px] min-w-0 items-center justify-center rounded-md border px-1 py-1.5 transition'
+  'flex min-h-[36px] min-w-0 items-center justify-center rounded-md border px-1 py-1.5 transition ios-app:min-h-10 ios-app:px-1.5 ios-app:py-2'
 const SOLO_LONG_PRESS_MS = 800
 
 function ToneButton({
@@ -179,7 +179,7 @@ export function NoteSelector({
                     shineActive ? 'Stop Shine. Long-press to open Shine card.' : 'Start Shine. Long-press to open Shine card.'
                   }
                   className={clsx(
-                    'col-span-2 flex min-h-[36px] min-w-0 items-center justify-center rounded-md border px-1 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] transition',
+                    'col-span-2 flex min-h-[36px] min-w-0 items-center justify-center rounded-md border px-1 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] transition ios-app:min-h-10',
                     shineActive
                       ? 'border-fuchsia-300/70 bg-fuchsia-300/20 text-fuchsia-100'
                       : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10',

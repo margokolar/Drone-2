@@ -7,7 +7,7 @@ type ToneLabelProps = {
   className?: string
 }
 
-const toneLabelBaseClass = 'text-base font-bold leading-none tracking-[0.03em]'
+const toneLabelBaseClass = 'text-base font-bold leading-none tracking-[0.03em] ios-app:leading-snug'
 const toneLabelOctaveClass = 'tone-label-octave'
 
 export function ToneLabel({ noteId, labelOverride, className }: ToneLabelProps) {

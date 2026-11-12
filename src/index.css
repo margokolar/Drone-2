@@ -177,11 +177,11 @@ select {
 }
 
 .ios-app .tone-mixer-channel {
-  width: 5.5rem;
+  width: 6rem;
 }
 
 .ios-app .tone-mixer-channel--expanded {
-  width: 7.25rem;
+  width: 7.75rem;
 }
 
 .ios-app .tone-mixer-fader-vertical {

@@ -26,8 +26,8 @@ export function PresetSongPickers({
   onSelectSong,
 }: PresetSongPickersProps) {
   return (
-    <div className="mx-auto mt-3 grid max-w-[26.5rem] grid-cols-2 gap-3 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem]">
-      <article className="relative min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/55 p-3 shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-sm">
+    <div className="mx-auto mt-3 grid max-w-[26.5rem] grid-cols-2 gap-3 landscape:mt-0 max-h-[500px]:mt-0 md:max-w-[62.5rem] ios-app:max-w-[28rem] ios-app:gap-3.5">
+      <article className="relative min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/55 p-3 shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-sm ios-app:p-3.5">
         <div className="mb-2 flex min-h-8 items-center gap-2">
           <h2 className="min-w-0 flex-1 text-xs uppercase tracking-[0.16em] text-white/60">
             Preset
@@ -51,9 +51,10 @@ export function PresetSongPickers({
           appearance="select"
           accent="amber"
           openAriaLabel="Open preset list"
+          triggerClassName="ios-app:min-h-11 ios-app:px-2.5 ios-app:leading-snug"
         />
       </article>
-      <article className="relative min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/55 p-3 shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-sm">
+      <article className="relative min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/55 p-3 shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-sm ios-app:p-3.5">
         <div className="mb-2 flex min-h-8 items-center gap-2">
           <h2 className="min-w-0 flex-1 text-xs uppercase tracking-[0.16em] text-white/60">
             Song
@@ -67,6 +68,7 @@ export function PresetSongPickers({
           accent="cyan"
           dropdownAlign="end"
           openAriaLabel="Open song list"
+          triggerClassName="ios-app:min-h-11 ios-app:px-2.5 ios-app:leading-snug"
         />
       </article>
     </div>

@@ -273,9 +273,9 @@ export function isPresetClickSyncEnabled(
 }
 
 /**
- * Click tab / play-marker SYNC is the master switch. Play/Pause then starts
- * and stops the click on a sounding preset. Resting on a play/pause marker
- * keeps the click off until Play advances to the next drone.
+ * Click tab SYNC is the master switch. A grey metronome on this preset
+ * keeps Play/Pause from starting the click. Resting on a play/pause marker
+ * also keeps the click off until Play advances to the next drone.
  */
 export function shouldClickFollowTransport(options: {
   metronomeSyncEnabled: boolean
@@ -290,7 +290,7 @@ export function shouldClickFollowTransport(options: {
   if (isTransportMarkerKey(options.activeNavigationKey, options.presetNavigation)) {
     return false
   }
-  return true
+  return isPresetClickSyncOn(options.presets.find((preset) => preset.id === options.activePresetId))
 }
 
 export function hasPresetLoopSync(presets: Preset[]): boolean {
