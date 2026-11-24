@@ -41,16 +41,12 @@ export function syncTransportPaused(): void {
   }
 }
 
-/** True after click was started because a play/pause marker (or global SYNC) coupled it to playback. */
-let clickFollowsTransport = false
-
 function shouldStartClickWithCurrentItem(): boolean {
   return shouldClickFollowTransport(useDroneStore.getState())
 }
 
 function startSyncedClick(): void {
   const state = useDroneStore.getState()
-  clickFollowsTransport = true
   if (state.metronomeMuted) {
     state.setMetronomeMuted(false)
   }
@@ -65,14 +61,12 @@ function startSyncedClick(): void {
 }
 
 export function stopSyncedClick(): void {
-  clickFollowsTransport = false
   metronomeEngine.stopFromGesture()
   useDroneStore.getState().setMetronomeEnabled(false)
 }
 
 function applyClickSyncForTransport(playing: boolean): void {
   if (!useDroneStore.getState().metronomeSyncEnabled) {
-    clickFollowsTransport = false
     return
   }
   if (playing) {
@@ -211,7 +205,6 @@ function startPresetPlayback(config: DroneRuntimeConfig): void {
 /** Transport play/pause button and remotes: keep click in step when Click tab SYNC is on. */
 export function syncClickWithTransportPlayState(playing: boolean): void {
   if (!useDroneStore.getState().metronomeSyncEnabled) {
-    clickFollowsTransport = false
     return
   }
   if (playing) {
