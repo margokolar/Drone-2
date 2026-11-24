@@ -216,15 +216,10 @@ export function syncClickWithTransportPlayState(playing: boolean): void {
   }
   if (playing) {
     if (!shouldStartClickWithCurrentItem()) {
-      if (clickFollowsTransport) {
-        stopSyncedClick()
-      }
+      stopSyncedClick()
       return
     }
     startSyncedClick()
-    return
-  }
-  if (!shouldStartClickWithCurrentItem() && !clickFollowsTransport) {
     return
   }
   stopSyncedClick()
